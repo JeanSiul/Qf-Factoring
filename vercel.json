@@ -1,8 +1,32 @@
 {
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "https://lissa-unfloatable-seditiously.ngrok-free.dev/:path*"
+      "source": "/api/webhook/canales/:accion",
+      "destination": "https://lissa-unfloatable-seditiously.ngrok-free.dev/webhook/canales/:accion"
+    },
+    {
+      "source": "/api/webhook/destinatarios/:accion",
+      "destination": "https://lissa-unfloatable-seditiously.ngrok-free.dev/webhook/destinatarios/:accion"
+    },
+    {
+      "source": "/api/webhook/procesos/:accion",
+      "destination": "https://lissa-unfloatable-seditiously.ngrok-free.dev/webhook/procesos/:accion"
+    },
+    {
+      "source": "/api/webhook/asignaciones/:accion",
+      "destination": "https://lissa-unfloatable-seditiously.ngrok-free.dev/webhook/asignaciones/:accion"
+    },
+    {
+      "source": "/api/webhook/cola/:accion",
+      "destination": "https://lissa-unfloatable-seditiously.ngrok-free.dev/webhook/cola/:accion"
+    },
+    {
+      "source": "/api/webhook/qf/:path*",
+      "destination": "https://lissa-unfloatable-seditiously.ngrok-free.dev/webhook/qf/:path*"
+    },
+    {
+      "source": "/api/webhook/:path*",
+      "destination": "https://lissa-unfloatable-seditiously.ngrok-free.dev/webhook/:path*"
     },
     {
       "source": "/(.*)",
