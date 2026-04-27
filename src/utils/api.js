@@ -1,8 +1,8 @@
-// Cambia esta URL por la URL de tu n8n (ngrok o cloudflare tunnel)
-export const N8N_BASE_URL = import.meta.env.VITE_N8N_URL || 'https://export-travelers-hawk-personal.trycloudflare.com'
+export const N8N_BASE_URL = window.__N8N_URL__ || 'https://lissa-unfloatable-seditiously.ngrok-free.dev'
 
 export const apiCall = async (endpoint, options = {}) => {
-  const url = `${N8N_BASE_URL}/webhook${endpoint}`
+  const baseUrl = window.__N8N_URL__ || N8N_BASE_URL
+  const url = `${baseUrl}/webhook${endpoint}`
   const response = await fetch(url, {
     headers: {
       'Content-Type': 'application/json',
