@@ -4,6 +4,11 @@ import { useToast } from '../hooks/useToast'
 import ToastContainer from '../components/ToastContainer'
 
 const ModalUsuario = ({ usuario, roles, onClose, onSave }) => {
+  // Parsear roleIdsStr → array de IDs
+  const rolesIniciales = usuario?.roleIdsStr
+    ? usuario.roleIdsStr.split(',').map(r => r.trim()).filter(Boolean)
+    : (usuario?.roles || [])
+
   const [form, setForm] = useState({
     id: usuario?.id || '',
     nombres: usuario?.nombres || '',
@@ -13,7 +18,7 @@ const ModalUsuario = ({ usuario, roles, onClose, onSave }) => {
     estado: usuario?.estado ?? 1,
     password: '',
     confirmarPassword: '',
-    roles: usuario?.roles || [],
+    roles: rolesIniciales,
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -91,24 +96,50 @@ const ModalUsuario = ({ usuario, roles, onClose, onSave }) => {
               <option value={0}>Inactivo</option>
             </select>
           </div>
+
+          {/* ROLES */}
           <div className="form-group">
-            <label className="form-label">Roles</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '10px', background: 'var(--qf-gray)', borderRadius: 'var(--qf-radius)', border: '1.5px solid var(--qf-border)' }}>
-              {roles.map(r => (
-                <label key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '4px 10px', borderRadius: 20, background: form.roles.includes(r.id) ? 'var(--qf-navy)' : 'white', color: form.roles.includes(r.id) ? 'white' : 'var(--qf-text)', border: '1.5px solid', borderColor: form.roles.includes(r.id) ? 'var(--qf-navy)' : 'var(--qf-border)', fontSize: 12, fontWeight: 500, transition: 'all 0.15s' }}>
-                  <input type="checkbox" checked={form.roles.includes(r.id)} onChange={() => toggleRole(r.id)} style={{ display: 'none' }} />
-                  {r.name || r.descripcion}
-                </label>
-              ))}
+            <label className="form-label">
+              Roles
+              {form.roles.length > 0 && (
+                <span style={{ marginLeft: 8, background: 'var(--qf-navy)', color: '#fff', borderRadius: 20, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>
+                  {form.roles.length} seleccionado{form.roles.length > 1 ? 's' : ''}
+                </span>
+              )}
+            </label>
+            <div style={{
+              display: 'flex', flexWrap: 'wrap', gap: 8, padding: '10px',
+              background: 'var(--qf-gray)', borderRadius: 'var(--qf-radius)',
+              border: '1.5px solid var(--qf-border)', maxHeight: 160, overflowY: 'auto'
+            }}>
+              {roles.map(r => {
+                const selected = form.roles.includes(r.id)
+                return (
+                  <label key={r.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
+                    padding: '4px 10px', borderRadius: 20,
+                    background: selected ? 'var(--qf-navy)' : 'white',
+                    color: selected ? 'white' : 'var(--qf-text)',
+                    border: '1.5px solid',
+                    borderColor: selected ? 'var(--qf-navy)' : 'var(--qf-border)',
+                    fontSize: 12, fontWeight: 500, transition: 'all 0.15s',
+                    userSelect: 'none',
+                  }}>
+                    <input type="checkbox" checked={selected} onChange={() => toggleRole(r.id)} style={{ display: 'none' }} />
+                    {selected ? '✓ ' : ''}{r.name}
+                  </label>
+                )
+              })}
               {roles.length === 0 && <span style={{ fontSize: 12, color: 'var(--qf-text-light)' }}>Cargando roles...</span>}
             </div>
           </div>
+
           {error && <div style={{ background: '#fce4e4', color: '#c62828', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 8 }}>⚠️ {error}</div>}
         </div>
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
           <button className="btn btn-primary" onClick={handleSubmit} disabled={loading}>
-            {loading ? <><span className="spinner"/>Guardando...</> : isEdit ? '💾 Actualizar' : '➕ Crear Usuario'}
+            {loading ? <><span className="spinner" />Guardando...</> : isEdit ? '💾 Actualizar' : '➕ Crear Usuario'}
           </button>
         </div>
       </div>
@@ -145,18 +176,18 @@ const ModalPassword = ({ usuario, onClose, onSave }) => {
           <p style={{ fontSize: 13, color: 'var(--qf-text-light)', marginBottom: 16 }}>Usuario: <strong>{usuario.userName}</strong></p>
           <div className="form-group">
             <label className="form-label">Nueva Contraseña</label>
-            <input className="form-control" type="password" value={form.password} onChange={e => setForm(f => ({...f, password: e.target.value}))} placeholder="Mínimo 6 caracteres" />
+            <input className="form-control" type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="Mínimo 6 caracteres" />
           </div>
           <div className="form-group">
             <label className="form-label">Confirmar Contraseña</label>
-            <input className="form-control" type="password" value={form.confirmar} onChange={e => setForm(f => ({...f, confirmar: e.target.value}))} placeholder="Repetir contraseña" />
+            <input className="form-control" type="password" value={form.confirmar} onChange={e => setForm(f => ({ ...f, confirmar: e.target.value }))} placeholder="Repetir contraseña" />
           </div>
           {error && <div style={{ background: '#fce4e4', color: '#c62828', borderRadius: 8, padding: '10px 14px', fontSize: 13 }}>⚠️ {error}</div>}
         </div>
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
           <button className="btn btn-warning" onClick={handleSubmit} disabled={loading}>
-            {loading ? <><span className="spinner" style={{borderTopColor:'#333'}}/>Guardando...</> : '🔑 Cambiar'}
+            {loading ? <><span className="spinner" style={{ borderTopColor: '#333' }} />Guardando...</> : '🔑 Cambiar'}
           </button>
         </div>
       </div>
@@ -169,7 +200,7 @@ const UsuariosPage = () => {
   const [roles, setRoles] = useState([])
   const [loading, setLoading] = useState(true)
   const [filtro, setFiltro] = useState('')
-  const [modal, setModal] = useState(null) // null | {type: 'new'|'edit'|'password'|'delete', data?}
+  const [modal, setModal] = useState(null)
   const { toasts, show } = useToast()
 
   const cargar = async () => {
@@ -238,7 +269,7 @@ const UsuariosPage = () => {
 
         <div style={{ overflowX: 'auto' }}>
           {loading ? (
-            <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner dark"/></div>
+            <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner dark" /></div>
           ) : filtrados.length === 0 ? (
             <div className="empty-state"><div className="icon">👤</div><p>No se encontraron usuarios</p></div>
           ) : (
@@ -255,27 +286,36 @@ const UsuariosPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {filtrados.map(u => (
-                  <tr key={u.id}>
-                    <td><strong style={{ color: 'var(--qf-navy)' }}>{u.userName}</strong></td>
-                    <td>{u.nombres}</td>
-                    <td>{u.apellidos}</td>
-                    <td style={{ color: 'var(--qf-text-light)', fontSize: 12 }}>{u.email || '—'}</td>
-                    <td><span className={`badge ${u.estado === 1 ? 'active' : 'inactive'}`}>{u.estado === 1 ? 'Activo' : 'Inactivo'}</span></td>
-                    <td style={{ fontSize: 12 }}>
-                      {u.roles?.length > 0 ? u.roles.map(r => (
-                        <span key={r} style={{ display: 'inline-block', background: '#e8eef5', color: 'var(--qf-navy)', borderRadius: 4, padding: '2px 7px', marginRight: 4, marginBottom: 2, fontSize: 11, fontWeight: 600 }}>{r}</span>
-                      )) : '—'}
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-                        <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'edit', data: u })} title="Editar">✏️</button>
-                        <button className="btn btn-warning btn-sm" onClick={() => setModal({ type: 'password', data: u })} title="Cambiar contraseña">🔑</button>
-                        <button className="btn btn-danger btn-sm" onClick={() => setModal({ type: 'delete', data: u })} title="Eliminar">🗑️</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {filtrados.map(u => {
+                  // Parsear rolesStr para mostrar en tabla
+                  const rolesArr = u.rolesStr ? u.rolesStr.split(',').map(r => r.trim()).filter(Boolean) : []
+                  return (
+                    <tr key={u.id}>
+                      <td><strong style={{ color: 'var(--qf-navy)' }}>{u.userName}</strong></td>
+                      <td>{u.nombres}</td>
+                      <td>{u.apellidos}</td>
+                      <td style={{ color: 'var(--qf-text-light)', fontSize: 12 }}>{u.email || '—'}</td>
+                      <td><span className={`badge ${u.estado === 1 ? 'active' : 'inactive'}`}>{u.estado === 1 ? 'Activo' : 'Inactivo'}</span></td>
+                      <td style={{ fontSize: 12 }}>
+                        {rolesArr.length > 0 ? rolesArr.map(r => (
+                          <span key={r} style={{
+                            display: 'inline-block', background: '#e8eef5',
+                            color: 'var(--qf-navy)', borderRadius: 4,
+                            padding: '2px 7px', marginRight: 4, marginBottom: 2,
+                            fontSize: 11, fontWeight: 600
+                          }}>{r}</span>
+                        )) : '—'}
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                          <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'edit', data: u })} title="Editar">✏️</button>
+                          <button className="btn btn-warning btn-sm" onClick={() => setModal({ type: 'password', data: u })} title="Cambiar contraseña">🔑</button>
+                          <button className="btn btn-danger btn-sm" onClick={() => setModal({ type: 'delete', data: u })} title="Eliminar">🗑️</button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           )}
