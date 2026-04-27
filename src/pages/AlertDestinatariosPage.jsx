@@ -86,7 +86,7 @@ const AlertDestinatariosPage = () => {
   const cargar = async () => {
     setLoading(true)
     try {
-      const res = await apiCall('/webhook/destinatarios/listar')
+      const res = await apiCall('/destinatarios/listar')
       setDestinatarios(Array.isArray(res) ? res : [])
     } catch (e) {
       show('Error al cargar destinatarios: ' + e.message, 'error')
