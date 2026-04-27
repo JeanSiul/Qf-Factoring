@@ -73,7 +73,7 @@ const AlertCanalesPage = () => {
   const cargar = async () => {
     setLoading(true)
     try {
-      const res = await apiCall('/webhook/canales/listar')
+      const res = await apiCall('/canales/listar')
       setCanales(Array.isArray(res) ? res : [])
     } catch (e) {
       show('Error al cargar canales: ' + e.message, 'error')
