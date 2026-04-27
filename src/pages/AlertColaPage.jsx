@@ -13,7 +13,7 @@ const AlertColaPage = () => {
   const cargar = async () => {
     setLoading(true)
     try {
-      const res = await apiCall('/webhook/cola/listar')
+      const res = await apiCall('/cola/listar')
       setCola(Array.isArray(res) ? res : [])
     } catch (e) {
       show('Error al cargar cola: ' + e.message, 'error')
