@@ -78,7 +78,7 @@ const AlertProcesosPage = () => {
   const cargar = async () => {
     setLoading(true)
     try {
-      const res = await apiCall('/webhook/procesos/listar')
+      const res = await apiCall('/procesos/listar')
       setProcesos(Array.isArray(res) ? res : [])
     } catch (e) {
       show('Error al cargar procesos: ' + e.message, 'error')
