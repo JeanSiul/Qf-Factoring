@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import QFLogo from './QFLogo'
 
 const menuItems = [
   { icon: '📊', label: 'Dashboard', path: '/dashboard' },
@@ -12,13 +11,23 @@ const menuItems = [
       { icon: '🏷️', label: 'Roles', path: '/roles' },
     ]
   },
+  {
+    icon: '🔔', label: 'Alertas', path: null,
+    children: [
+      { icon: '📡', label: 'Canales', path: '/alertas/canales' },
+      { icon: '👤', label: 'Destinatarios', path: '/alertas/destinatarios' },
+      { icon: '⚙️', label: 'Procesos', path: '/alertas/procesos' },
+      { icon: '🔗', label: 'Asignaciones', path: '/alertas/asignaciones' },
+      { icon: '📬', label: 'Cola de envíos', path: '/alertas/cola' },
+    ]
+  },
 ]
 
 const Sidebar = ({ mobileOpen, onClose }) => {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [expanded, setExpanded] = useState({ '🔐': true })
+  const [expanded, setExpanded] = useState({ '🔐': true, '🔔': false })
 
   const handleNav = (path) => {
     navigate(path)
@@ -30,14 +39,15 @@ const Sidebar = ({ mobileOpen, onClose }) => {
   }
 
   const isActive = (path) => location.pathname === path
+  const isGroupActive = (children) => children?.some(c => location.pathname === c.path)
 
   return (
     <>
       {/* Mobile overlay */}
       {mobileOpen && (
         <div onClick={onClose} style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 99, display: 'none'
-        }} className="mobile-overlay" />
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 99,
+        }} />
       )}
 
       <aside style={{
@@ -67,12 +77,16 @@ const Sidebar = ({ mobileOpen, onClose }) => {
                     onClick={() => toggleMenu(item.icon)}
                     style={{
                       ...styles.navItem,
-                      ...(expanded[item.icon] ? styles.navItemExpanded : {})
+                      ...(expanded[item.icon] || isGroupActive(item.children) ? styles.navItemExpanded : {})
                     }}
                   >
                     <span style={styles.navIcon}>{item.icon}</span>
                     <span style={styles.navLabel}>{item.label}</span>
-                    <span style={{ marginLeft: 'auto', fontSize: 11, opacity: 0.7, transition: 'transform 0.2s', transform: expanded[item.icon] ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
+                    <span style={{
+                      marginLeft: 'auto', fontSize: 11, opacity: 0.7,
+                      transition: 'transform 0.2s',
+                      transform: expanded[item.icon] ? 'rotate(180deg)' : 'rotate(0)'
+                    }}>▼</span>
                   </button>
                   {expanded[item.icon] && (
                     <div style={styles.subMenu}>
@@ -88,7 +102,7 @@ const Sidebar = ({ mobileOpen, onClose }) => {
                         >
                           <span style={styles.navIcon}>{child.icon}</span>
                           <span style={styles.navLabel}>{child.label}</span>
-                          {isActive(child.path) && <span style={styles.activeDot}/>}
+                          {isActive(child.path) && <span style={styles.activeDot} />}
                         </button>
                       ))}
                     </div>
@@ -104,7 +118,7 @@ const Sidebar = ({ mobileOpen, onClose }) => {
                 >
                   <span style={styles.navIcon}>{item.icon}</span>
                   <span style={styles.navLabel}>{item.label}</span>
-                  {isActive(item.path) && <span style={styles.activeDot}/>}
+                  {isActive(item.path) && <span style={styles.activeDot} />}
                 </button>
               )}
             </div>
@@ -135,8 +149,7 @@ const styles = {
     flexDirection: 'column',
     height: '100vh',
     position: 'fixed',
-    left: 0,
-    top: 0,
+    left: 0, top: 0,
     zIndex: 100,
     boxShadow: '2px 0 12px rgba(0,0,0,0.15)',
   },
@@ -145,125 +158,66 @@ const styles = {
     borderBottom: '1px solid rgba(255,255,255,0.1)',
   },
   logoIcon: {
-    width: 38,
-    height: 38,
+    width: 38, height: 38,
     background: 'rgba(255,255,255,0.15)',
     borderRadius: 10,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
     flexShrink: 0,
   },
   logoText: {
-    fontFamily: 'Montserrat',
-    fontWeight: 700,
-    fontSize: 14,
-    color: 'white',
-    lineHeight: 1.2,
+    fontFamily: 'Montserrat', fontWeight: 700, fontSize: 14,
+    color: 'white', lineHeight: 1.2,
   },
   logoSub: {
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.55)',
-    marginTop: 1,
+    fontSize: 10, color: 'rgba(255,255,255,0.55)', marginTop: 1,
   },
   nav: {
-    flex: 1,
-    padding: '12px 0',
-    overflowY: 'auto',
+    flex: 1, padding: '12px 0', overflowY: 'auto',
   },
   navItem: {
-    width: '100%',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    padding: '10px 16px',
-    background: 'none',
-    border: 'none',
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 13.5,
-    fontFamily: 'Inter',
-    fontWeight: 400,
-    cursor: 'pointer',
-    transition: 'all 0.15s',
-    textAlign: 'left',
-    position: 'relative',
+    width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+    padding: '10px 16px', background: 'none', border: 'none',
+    color: 'rgba(255,255,255,0.7)', fontSize: 13.5,
+    fontFamily: 'Inter', fontWeight: 400,
+    cursor: 'pointer', transition: 'all 0.15s',
+    textAlign: 'left', position: 'relative',
   },
   navItemActive: {
-    background: 'rgba(255,255,255,0.12)',
-    color: 'white',
-    fontWeight: 600,
+    background: 'rgba(255,255,255,0.12)', color: 'white', fontWeight: 600,
   },
-  navItemExpanded: {
-    color: 'white',
-  },
-  subMenu: {
-    background: 'rgba(0,0,0,0.15)',
-  },
-  subItem: {
-    paddingLeft: 36,
-    fontSize: 13,
-  },
-  navIcon: {
-    fontSize: 16,
-    width: 20,
-    textAlign: 'center',
-    flexShrink: 0,
-  },
-  navLabel: {
-    flex: 1,
-  },
+  navItemExpanded: { color: 'white' },
+  subMenu: { background: 'rgba(0,0,0,0.15)' },
+  subItem: { paddingLeft: 36, fontSize: 13 },
+  navIcon: { fontSize: 16, width: 20, textAlign: 'center', flexShrink: 0 },
+  navLabel: { flex: 1 },
   activeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: '50%',
-    background: '#4CAF50',
-    flexShrink: 0,
+    width: 6, height: 6, borderRadius: '50%',
+    background: '#4CAF50', flexShrink: 0,
   },
   userArea: {
     padding: '14px 16px',
     borderTop: '1px solid rgba(255,255,255,0.1)',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
+    display: 'flex', alignItems: 'center', gap: 10,
   },
   userAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: '50%',
+    width: 34, height: 34, borderRadius: '50%',
     background: 'linear-gradient(135deg, #2D6A9F, #4CAF50)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: 'white',
-    fontWeight: 700,
-    fontSize: 14,
-    fontFamily: 'Montserrat',
-    flexShrink: 0,
-    textTransform: 'uppercase',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    color: 'white', fontWeight: 700, fontSize: 14,
+    fontFamily: 'Montserrat', flexShrink: 0, textTransform: 'uppercase',
   },
   userName: {
-    fontSize: 12,
-    color: 'white',
-    fontWeight: 600,
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
+    fontSize: 12, color: 'white', fontWeight: 600,
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
   },
   userRole: {
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.5)',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
+    fontSize: 10, color: 'rgba(255,255,255,0.5)',
+    textTransform: 'uppercase', letterSpacing: 0.3,
   },
   logoutBtn: {
-    background: 'none',
-    border: 'none',
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 18,
-    cursor: 'pointer',
-    padding: 4,
-    flexShrink: 0,
-    transition: 'color 0.15s',
+    background: 'none', border: 'none',
+    color: 'rgba(255,255,255,0.5)', fontSize: 18,
+    cursor: 'pointer', padding: 4, flexShrink: 0, transition: 'color 0.15s',
   },
 }
 
