@@ -78,10 +78,10 @@ const AlertAsignacionesPage = () => {
     setLoading(true)
     try {
       const [as, pr, de, ca] = await Promise.all([
-        apiCall('/webhook/asignaciones/listar'),
-        apiCall('/webhook/procesos/listar'),
-        apiCall('/webhook/destinatarios/listar'),
-        apiCall('/webhook/canales/listar'),
+        apiCall('/asignaciones/listar'),
+        apiCall('/procesos/listar'),
+        apiCall('/destinatarios/listar'),
+        apiCall('/canales/listar'),
       ])
       const asArr = Array.isArray(as) ? as : []
       const prArr = Array.isArray(pr) ? pr : []
@@ -98,14 +98,14 @@ const AlertAsignacionesPage = () => {
   useEffect(() => { cargar() }, [])
 
   const handleSave = async (form) => {
-    await apiCall('/webhook/asignaciones/crear', { method: 'POST', body: JSON.stringify(form) })
+    await apiCall('/asignaciones/crear', { method: 'POST', body: JSON.stringify(form) })
     show('Asignación creada')
     cargar()
   }
 
   const handleToggle = async (asig) => {
     try {
-      await apiCall('/webhook/asignaciones/actualizar', {
+      await apiCall('/asignaciones/actualizar', {
         method: 'POST',
         body: JSON.stringify({ ...asig, activo: asig.activo ? 0 : 1 })
       })
