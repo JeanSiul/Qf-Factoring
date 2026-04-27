@@ -1,11 +1,13 @@
-export const N8N_BASE_URL = window.__N8N_URL__ || 'https://lissa-unfloatable-seditiously.ngrok-free.dev'
+export const getBaseUrl = () => {
+  return '/api'
+}
 
 export const apiCall = async (endpoint, options = {}) => {
-  const baseUrl = window.__N8N_URL__ || N8N_BASE_URL
-  const url = `${baseUrl}/webhook${endpoint}`
+  const url = `/api/webhook${endpoint}`
   const response = await fetch(url, {
     headers: {
       'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': '1',
       ...options.headers
     },
     ...options
