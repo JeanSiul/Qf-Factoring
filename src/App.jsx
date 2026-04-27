@@ -5,6 +5,11 @@ import LoginPage from './pages/LoginPage'
 import Dashboard from './pages/Dashboard'
 import UsuariosPage from './pages/UsuariosPage'
 import RolesPage from './pages/RolesPage'
+import AlertCanalesPage from './pages/AlertCanalesPage'
+import AlertDestinatariosPage from './pages/AlertDestinatariosPage'
+import AlertProcesosPage from './pages/AlertProcesosPage'
+import AlertAsignacionesPage from './pages/AlertAsignacionesPage'
+import AlertColaPage from './pages/AlertColaPage'
 import Layout from './components/Layout'
 
 const PrivateRoute = ({ children }) => {
@@ -13,7 +18,7 @@ const PrivateRoute = ({ children }) => {
     <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--qf-navy)' }}>
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 28, color: 'white', marginBottom: 16 }}>QF-Factoring</div>
-        <span className="spinner" style={{ width: 32, height: 32, borderWidth: 3 }}/>
+        <span className="spinner" style={{ width: 32, height: 32, borderWidth: 3 }} />
       </div>
     </div>
   )
@@ -36,6 +41,12 @@ const App = () => (
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="usuarios" element={<UsuariosPage />} />
           <Route path="roles" element={<RolesPage />} />
+          {/* Alertas */}
+          <Route path="alertas/canales" element={<AlertCanalesPage />} />
+          <Route path="alertas/destinatarios" element={<AlertDestinatariosPage />} />
+          <Route path="alertas/procesos" element={<AlertProcesosPage />} />
+          <Route path="alertas/asignaciones" element={<AlertAsignacionesPage />} />
+          <Route path="alertas/cola" element={<AlertColaPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
