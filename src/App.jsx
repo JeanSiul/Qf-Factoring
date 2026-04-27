@@ -1,0 +1,46 @@
+import React from 'react'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { AuthProvider, useAuth } from './context/AuthContext'
+import LoginPage from './pages/LoginPage'
+import Dashboard from './pages/Dashboard'
+import UsuariosPage from './pages/UsuariosPage'
+import RolesPage from './pages/RolesPage'
+import Layout from './components/Layout'
+
+const PrivateRoute = ({ children }) => {
+  const { user, loading } = useAuth()
+  if (loading) return (
+    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--qf-navy)' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 28, color: 'white', marginBottom: 16 }}>QF-Factoring</div>
+        <span className="spinner" style={{ width: 32, height: 32, borderWidth: 3 }}/>
+      </div>
+    </div>
+  )
+  return user ? children : <Navigate to="/login" replace />
+}
+
+const PublicRoute = ({ children }) => {
+  const { user, loading } = useAuth()
+  if (loading) return null
+  return user ? <Navigate to="/dashboard" replace /> : children
+}
+
+const App = () => (
+  <BrowserRouter>
+    <AuthProvider>
+      <Routes>
+        <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+        <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="usuarios" element={<UsuariosPage />} />
+          <Route path="roles" element={<RolesPage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </AuthProvider>
+  </BrowserRouter>
+)
+
+export default App
