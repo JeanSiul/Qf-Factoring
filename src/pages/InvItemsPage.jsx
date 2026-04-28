@@ -1,22 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { apiCall } from '../utils/api'
+import { apiCall, toArray } from '../utils/api'
 import { useToast } from '../hooks/useToast'
 import ToastContainer from '../components/ToastContainer'
 import { useAuth } from '../context/AuthContext'
-
-const toArray = (res) => {
-  if (!res || res === 1 || typeof res === 'number' || typeof res === 'boolean') return []
-  if (Array.isArray(res)) return res.filter(i => i && typeof i === 'object' && i.id != null)
-  if (typeof res === 'string') {
-    try {
-      const p = JSON.parse(res)
-      if (Array.isArray(p)) return p.filter(i => i && typeof i === 'object' && i.id != null)
-      if (p && typeof p === 'object' && p.id != null) return [p]
-    } catch { return [] }
-  }
-  if (typeof res === 'object' && res.id != null) return [res]
-  return []
-}
 
 // ── MODAL ITEM ─────────────────────────────────────────────────────────────
 const ModalItem = ({ item, grupos, onClose, onSave }) => {
@@ -41,7 +27,9 @@ const ModalItem = ({ item, grupos, onClose, onSave }) => {
     setLoadingAtrs(true)
     apiCall(`/qf/inv/atributos/listar?grupoId=${form.grupo_id}`)
       .then(res => {
-        const atrs = toArray(res)
+        // Filtrar atributos solo del grupo seleccionado
+        const todos = toArray(res)
+        const atrs = todos.filter(a => a.grupo_id === form.grupo_id || String(a.grupo_id) === String(form.grupo_id))
         setAtributos(atrs)
         if (isEdit) {
           apiCall(`/qf/inv/items/detalle?itemId=${item.id}`)
@@ -103,6 +91,7 @@ const ModalItem = ({ item, grupos, onClose, onSave }) => {
             <div className="form-group">
               <label className="form-label">Grupo *</label>
               <select className="form-control" value={form.grupo_id} onChange={e => set('grupo_id', parseInt(e.target.value))} disabled={isEdit}>
+                {grupos.length === 0 && <option value="">Sin grupos disponibles</option>}
                 {grupos.map(g => <option key={g.id} value={g.id}>{g.nombre}</option>)}
               </select>
             </div>
@@ -113,7 +102,7 @@ const ModalItem = ({ item, grupos, onClose, onSave }) => {
           </div>
           {loadingAtrs ? (
             <div style={{ padding: 20, textAlign: 'center' }}><span className="spinner dark" /></div>
-          ) : atributos.length > 0 && (
+          ) : atributos.length > 0 ? (
             <div style={{ background: '#f8fafc', borderRadius: 8, padding: 16, marginBottom: 12, border: '1px solid var(--qf-border)' }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--qf-navy)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Características</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
@@ -124,6 +113,10 @@ const ModalItem = ({ item, grupos, onClose, onSave }) => {
                   </div>
                 ))}
               </div>
+            </div>
+          ) : form.grupo_id && (
+            <div style={{ background: '#fff8e1', borderRadius: 8, padding: 12, marginBottom: 12, fontSize: 12, color: '#7c6f00' }}>
+              ⚠️ Este grupo no tiene atributos definidos
             </div>
           )}
           <div className="form-group">
@@ -177,29 +170,27 @@ const ModalHistorial = ({ item, onClose }) => {
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-          {loading ? (
-            <div style={{ padding: 30, textAlign: 'center' }}><span className="spinner dark" /></div>
-          ) : historial.length === 0 ? (
-            <div className="empty-state"><p>Sin historial de asignaciones</p></div>
-          ) : (
-            <table className="qf-table">
-              <thead><tr><th>Acción</th><th>Usuario</th><th>Realizado por</th><th>Fecha</th><th>Observación</th></tr></thead>
-              <tbody>
-                {historial.map(h => {
-                  const ac = accionLabel[h.accion] || { label: h.accion, color: '#666', bg: '#eee' }
-                  return (
-                    <tr key={h.id}>
-                      <td><span style={{ background: ac.bg, color: ac.color, borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 600 }}>{ac.label}</span></td>
-                      <td style={{ fontSize: 12, fontWeight: 500 }}>{h.usuario_nombre || '—'}</td>
-                      <td style={{ fontSize: 12, color: 'var(--qf-text-light)' }}>{h.usr_realizo || '—'}</td>
-                      <td style={{ fontSize: 11, color: 'var(--qf-text-light)' }}>{h.fecha ? new Date(h.fecha).toLocaleString('es-PE') : '—'}</td>
-                      <td style={{ fontSize: 12, color: 'var(--qf-text-light)' }}>{h.observacion || '—'}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          )}
+          {loading ? <div style={{ padding: 30, textAlign: 'center' }}><span className="spinner dark" /></div>
+            : historial.length === 0 ? <div className="empty-state"><p>Sin historial de asignaciones</p></div>
+            : (
+              <table className="qf-table">
+                <thead><tr><th>Acción</th><th>Usuario</th><th>Realizado por</th><th>Fecha</th><th>Observación</th></tr></thead>
+                <tbody>
+                  {historial.map(h => {
+                    const ac = accionLabel[h.accion] || { label: h.accion, color: '#666', bg: '#eee' }
+                    return (
+                      <tr key={h.id}>
+                        <td><span style={{ background: ac.bg, color: ac.color, borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 600 }}>{ac.label}</span></td>
+                        <td style={{ fontSize: 12, fontWeight: 500 }}>{h.usuario_nombre || '—'}</td>
+                        <td style={{ fontSize: 12, color: 'var(--qf-text-light)' }}>{h.usr_realizo || '—'}</td>
+                        <td style={{ fontSize: 11, color: 'var(--qf-text-light)' }}>{h.fecha ? new Date(h.fecha).toLocaleString('es-PE') : '—'}</td>
+                        <td style={{ fontSize: 12, color: 'var(--qf-text-light)' }}>{h.observacion || '—'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
         </div>
         <div className="modal-footer"><button className="btn btn-secondary" onClick={onClose}>Cerrar</button></div>
       </div>
@@ -302,12 +293,14 @@ const InvItemsPage = () => {
               <option value="baja">Baja</option>
             </select>
             <input className="filter-input" placeholder="🔍 Filtrar..." value={filtro} onChange={e => setFiltro(e.target.value)} />
-            <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })}>➕ Nuevo Item</button>
+            <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })} disabled={grupos.length === 0}>➕ Nuevo Item</button>
           </div>
         </div>
         <div style={{ overflowX: 'auto' }}>
           {loading ? (
             <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner dark" /></div>
+          ) : grupos.length === 0 ? (
+            <div className="empty-state"><div className="icon">⚠️</div><p>Primero crea grupos en "Grupos y Atributos"</p></div>
           ) : filtrados.length === 0 ? (
             <div className="empty-state"><div className="icon">📦</div><p>No se encontraron items</p></div>
           ) : (
