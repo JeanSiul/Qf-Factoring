@@ -199,7 +199,7 @@ const InvAsignacionesPage = () => {
   const handleAsignar = async (form) => {
     const res = await apiCall('/qf/inv/asignaciones/asignar', {
       method: 'POST',
-      body: JSON.stringify({ ...form, usr_realizo_id: user?.id, usr_realizo: user?.nombres || user?.username })
+      body: JSON.stringify({ ...form, usr_realizo_id: user?.id, usr_realizo: user?.username || user?.userName })
     })
     if (!res.success) throw new Error(res.message)
     show('Item asignado correctamente'); cargar()
@@ -208,7 +208,7 @@ const InvAsignacionesPage = () => {
   const handleDevolver = async (form) => {
     const res = await apiCall('/qf/inv/asignaciones/devolver', {
       method: 'POST',
-      body: JSON.stringify({ ...form, usr_realizo_id: user?.id, usr_realizo: user?.nombres || user?.username })
+      body: JSON.stringify({ ...form, usr_realizo_id: user?.id, usr_realizo: user?.username || user?.userName })
     })
     if (!res.success) throw new Error(res.message)
     show('Devolución registrada'); cargar()
