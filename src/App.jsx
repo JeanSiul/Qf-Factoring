@@ -11,6 +11,10 @@ import AlertDestinatariosPage from './pages/AlertDestinatariosPage'
 import AlertProcesosPage from './pages/AlertProcesosPage'
 import AlertAsignacionesPage from './pages/AlertAsignacionesPage'
 import AlertColaPage from './pages/AlertColaPage'
+import InvDashboardPage from './pages/InvDashboardPage'
+import InvGruposPage from './pages/InvGruposPage'
+import InvItemsPage from './pages/InvItemsPage'
+import InvAsignacionesPage from './pages/InvAsignacionesPage'
 import Layout from './components/Layout'
 
 const PrivateRoute = ({ children }) => {
@@ -49,6 +53,11 @@ const App = () => (
           <Route path="alertas/procesos" element={<AlertProcesosPage />} />
           <Route path="alertas/asignaciones" element={<AlertAsignacionesPage />} />
           <Route path="alertas/cola" element={<AlertColaPage />} />
+          {/* Inventario */}
+          <Route path="inventario/dashboard" element={<InvDashboardPage />} />
+          <Route path="inventario/grupos" element={<InvGruposPage />} />
+          <Route path="inventario/items" element={<InvItemsPage />} />
+          <Route path="inventario/asignaciones" element={<InvAsignacionesPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
