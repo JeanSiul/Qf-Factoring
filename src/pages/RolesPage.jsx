@@ -334,7 +334,7 @@ const ModalRol = ({ rol, onClose, onSave }) => {
     id: rol?.id || '',
     name: rol?.name || '',
     descripcion: rol?.descripcion || '',
-    estado: rol?.estado ?? 1,
+    estado: rol?.estado ?? 0,
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -372,8 +372,8 @@ const ModalRol = ({ rol, onClose, onSave }) => {
           <div className="form-group">
             <label className="form-label">Estado</label>
             <select className="form-control" value={form.estado} onChange={e => set('estado', parseInt(e.target.value))}>
-              <option value={1}>Activo</option>
-              <option value={0}>Inactivo</option>
+              <option value={0}>Activo</option>
+              <option value={1}>Inactivo</option>
             </select>
           </div>
           {error && <div style={{ background: '#fce4e4', color: '#c62828', borderRadius: 8, padding: '10px 14px', fontSize: 13 }}>⚠️ {error}</div>}
@@ -482,7 +482,7 @@ const RolesPage = () => {
                   <tr key={r.id}>
                     <td><strong style={{ color: 'var(--qf-navy)', fontFamily: 'Montserrat' }}>{r.name}</strong></td>
                     <td style={{ color: 'var(--qf-text-light)' }}>{r.descripcion || '—'}</td>
-                    <td><span className={`badge ${r.estado === 1 ? 'active' : 'inactive'}`}>{r.estado === 1 ? 'Activo' : 'Inactivo'}</span></td>
+                    <td><span className={`badge ${r.estado === 0 ? 'active' : 'inactive'}`}>{r.estado === 0 ? 'Activo' : 'Inactivo'}</span></td>
                     <td style={{ textAlign: 'center' }}>
                       <span style={{ background: '#e8eef5', color: 'var(--qf-navy)', borderRadius: 20, padding: '3px 12px', fontSize: 12, fontWeight: 600 }}>
                         {r.totalUsuarios || 0}

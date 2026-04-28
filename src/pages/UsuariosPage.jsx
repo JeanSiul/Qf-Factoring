@@ -15,7 +15,7 @@ const ModalUsuario = ({ usuario, roles, onClose, onSave }) => {
     apellidos: usuario?.apellidos || '',
     userName: usuario?.userName || '',
     email: usuario?.email || '',
-    estado: usuario?.estado ?? 1,
+    estado: usuario?.estado ?? 0,
     password: '',
     confirmarPassword: '',
     roles: rolesIniciales,
@@ -88,8 +88,8 @@ const ModalUsuario = ({ usuario, roles, onClose, onSave }) => {
           <div className="form-group">
             <label className="form-label">Estado</label>
             <select className="form-control" value={form.estado} onChange={e => set('estado', parseInt(e.target.value))}>
-              <option value={1}>Activo</option>
-              <option value={0}>Inactivo</option>
+              <option value={0}>Activo</option>
+              <option value={1}>Inactivo</option>
             </select>
           </div>
           <div className="form-group">
@@ -284,7 +284,7 @@ const UsuariosPage = () => {
                       <td>{u.nombres}</td>
                       <td>{u.apellidos}</td>
                       <td style={{ color: 'var(--qf-text-light)', fontSize: 12 }}>{u.email || '—'}</td>
-                      <td><span className={`badge ${u.estado === 1 ? 'active' : 'inactive'}`}>{u.estado === 1 ? 'Activo' : 'Inactivo'}</span></td>
+                      <td><span className={`badge ${u.estado === 0 ? 'active' : 'inactive'}`}>{u.estado === 0 ? 'Activo' : 'Inactivo'}</span></td>
                       <td style={{ fontSize: 12 }}>
                         {rolesArr.length > 0 ? rolesArr.map(r => (
                           <span key={r} style={{ display: 'inline-block', background: '#e8eef5', color: 'var(--qf-navy)', borderRadius: 4, padding: '2px 7px', marginRight: 4, marginBottom: 2, fontSize: 11, fontWeight: 600 }}>{r}</span>
