@@ -172,6 +172,12 @@ const InvGruposPage = () => {
   const [modal, setModal] = useState(null)
   const { toasts, show } = useToast()
 
+  const toArray = (res) => {
+    if (Array.isArray(res)) return res
+    if (res && typeof res === 'object') return [res]
+    try { const p = JSON.parse(res); return Array.isArray(p) ? p : [p] } catch { return [] }
+  }
+
   const cargar = async () => {
     setLoading(true)
     try {
@@ -179,9 +185,9 @@ const InvGruposPage = () => {
         apiCall('/qf/inv/grupos/listar'),
         apiCall('/qf/inv/atributos/listar'),
       ])
-      const grArr = Array.isArray(gr) ? gr : []
+      const grArr = toArray(gr)
       setGrupos(grArr)
-      setAtributos(Array.isArray(at) ? at : [])
+      setAtributos(toArray(at))
       if (grArr.length > 0 && !grupoActivo) setGrupoActivo(grArr[0].id)
     } catch (e) {
       show('Error al cargar datos: ' + e.message, 'error')
