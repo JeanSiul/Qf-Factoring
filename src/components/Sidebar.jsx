@@ -14,6 +14,7 @@ const menuItems = [
   {
     icon: '🔔', label: 'Alertas', path: null,
     children: [
+      { icon: '📊', label: 'Dashboard', path: '/alertas/dashboard' },
       { icon: '📡', label: 'Canales', path: '/alertas/canales' },
       { icon: '👤', label: 'Destinatarios', path: '/alertas/destinatarios' },
       { icon: '⚙️', label: 'Procesos', path: '/alertas/procesos' },
