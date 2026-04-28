@@ -16,5 +16,13 @@ export const apiCall = async (endpoint, options = {}) => {
     const err = await response.text()
     throw new Error(err || `Error ${response.status}`)
   }
-  return response.json()
+  // n8n a veces devuelve ="[...]" o =[{...}] con = al inicio
+  // Lo limpiamos antes de parsear
+  const text = await response.text()
+  const clean = text.startsWith('=') ? text.slice(1) : text
+  try {
+    return JSON.parse(clean)
+  } catch {
+    throw new Error('Respuesta inválida del servidor')
+  }
 }
