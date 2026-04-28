@@ -173,9 +173,14 @@ const InvGruposPage = () => {
   const { toasts, show } = useToast()
 
   const toArray = (res) => {
+    if (!res) return []
     if (Array.isArray(res)) return res
-    if (res && typeof res === 'object') return [res]
-    try { const p = JSON.parse(res); return Array.isArray(p) ? p : [p] } catch { return [] }
+    if (typeof res === 'number' || typeof res === 'boolean') return []
+    if (typeof res === 'string') {
+      try { const p = JSON.parse(res); return Array.isArray(p) ? p : (p && typeof p === 'object' ? [p] : []) } catch { return [] }
+    }
+    if (typeof res === 'object') return [res]
+    return []
   }
 
   const cargar = async () => {
