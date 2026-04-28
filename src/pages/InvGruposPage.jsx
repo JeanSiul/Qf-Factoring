@@ -1,23 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { apiCall } from '../utils/api'
+import { apiCall, toArray } from '../utils/api'
 import { useToast } from '../hooks/useToast'
 import ToastContainer from '../components/ToastContainer'
 import { useAuth } from '../context/AuthContext'
-
-// ── UTILIDAD GLOBAL ────────────────────────────────────────────────────────
-const toArray = (res) => {
-  if (!res || res === 1 || typeof res === 'number' || typeof res === 'boolean') return []
-  if (Array.isArray(res)) return res.filter(i => i && typeof i === 'object' && i.id != null)
-  if (typeof res === 'string') {
-    try {
-      const p = JSON.parse(res)
-      if (Array.isArray(p)) return p.filter(i => i && typeof i === 'object' && i.id != null)
-      if (p && typeof p === 'object' && p.id != null) return [p]
-    } catch { return [] }
-  }
-  if (typeof res === 'object' && res.id != null) return [res]
-  return []
-}
 
 // ── MODAL ATRIBUTO ─────────────────────────────────────────────────────────
 const ModalAtributo = ({ atributo, grupoId, onClose, onSave }) => {
@@ -188,8 +173,12 @@ const InvGruposPage = () => {
         apiCall('/qf/inv/grupos/listar'),
         apiCall('/qf/inv/atributos/listar'),
       ])
+      console.log('GR tipo:', typeof gr, '| valor:', JSON.stringify(gr))
+      console.log('AT tipo:', typeof at, '| valor:', JSON.stringify(at))
       const grArr = toArray(gr)
       const atArr = toArray(at)
+      console.log('GR array:', grArr)
+      console.log('AT array:', atArr)
       setGrupos(grArr)
       setAtributos(atArr)
       if (grArr.length > 0 && !grupoActivo) setGrupoActivo(grArr[0].id)
@@ -253,7 +242,6 @@ const InvGruposPage = () => {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 16, alignItems: 'start' }}>
-        {/* Panel izquierdo */}
         <div className="page-card" style={{ margin: 0 }}>
           <div className="page-card-header">
             <h2>Grupos</h2>
@@ -291,7 +279,6 @@ const InvGruposPage = () => {
           )}
         </div>
 
-        {/* Panel derecho */}
         <div className="page-card" style={{ margin: 0 }}>
           <div className="page-card-header">
             <div>
@@ -310,9 +297,7 @@ const InvGruposPage = () => {
             <div style={{ overflowX: 'auto' }}>
               <table className="qf-table">
                 <thead>
-                  <tr>
-                    <th>Orden</th><th>Nombre</th><th>Tipo</th><th>Opciones</th><th>Requerido</th><th>Estado</th><th style={{ textAlign: 'center' }}>Acciones</th>
-                  </tr>
+                  <tr><th>Orden</th><th>Nombre</th><th>Tipo</th><th>Opciones</th><th>Requerido</th><th>Estado</th><th style={{ textAlign: 'center' }}>Acciones</th></tr>
                 </thead>
                 <tbody>
                   {atributosGrupo.sort((a, b) => a.orden - b.orden).map(a => (
