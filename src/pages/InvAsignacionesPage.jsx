@@ -117,7 +117,12 @@ const ModalHistorial = ({ item, onClose }) => {
 
   useEffect(() => {
     apiCall(`/qf/inv/asignaciones/historial?itemId=${item.item_id}`)
-      .then(res => setHistorial(toArray(res)))
+      .then(res => {
+        const arr = Array.isArray(res) ? res
+          : (res?.data ? (Array.isArray(res.data) ? res.data : [res.data])
+          : (res && res.id ? [res] : []))
+        setHistorial(arr.filter(h => h && h.id))
+      })
       .finally(() => setLoading(false))
   }, [item.item_id])
 
@@ -179,8 +184,12 @@ const InvAsignacionesPage = () => {
         apiCall('/qf/inv/asignaciones/listar'),
         apiCall('/qf/usuarios/listar'),
       ])
-      setAsignados(toArray(as))
-      setUsuarios(toArray(us).filter(u => u.estado === 1))
+      // Asignaciones usan 'asignacion_id' no 'id' — no usar toArray
+      const asArr = Array.isArray(as) ? as
+        : (as?.data ? (Array.isArray(as.data) ? as.data : [as.data])
+        : (as && as.asignacion_id ? [as] : []))
+      setAsignados(asArr.filter(a => a && a.asignacion_id))
+      setUsuarios(toArray(us).filter(u => u.estado === 0))
     } catch (e) { show('Error al cargar datos: ' + e.message, 'error') }
     finally { setLoading(false) }
   }
