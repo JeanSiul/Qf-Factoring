@@ -4,6 +4,20 @@ import { useToast } from '../hooks/useToast'
 import ToastContainer from '../components/ToastContainer'
 import { useAuth } from '../context/AuthContext'
 
+const toArray = (res) => {
+  if (!res || res === 1 || typeof res === 'number' || typeof res === 'boolean') return []
+  if (Array.isArray(res)) return res.filter(i => i && typeof i === 'object' && i.id != null)
+  if (typeof res === 'string') {
+    try {
+      const p = JSON.parse(res)
+      if (Array.isArray(p)) return p.filter(i => i && typeof i === 'object' && i.id != null)
+      if (p && typeof p === 'object' && p.id != null) return [p]
+    } catch { return [] }
+  }
+  if (typeof res === 'object' && res.id != null) return [res]
+  return []
+}
+
 // ── MODAL ITEM ─────────────────────────────────────────────────────────────
 const ModalItem = ({ item, grupos, onClose, onSave }) => {
   const [form, setForm] = useState({
@@ -22,24 +36,19 @@ const ModalItem = ({ item, grupos, onClose, onSave }) => {
   const isEdit = !!item?.id
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  // Cargar atributos cuando cambia el grupo
   useEffect(() => {
     if (!form.grupo_id) return
     setLoadingAtrs(true)
     apiCall(`/qf/inv/atributos/listar?grupoId=${form.grupo_id}`)
       .then(res => {
-        const atrs = Array.isArray(res) ? res : []
+        const atrs = toArray(res)
         setAtributos(atrs)
-        // Si es edición, cargar valores existentes
         if (isEdit) {
           apiCall(`/qf/inv/items/detalle?itemId=${item.id}`)
             .then(vals => {
               const valMap = {}
-              if (Array.isArray(vals)) vals.forEach(v => { valMap[v.atributo_id] = v.valor })
-              setForm(f => ({
-                ...f,
-                valores: atrs.map(a => ({ atributo_id: a.id, valor: valMap[a.id] || '' }))
-              }))
+              toArray(vals).forEach(v => { valMap[v.atributo_id] = v.valor })
+              setForm(f => ({ ...f, valores: atrs.map(a => ({ atributo_id: a.id, valor: valMap[a.id] || '' })) }))
             })
         } else {
           setForm(f => ({ ...f, valores: atrs.map(a => ({ atributo_id: a.id, valor: '' })) }))
@@ -49,44 +58,28 @@ const ModalItem = ({ item, grupos, onClose, onSave }) => {
   }, [form.grupo_id])
 
   const setValor = (atributoId, valor) => {
-    setForm(f => ({
-      ...f,
-      valores: f.valores.map(v => v.atributo_id === atributoId ? { ...v, valor } : v)
-    }))
+    setForm(f => ({ ...f, valores: f.valores.map(v => v.atributo_id === atributoId ? { ...v, valor } : v) }))
   }
 
   const handleSubmit = async () => {
     if (!form.codigo || !form.nombre || !form.grupo_id) { setError('Código, nombre y grupo son requeridos'); return }
-    // Validar requeridos
     const requeridos = atributos.filter(a => a.requerido)
     for (const atr of requeridos) {
       const val = form.valores.find(v => v.atributo_id === atr.id)
       if (!val?.valor) { setError(`El atributo "${atr.nombre}" es requerido`); return }
     }
     setLoading(true); setError('')
-    try {
-      await onSave(form)
-      onClose()
-    } catch (e) {
-      setError(e.message || 'Error al guardar')
-    } finally { setLoading(false) }
+    try { await onSave(form); onClose() }
+    catch (e) { setError(e.message || 'Error al guardar') }
+    finally { setLoading(false) }
   }
 
   const renderInput = (atr) => {
     const val = form.valores.find(v => v.atributo_id === atr.id)?.valor || ''
-    const baseProps = {
-      className: 'form-control',
-      value: val,
-      onChange: e => setValor(atr.id, e.target.value),
-    }
+    const baseProps = { className: 'form-control', value: val, onChange: e => setValor(atr.id, e.target.value) }
     if (atr.tipo === 'lista') {
       const opts = (atr.opciones || '').split(',').map(o => o.trim()).filter(Boolean)
-      return (
-        <select {...baseProps}>
-          <option value="">Seleccionar...</option>
-          {opts.map(o => <option key={o} value={o}>{o}</option>)}
-        </select>
-      )
+      return <select {...baseProps}><option value="">Seleccionar...</option>{opts.map(o => <option key={o} value={o}>{o}</option>)}</select>
     }
     if (atr.tipo === 'numero') return <input {...baseProps} type="number" />
     if (atr.tipo === 'fecha') return <input {...baseProps} type="date" />
@@ -118,34 +111,25 @@ const ModalItem = ({ item, grupos, onClose, onSave }) => {
             <label className="form-label">Nombre descriptivo *</label>
             <input className="form-control" value={form.nombre} onChange={e => set('nombre', e.target.value)} placeholder="HP EliteBook 840 G8" />
           </div>
-
-          {/* Atributos dinámicos */}
           {loadingAtrs ? (
             <div style={{ padding: 20, textAlign: 'center' }}><span className="spinner dark" /></div>
           ) : atributos.length > 0 && (
             <div style={{ background: '#f8fafc', borderRadius: 8, padding: 16, marginBottom: 12, border: '1px solid var(--qf-border)' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--qf-navy)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Características
-              </div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--qf-navy)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Características</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
                 {atributos.sort((a, b) => a.orden - b.orden).map(atr => (
                   <div key={atr.id} className="form-group">
-                    <label className="form-label">
-                      {atr.nombre}
-                      {atr.requerido ? <span style={{ color: '#c62828' }}> *</span> : ''}
-                    </label>
+                    <label className="form-label">{atr.nombre}{atr.requerido ? <span style={{ color: '#c62828' }}> *</span> : ''}</label>
                     {renderInput(atr)}
                   </div>
                 ))}
               </div>
             </div>
           )}
-
           <div className="form-group">
             <label className="form-label">Observaciones</label>
             <textarea className="form-control" value={form.observacion} onChange={e => set('observacion', e.target.value)} rows={2} style={{ resize: 'vertical' }} placeholder="Notas adicionales..." />
           </div>
-
           {isEdit && (
             <div className="form-group">
               <label className="form-label">Estado</label>
@@ -155,7 +139,6 @@ const ModalItem = ({ item, grupos, onClose, onSave }) => {
               </select>
             </div>
           )}
-
           {error && <div style={{ background: '#fce4e4', color: '#c62828', borderRadius: 8, padding: '10px 14px', fontSize: 13 }}>⚠️ {error}</div>}
         </div>
         <div className="modal-footer">
@@ -176,11 +159,15 @@ const ModalHistorial = ({ item, onClose }) => {
 
   useEffect(() => {
     apiCall(`/qf/inv/asignaciones/historial?itemId=${item.id}`)
-      .then(res => setHistorial(Array.isArray(res) ? res : []))
+      .then(res => setHistorial(toArray(res)))
       .finally(() => setLoading(false))
   }, [item.id])
 
-  const accionLabel = { asignacion: { label: 'Asignación', color: '#2e7d32', bg: '#e8f5e9' }, reasignacion: { label: 'Reasignación', color: '#e65100', bg: '#fff3e0' }, devolucion: { label: 'Devolución', color: '#185FA5', bg: '#e3f2fd' } }
+  const accionLabel = {
+    asignacion: { label: 'Asignación', color: '#2e7d32', bg: '#e8f5e9' },
+    reasignacion: { label: 'Reasignación', color: '#e65100', bg: '#fff3e0' },
+    devolucion: { label: 'Devolución', color: '#185FA5', bg: '#e3f2fd' }
+  }
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -196,25 +183,13 @@ const ModalHistorial = ({ item, onClose }) => {
             <div className="empty-state"><p>Sin historial de asignaciones</p></div>
           ) : (
             <table className="qf-table">
-              <thead>
-                <tr>
-                  <th>Acción</th>
-                  <th>Usuario</th>
-                  <th>Realizado por</th>
-                  <th>Fecha</th>
-                  <th>Observación</th>
-                </tr>
-              </thead>
+              <thead><tr><th>Acción</th><th>Usuario</th><th>Realizado por</th><th>Fecha</th><th>Observación</th></tr></thead>
               <tbody>
                 {historial.map(h => {
                   const ac = accionLabel[h.accion] || { label: h.accion, color: '#666', bg: '#eee' }
                   return (
                     <tr key={h.id}>
-                      <td>
-                        <span style={{ background: ac.bg, color: ac.color, borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 600 }}>
-                          {ac.label}
-                        </span>
-                      </td>
+                      <td><span style={{ background: ac.bg, color: ac.color, borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 600 }}>{ac.label}</span></td>
                       <td style={{ fontSize: 12, fontWeight: 500 }}>{h.usuario_nombre || '—'}</td>
                       <td style={{ fontSize: 12, color: 'var(--qf-text-light)' }}>{h.usr_realizo || '—'}</td>
                       <td style={{ fontSize: 11, color: 'var(--qf-text-light)' }}>{h.fecha ? new Date(h.fecha).toLocaleString('es-PE') : '—'}</td>
@@ -226,9 +201,7 @@ const ModalHistorial = ({ item, onClose }) => {
             </table>
           )}
         </div>
-        <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose}>Cerrar</button>
-        </div>
+        <div className="modal-footer"><button className="btn btn-secondary" onClick={onClose}>Cerrar</button></div>
       </div>
     </div>
   )
@@ -253,21 +226,17 @@ const InvItemsPage = () => {
         apiCall('/qf/inv/items/listar'),
         apiCall('/qf/inv/grupos/listar'),
       ])
-      setItems(Array.isArray(it) ? it : [])
-      setGrupos(Array.isArray(gr) ? gr : [])
-    } catch (e) {
-      show('Error al cargar items: ' + e.message, 'error')
-    } finally { setLoading(false) }
+      setItems(toArray(it))
+      setGrupos(toArray(gr))
+    } catch (e) { show('Error al cargar items: ' + e.message, 'error') }
+    finally { setLoading(false) }
   }
 
   useEffect(() => { cargar() }, [])
 
   const handleSave = async (form) => {
     const endpoint = form.id ? '/qf/inv/items/actualizar' : '/qf/inv/items/crear'
-    const res = await apiCall(endpoint, {
-      method: 'POST',
-      body: JSON.stringify({ ...form, usr_crea: user?.userName || user?.username })
-    })
+    const res = await apiCall(endpoint, { method: 'POST', body: JSON.stringify({ ...form, usr_crea: user?.userName || user?.username }) })
     if (!res.success) throw new Error(res.message)
     show(form.id ? 'Item actualizado' : 'Item creado')
     cargar()
@@ -279,8 +248,7 @@ const InvItemsPage = () => {
     try {
       const res = await apiCall('/qf/inv/items/eliminar', { method: 'POST', body: JSON.stringify({ id: item.id }) })
       if (!res.success) throw new Error(res.message)
-      show('Item eliminado')
-      cargar()
+      show('Item eliminado'); cargar()
     } catch (e) { show(e.message, 'error') }
   }
 
@@ -301,13 +269,10 @@ const InvItemsPage = () => {
   return (
     <div className="fade-in">
       <ToastContainer toasts={toasts} />
-
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontFamily: 'Montserrat', fontSize: 22, fontWeight: 700, color: 'var(--qf-navy)', marginBottom: 4 }}>📦 Items</h1>
         <p style={{ color: 'var(--qf-text-light)', fontSize: 13 }}>Inventario de equipos y materiales</p>
       </div>
-
-      {/* Stats rápidas */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 20 }}>
         {[
           { label: 'Total', value: items.length, color: 'var(--qf-navy)', border: '#2196f3' },
@@ -321,7 +286,6 @@ const InvItemsPage = () => {
           </div>
         ))}
       </div>
-
       <div className="page-card">
         <div className="page-card-header">
           <h2>Lista de Items</h2>
@@ -341,7 +305,6 @@ const InvItemsPage = () => {
             <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })}>➕ Nuevo Item</button>
           </div>
         </div>
-
         <div style={{ overflowX: 'auto' }}>
           {loading ? (
             <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner dark" /></div>
@@ -350,14 +313,7 @@ const InvItemsPage = () => {
           ) : (
             <table className="qf-table">
               <thead>
-                <tr>
-                  <th>Código</th>
-                  <th>Nombre</th>
-                  <th>Grupo</th>
-                  <th>Estado</th>
-                  <th>Asignado a</th>
-                  <th style={{ textAlign: 'center' }}>Acciones</th>
-                </tr>
+                <tr><th>Código</th><th>Nombre</th><th>Grupo</th><th>Estado</th><th>Asignado a</th><th style={{ textAlign: 'center' }}>Acciones</th></tr>
               </thead>
               <tbody>
                 {filtrados.map(i => {
@@ -366,13 +322,9 @@ const InvItemsPage = () => {
                     <tr key={i.id}>
                       <td><code style={{ background: '#e8eef5', padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 700 }}>{i.codigo}</code></td>
                       <td style={{ fontWeight: 500 }}>{i.nombre}</td>
-                      <td style={{ fontSize: 12 }}>
-                        <span style={{ background: '#e8eef5', color: 'var(--qf-navy)', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>{i.grupo_nombre}</span>
-                      </td>
+                      <td><span style={{ background: '#e8eef5', color: 'var(--qf-navy)', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>{i.grupo_nombre}</span></td>
                       <td><span className={`badge ${est.cls}`}>{est.label}</span></td>
-                      <td style={{ fontSize: 12, color: i.asignado_a ? 'var(--qf-navy)' : 'var(--qf-text-light)', fontWeight: i.asignado_a ? 500 : 400 }}>
-                        {i.asignado_a || '—'}
-                      </td>
+                      <td style={{ fontSize: 12, color: i.asignado_a ? 'var(--qf-navy)' : 'var(--qf-text-light)', fontWeight: i.asignado_a ? 500 : 400 }}>{i.asignado_a || '—'}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'wrap' }}>
                           <button className="btn btn-secondary btn-sm" onClick={() => setModal({ type: 'historial', data: i })} title="Historial">📋</button>
@@ -387,14 +339,8 @@ const InvItemsPage = () => {
             </table>
           )}
         </div>
-
-        {!loading && (
-          <div style={{ padding: '12px 24px', borderTop: '1px solid var(--qf-border)', fontSize: 12, color: 'var(--qf-text-light)' }}>
-            {filtrados.length} de {items.length} items
-          </div>
-        )}
+        {!loading && <div style={{ padding: '12px 24px', borderTop: '1px solid var(--qf-border)', fontSize: 12, color: 'var(--qf-text-light)' }}>{filtrados.length} de {items.length} items</div>}
       </div>
-
       {modal?.type === 'nuevo' && <ModalItem grupos={grupos} onClose={() => setModal(null)} onSave={handleSave} />}
       {modal?.type === 'editar' && <ModalItem item={modal.data} grupos={grupos} onClose={() => setModal(null)} onSave={handleSave} />}
       {modal?.type === 'historial' && <ModalHistorial item={modal.data} onClose={() => setModal(null)} />}

@@ -4,6 +4,21 @@ import { useToast } from '../hooks/useToast'
 import ToastContainer from '../components/ToastContainer'
 import { useAuth } from '../context/AuthContext'
 
+// ── UTILIDAD GLOBAL ────────────────────────────────────────────────────────
+const toArray = (res) => {
+  if (!res || res === 1 || typeof res === 'number' || typeof res === 'boolean') return []
+  if (Array.isArray(res)) return res.filter(i => i && typeof i === 'object' && i.id != null)
+  if (typeof res === 'string') {
+    try {
+      const p = JSON.parse(res)
+      if (Array.isArray(p)) return p.filter(i => i && typeof i === 'object' && i.id != null)
+      if (p && typeof p === 'object' && p.id != null) return [p]
+    } catch { return [] }
+  }
+  if (typeof res === 'object' && res.id != null) return [res]
+  return []
+}
+
 // ── MODAL ATRIBUTO ─────────────────────────────────────────────────────────
 const ModalAtributo = ({ atributo, grupoId, onClose, onSave }) => {
   const [form, setForm] = useState({
@@ -25,12 +40,9 @@ const ModalAtributo = ({ atributo, grupoId, onClose, onSave }) => {
     if (!form.nombre) { setError('El nombre es requerido'); return }
     if (form.tipo === 'lista' && !form.opciones) { setError('Ingresa las opciones separadas por coma'); return }
     setLoading(true); setError('')
-    try {
-      await onSave(form)
-      onClose()
-    } catch (e) {
-      setError(e.message || 'Error al guardar')
-    } finally { setLoading(false) }
+    try { await onSave(form); onClose() }
+    catch (e) { setError(e.message || 'Error al guardar') }
+    finally { setLoading(false) }
   }
 
   return (
@@ -113,12 +125,9 @@ const ModalGrupo = ({ grupo, onClose, onSave }) => {
   const handleSubmit = async () => {
     if (!form.codigo || !form.nombre) { setError('Código y nombre son requeridos'); return }
     setLoading(true); setError('')
-    try {
-      await onSave(form)
-      onClose()
-    } catch (e) {
-      setError(e.message || 'Error al guardar')
-    } finally { setLoading(false) }
+    try { await onSave(form); onClose() }
+    catch (e) { setError(e.message || 'Error al guardar') }
+    finally { setLoading(false) }
   }
 
   return (
@@ -172,17 +181,6 @@ const InvGruposPage = () => {
   const [modal, setModal] = useState(null)
   const { toasts, show } = useToast()
 
-  const toArray = (res) => {
-    if (!res) return []
-    if (Array.isArray(res)) return res
-    if (typeof res === 'number' || typeof res === 'boolean') return []
-    if (typeof res === 'string') {
-      try { const p = JSON.parse(res); return Array.isArray(p) ? p : (p && typeof p === 'object' ? [p] : []) } catch { return [] }
-    }
-    if (typeof res === 'object') return [res]
-    return []
-  }
-
   const cargar = async () => {
     setLoading(true)
     try {
@@ -191,8 +189,9 @@ const InvGruposPage = () => {
         apiCall('/qf/inv/atributos/listar'),
       ])
       const grArr = toArray(gr)
+      const atArr = toArray(at)
       setGrupos(grArr)
-      setAtributos(toArray(at))
+      setAtributos(atArr)
       if (grArr.length > 0 && !grupoActivo) setGrupoActivo(grArr[0].id)
     } catch (e) {
       show('Error al cargar datos: ' + e.message, 'error')
@@ -218,6 +217,7 @@ const InvGruposPage = () => {
       const res = await apiCall('/qf/inv/grupos/eliminar', { method: 'POST', body: JSON.stringify({ id }) })
       if (!res.success) throw new Error(res.message)
       show('Grupo eliminado')
+      if (grupoActivo === id) setGrupoActivo(null)
       cargar()
     } catch (e) { show(e.message, 'error') }
   }
@@ -242,21 +242,18 @@ const InvGruposPage = () => {
 
   const grupoSeleccionado = grupos.find(g => g.id === grupoActivo)
   const atributosGrupo = atributos.filter(a => a.grupo_id === grupoActivo)
-
   const tipoLabel = { texto: '🔤 Texto', numero: '🔢 Número', fecha: '📅 Fecha', lista: '📋 Lista' }
 
   return (
     <div className="fade-in">
       <ToastContainer toasts={toasts} />
-
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontFamily: 'Montserrat', fontSize: 22, fontWeight: 700, color: 'var(--qf-navy)', marginBottom: 4 }}>🗂️ Grupos y Atributos</h1>
         <p style={{ color: 'var(--qf-text-light)', fontSize: 13 }}>Define los tipos de items y sus características</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 16, alignItems: 'start' }}>
-
-        {/* Panel izquierdo — Lista de grupos */}
+        {/* Panel izquierdo */}
         <div className="page-card" style={{ margin: 0 }}>
           <div className="page-card-header">
             <h2>Grupos</h2>
@@ -265,53 +262,44 @@ const InvGruposPage = () => {
           {loading ? (
             <div style={{ padding: 30, textAlign: 'center' }}><span className="spinner dark" /></div>
           ) : grupos.length === 0 ? (
-            <div className="empty-state"><p>Sin grupos</p></div>
+            <div className="empty-state"><p>Sin grupos — crea el primero</p></div>
           ) : (
-            <div>
-              {grupos.map(g => (
-                <div key={g.id} onClick={() => setGrupoActivo(g.id)} style={{
-                  padding: '12px 16px', cursor: 'pointer', borderBottom: '1px solid var(--qf-border)',
-                  background: grupoActivo === g.id ? '#e8eef5' : '#fff',
-                  borderLeft: grupoActivo === g.id ? '3px solid var(--qf-navy)' : '3px solid transparent',
-                  transition: 'all 0.15s',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--qf-navy)' }}>{g.nombre}</div>
-                      <div style={{ fontSize: 11, color: 'var(--qf-text-light)', marginTop: 2 }}>
-                        <code style={{ background: '#e8eef5', padding: '1px 5px', borderRadius: 3 }}>{g.codigo}</code>
-                        <span style={{ marginLeft: 6 }}>{g.totalAtributos || 0} atributo(s)</span>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      <button className="btn btn-primary btn-sm" style={{ padding: '2px 6px', fontSize: 11 }}
-                        onClick={e => { e.stopPropagation(); setModal({ type: 'editar-grupo', data: g }) }}>✏️</button>
-                      <button className="btn btn-danger btn-sm" style={{ padding: '2px 6px', fontSize: 11 }}
-                        onClick={e => { e.stopPropagation(); handleEliminarGrupo(g.id) }}>🗑️</button>
+            grupos.map(g => (
+              <div key={g.id} onClick={() => setGrupoActivo(g.id)} style={{
+                padding: '12px 16px', cursor: 'pointer', borderBottom: '1px solid var(--qf-border)',
+                background: grupoActivo === g.id ? '#e8eef5' : '#fff',
+                borderLeft: grupoActivo === g.id ? '3px solid var(--qf-navy)' : '3px solid transparent',
+                transition: 'all 0.15s',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--qf-navy)' }}>{g.nombre}</div>
+                    <div style={{ fontSize: 11, color: 'var(--qf-text-light)', marginTop: 2 }}>
+                      <code style={{ background: '#e8eef5', padding: '1px 5px', borderRadius: 3 }}>{g.codigo}</code>
+                      <span style={{ marginLeft: 6 }}>{atributos.filter(a => a.grupo_id === g.id).length} atributo(s)</span>
                     </div>
                   </div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button className="btn btn-primary btn-sm" style={{ padding: '2px 6px', fontSize: 11 }}
+                      onClick={e => { e.stopPropagation(); setModal({ type: 'editar-grupo', data: g }) }}>✏️</button>
+                    <button className="btn btn-danger btn-sm" style={{ padding: '2px 6px', fontSize: 11 }}
+                      onClick={e => { e.stopPropagation(); handleEliminarGrupo(g.id) }}>🗑️</button>
+                  </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))
           )}
         </div>
 
-        {/* Panel derecho — Atributos del grupo */}
+        {/* Panel derecho */}
         <div className="page-card" style={{ margin: 0 }}>
           <div className="page-card-header">
             <div>
               <h2>{grupoSeleccionado ? `Atributos — ${grupoSeleccionado.nombre}` : 'Atributos'}</h2>
-              {grupoSeleccionado?.descripcion && (
-                <p style={{ fontSize: 12, color: 'var(--qf-text-light)', margin: 0 }}>{grupoSeleccionado.descripcion}</p>
-              )}
+              {grupoSeleccionado?.descripcion && <p style={{ fontSize: 12, color: 'var(--qf-text-light)', margin: 0 }}>{grupoSeleccionado.descripcion}</p>}
             </div>
-            {grupoActivo && (
-              <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo-atributo' })}>
-                ➕ Nuevo Atributo
-              </button>
-            )}
+            {grupoActivo && <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo-atributo' })}>➕ Nuevo Atributo</button>}
           </div>
-
           {!grupoActivo ? (
             <div className="empty-state"><div className="icon">👈</div><p>Selecciona un grupo</p></div>
           ) : loading ? (
@@ -323,13 +311,7 @@ const InvGruposPage = () => {
               <table className="qf-table">
                 <thead>
                   <tr>
-                    <th>Orden</th>
-                    <th>Nombre</th>
-                    <th>Tipo</th>
-                    <th>Opciones</th>
-                    <th>Requerido</th>
-                    <th>Estado</th>
-                    <th style={{ textAlign: 'center' }}>Acciones</th>
+                    <th>Orden</th><th>Nombre</th><th>Tipo</th><th>Opciones</th><th>Requerido</th><th>Estado</th><th style={{ textAlign: 'center' }}>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -338,9 +320,7 @@ const InvGruposPage = () => {
                       <td style={{ textAlign: 'center', color: 'var(--qf-text-light)', fontSize: 12 }}>{a.orden}</td>
                       <td style={{ fontWeight: 600 }}>{a.nombre}</td>
                       <td><span style={{ fontSize: 12 }}>{tipoLabel[a.tipo] || a.tipo}</span></td>
-                      <td style={{ fontSize: 11, color: 'var(--qf-text-light)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {a.opciones || '—'}
-                      </td>
+                      <td style={{ fontSize: 11, color: 'var(--qf-text-light)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.opciones || '—'}</td>
                       <td style={{ textAlign: 'center' }}>
                         {a.requerido ? <span style={{ color: '#c62828', fontWeight: 700, fontSize: 12 }}>Sí</span> : <span style={{ color: 'var(--qf-text-light)', fontSize: 12 }}>No</span>}
                       </td>
@@ -360,7 +340,6 @@ const InvGruposPage = () => {
         </div>
       </div>
 
-      {/* Modales */}
       {modal?.type === 'nuevo-grupo' && <ModalGrupo onClose={() => setModal(null)} onSave={handleSaveGrupo} />}
       {modal?.type === 'editar-grupo' && <ModalGrupo grupo={modal.data} onClose={() => setModal(null)} onSave={handleSaveGrupo} />}
       {modal?.type === 'nuevo-atributo' && <ModalAtributo grupoId={grupoActivo} onClose={() => setModal(null)} onSave={handleSaveAtributo} />}
