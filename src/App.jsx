@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage'
 import Dashboard from './pages/Dashboard'
 import UsuariosPage from './pages/UsuariosPage'
 import RolesPage from './pages/RolesPage'
+import AlertDashboardPage from './pages/AlertDashboardPage'
 import AlertCanalesPage from './pages/AlertCanalesPage'
 import AlertDestinatariosPage from './pages/AlertDestinatariosPage'
 import AlertProcesosPage from './pages/AlertProcesosPage'
@@ -42,6 +43,7 @@ const App = () => (
           <Route path="usuarios" element={<UsuariosPage />} />
           <Route path="roles" element={<RolesPage />} />
           {/* Alertas */}
+          <Route path="alertas/dashboard" element={<AlertDashboardPage />} />
           <Route path="alertas/canales" element={<AlertCanalesPage />} />
           <Route path="alertas/destinatarios" element={<AlertDestinatariosPage />} />
           <Route path="alertas/procesos" element={<AlertProcesosPage />} />
