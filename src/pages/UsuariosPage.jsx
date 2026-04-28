@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { apiCall } from '../utils/api'
+import { apiCall, toArray } from '../utils/api'
 import { useToast } from '../hooks/useToast'
 import ToastContainer from '../components/ToastContainer'
 
 const ModalUsuario = ({ usuario, roles, onClose, onSave }) => {
-  // Parsear roleIdsStr → array de IDs
   const rolesIniciales = usuario?.roleIdsStr
     ? usuario.roleIdsStr.split(',').map(r => r.trim()).filter(Boolean)
     : (usuario?.roles || [])
@@ -29,9 +28,7 @@ const ModalUsuario = ({ usuario, roles, onClose, onSave }) => {
   const toggleRole = (roleId) => {
     setForm(f => ({
       ...f,
-      roles: f.roles.includes(roleId)
-        ? f.roles.filter(r => r !== roleId)
-        : [...f.roles, roleId]
+      roles: f.roles.includes(roleId) ? f.roles.filter(r => r !== roleId) : [...f.roles, roleId]
     }))
   }
 
@@ -46,9 +43,7 @@ const ModalUsuario = ({ usuario, roles, onClose, onSave }) => {
       onClose()
     } catch (e) {
       setError(e.message || 'Error al guardar')
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
 
   return (
@@ -96,8 +91,6 @@ const ModalUsuario = ({ usuario, roles, onClose, onSave }) => {
               <option value={0}>Inactivo</option>
             </select>
           </div>
-
-          {/* ROLES */}
           <div className="form-group">
             <label className="form-label">
               Roles
@@ -120,10 +113,8 @@ const ModalUsuario = ({ usuario, roles, onClose, onSave }) => {
                     padding: '4px 10px', borderRadius: 20,
                     background: selected ? 'var(--qf-navy)' : 'white',
                     color: selected ? 'white' : 'var(--qf-text)',
-                    border: '1.5px solid',
-                    borderColor: selected ? 'var(--qf-navy)' : 'var(--qf-border)',
-                    fontSize: 12, fontWeight: 500, transition: 'all 0.15s',
-                    userSelect: 'none',
+                    border: '1.5px solid', borderColor: selected ? 'var(--qf-navy)' : 'var(--qf-border)',
+                    fontSize: 12, fontWeight: 500, transition: 'all 0.15s', userSelect: 'none',
                   }}>
                     <input type="checkbox" checked={selected} onChange={() => toggleRole(r.id)} style={{ display: 'none' }} />
                     {selected ? '✓ ' : ''}{r.name}
@@ -133,7 +124,6 @@ const ModalUsuario = ({ usuario, roles, onClose, onSave }) => {
               {roles.length === 0 && <span style={{ fontSize: 12, color: 'var(--qf-text-light)' }}>Cargando roles...</span>}
             </div>
           </div>
-
           {error && <div style={{ background: '#fce4e4', color: '#c62828', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 8 }}>⚠️ {error}</div>}
         </div>
         <div className="modal-footer">
@@ -210,8 +200,8 @@ const UsuariosPage = () => {
         apiCall('/qf/usuarios/listar'),
         apiCall('/qf/roles/listar')
       ])
-      setUsuarios(us)
-      setRoles(rs)
+      setUsuarios(toArray(us))
+      setRoles(toArray(rs))
     } catch (e) {
       show('Error al cargar datos: ' + e.message, 'error')
     } finally { setLoading(false) }
@@ -219,24 +209,32 @@ const UsuariosPage = () => {
 
   useEffect(() => { cargar() }, [])
 
+  // Maneja respuesta null/undefined del API
+  const handleResponse = (res, defaultMsg) => {
+    if (res === null || res === undefined) return // null = OK silencioso
+    if (res?.success === false) throw new Error(res.message || defaultMsg)
+    if (res?.success === true) return
+    // Si no tiene success, asumimos éxito (n8n no devolvió formato esperado)
+  }
+
   const handleSave = async (form) => {
     const endpoint = form.id ? '/qf/usuarios/actualizar' : '/qf/usuarios/crear'
     const res = await apiCall(endpoint, { method: 'POST', body: JSON.stringify(form) })
-    if (!res.success) throw new Error(res.message)
+    handleResponse(res, 'Error al guardar')
     show(form.id ? 'Usuario actualizado correctamente' : 'Usuario creado correctamente')
     cargar()
   }
 
   const handlePassword = async (data) => {
     const res = await apiCall('/qf/usuarios/cambiar-password', { method: 'POST', body: JSON.stringify(data) })
-    if (!res.success) throw new Error(res.message)
+    handleResponse(res, 'Error al cambiar contraseña')
     show('Contraseña actualizada correctamente')
   }
 
   const handleDelete = async (id) => {
     try {
       const res = await apiCall('/qf/usuarios/eliminar', { method: 'POST', body: JSON.stringify({ id }) })
-      if (!res.success) throw new Error(res.message)
+      handleResponse(res, 'Error al eliminar')
       show('Usuario eliminado')
       cargar()
     } catch (e) { show(e.message, 'error') }
@@ -252,12 +250,10 @@ const UsuariosPage = () => {
   return (
     <div className="fade-in">
       <ToastContainer toasts={toasts} />
-
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontFamily: 'Montserrat', fontSize: 22, fontWeight: 700, color: 'var(--qf-navy)', marginBottom: 4 }}>👥 Usuarios</h1>
         <p style={{ color: 'var(--qf-text-light)', fontSize: 13 }}>Gestión de usuarios del sistema</p>
       </div>
-
       <div className="page-card">
         <div className="page-card-header">
           <h2>Lista de Usuarios</h2>
@@ -266,7 +262,6 @@ const UsuariosPage = () => {
             <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'new' })}>➕ Nuevo Usuario</button>
           </div>
         </div>
-
         <div style={{ overflowX: 'auto' }}>
           {loading ? (
             <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner dark" /></div>
@@ -275,19 +270,10 @@ const UsuariosPage = () => {
           ) : (
             <table className="qf-table">
               <thead>
-                <tr>
-                  <th>Usuario</th>
-                  <th>Nombres</th>
-                  <th>Apellidos</th>
-                  <th>Email</th>
-                  <th>Estado</th>
-                  <th>Roles</th>
-                  <th style={{ textAlign: 'center' }}>Acciones</th>
-                </tr>
+                <tr><th>Usuario</th><th>Nombres</th><th>Apellidos</th><th>Email</th><th>Estado</th><th>Roles</th><th style={{ textAlign: 'center' }}>Acciones</th></tr>
               </thead>
               <tbody>
                 {filtrados.map(u => {
-                  // Parsear rolesStr para mostrar en tabla
                   const rolesArr = u.rolesStr ? u.rolesStr.split(',').map(r => r.trim()).filter(Boolean) : []
                   return (
                     <tr key={u.id}>
@@ -298,12 +284,7 @@ const UsuariosPage = () => {
                       <td><span className={`badge ${u.estado === 1 ? 'active' : 'inactive'}`}>{u.estado === 1 ? 'Activo' : 'Inactivo'}</span></td>
                       <td style={{ fontSize: 12 }}>
                         {rolesArr.length > 0 ? rolesArr.map(r => (
-                          <span key={r} style={{
-                            display: 'inline-block', background: '#e8eef5',
-                            color: 'var(--qf-navy)', borderRadius: 4,
-                            padding: '2px 7px', marginRight: 4, marginBottom: 2,
-                            fontSize: 11, fontWeight: 600
-                          }}>{r}</span>
+                          <span key={r} style={{ display: 'inline-block', background: '#e8eef5', color: 'var(--qf-navy)', borderRadius: 4, padding: '2px 7px', marginRight: 4, marginBottom: 2, fontSize: 11, fontWeight: 600 }}>{r}</span>
                         )) : '—'}
                       </td>
                       <td>
@@ -320,24 +301,15 @@ const UsuariosPage = () => {
             </table>
           )}
         </div>
-
         {!loading && (
           <div style={{ padding: '12px 24px', borderTop: '1px solid var(--qf-border)', fontSize: 12, color: 'var(--qf-text-light)' }}>
             {filtrados.length} de {usuarios.length} usuarios
           </div>
         )}
       </div>
-
-      {/* Modals */}
-      {modal?.type === 'new' && (
-        <ModalUsuario roles={roles} onClose={() => setModal(null)} onSave={handleSave} />
-      )}
-      {modal?.type === 'edit' && (
-        <ModalUsuario usuario={modal.data} roles={roles} onClose={() => setModal(null)} onSave={handleSave} />
-      )}
-      {modal?.type === 'password' && (
-        <ModalPassword usuario={modal.data} onClose={() => setModal(null)} onSave={handlePassword} />
-      )}
+      {modal?.type === 'new' && <ModalUsuario roles={roles} onClose={() => setModal(null)} onSave={handleSave} />}
+      {modal?.type === 'edit' && <ModalUsuario usuario={modal.data} roles={roles} onClose={() => setModal(null)} onSave={handleSave} />}
+      {modal?.type === 'password' && <ModalPassword usuario={modal.data} onClose={() => setModal(null)} onSave={handlePassword} />}
       {modal?.type === 'delete' && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModal(null)}>
           <div className="modal" style={{ maxWidth: 380 }}>
