@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { apiCall } from '../utils/api'
 import { useToast } from '../hooks/useToast'
 import ToastContainer from '../components/ToastContainer'
+import { useAuth } from '../context/AuthContext'
 
 // ── MODAL ATRIBUTO ─────────────────────────────────────────────────────────
 const ModalAtributo = ({ atributo, grupoId, onClose, onSave }) => {
@@ -163,6 +164,7 @@ const ModalGrupo = ({ grupo, onClose, onSave }) => {
 
 // ── MAIN PAGE ──────────────────────────────────────────────────────────────
 const InvGruposPage = () => {
+  const { user } = useAuth()
   const [grupos, setGrupos] = useState([])
   const [atributos, setAtributos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -190,7 +192,10 @@ const InvGruposPage = () => {
 
   const handleSaveGrupo = async (form) => {
     const endpoint = form.id ? '/qf/inv/grupos/actualizar' : '/qf/inv/grupos/crear'
-    const res = await apiCall(endpoint, { method: 'POST', body: JSON.stringify(form) })
+    const res = await apiCall(endpoint, {
+      method: 'POST',
+      body: JSON.stringify({ ...form, usr_crea: user?.userName || user?.username })
+    })
     if (!res.success) throw new Error(res.message)
     show(form.id ? 'Grupo actualizado' : 'Grupo creado')
     cargar()
