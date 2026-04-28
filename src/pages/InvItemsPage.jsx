@@ -34,8 +34,13 @@ const ModalItem = ({ item, grupos, onClose, onSave }) => {
         if (isEdit) {
           apiCall(`/qf/inv/items/detalle?itemId=${item.id}`)
             .then(vals => {
+              // No usar toArray aquí — los valores no tienen campo 'id'
+              let valArr = []
+              if (Array.isArray(vals)) valArr = vals
+              else if (vals && typeof vals === 'object' && vals.data) valArr = Array.isArray(vals.data) ? vals.data : []
+              else if (vals && typeof vals === 'object' && vals.atributo_id) valArr = [vals]
               const valMap = {}
-              toArray(vals).forEach(v => { valMap[v.atributo_id] = v.valor })
+              valArr.forEach(v => { if (v.atributo_id) valMap[v.atributo_id] = v.valor })
               setForm(f => ({ ...f, valores: atrs.map(a => ({ atributo_id: a.id, valor: valMap[a.id] || '' })) }))
             })
         } else {
