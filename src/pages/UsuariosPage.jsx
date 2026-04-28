@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { apiCall, toArray } from '../utils/api'
 import { useToast } from '../hooks/useToast'
 import ToastContainer from '../components/ToastContainer'
+import { useAuth } from '../context/AuthContext'
 
 const ModalUsuario = ({ usuario, roles, onClose, onSave }) => {
   const rolesIniciales = usuario?.roleIdsStr
@@ -186,6 +187,7 @@ const ModalPassword = ({ usuario, onClose, onSave }) => {
 }
 
 const UsuariosPage = () => {
+  const { user } = useAuth()
   const [usuarios, setUsuarios] = useState([])
   const [roles, setRoles] = useState([])
   const [loading, setLoading] = useState(true)
@@ -219,7 +221,8 @@ const UsuariosPage = () => {
 
   const handleSave = async (form) => {
     const endpoint = form.id ? '/qf/usuarios/actualizar' : '/qf/usuarios/crear'
-    const res = await apiCall(endpoint, { method: 'POST', body: JSON.stringify(form) })
+    const usr_crea = user?.userName || user?.username || 'SISTEMA'
+    const res = await apiCall(endpoint, { method: 'POST', body: JSON.stringify({ ...form, usr_crea }) })
     handleResponse(res, 'Error al guardar')
     show(form.id ? 'Usuario actualizado correctamente' : 'Usuario creado correctamente')
     cargar()
