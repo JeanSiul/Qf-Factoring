@@ -198,11 +198,67 @@ const ModalHistorial = ({ item, onClose }) => {
   )
 }
 
+// ── MODAL ASIGNAR ──────────────────────────────────────────────────────────
+const ModalAsignar = ({ item, usuarios, onClose, onSave }) => {
+  const [form, setForm] = useState({ usuario_id: '', usuario_nombre: '', observacion: '' })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleUsuario = (e) => {
+    const u = usuarios.find(u => u.id === e.target.value)
+    setForm(f => ({ ...f, usuario_id: u?.id || '', usuario_nombre: u ? `${u.nombres} ${u.apellidos}`.trim() : '' }))
+  }
+
+  const handleSubmit = async () => {
+    if (!form.usuario_id) { setError('Selecciona un usuario'); return }
+    setLoading(true); setError('')
+    try { await onSave({ ...form, item_id: item.id, accion: 'asignacion' }); onClose() }
+    catch (e) { setError(e.message || 'Error al asignar') }
+    finally { setLoading(false) }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 440 }}>
+        <div className="modal-header">
+          <h3>👤 Asignar Item</h3>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div style={{ background: '#e8eef5', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13 }}>
+            <strong>{item.codigo}</strong> — {item.nombre}
+            <div style={{ fontSize: 11, color: 'var(--qf-text-light)', marginTop: 2 }}>{item.grupo_nombre}</div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Asignar a *</label>
+            <select className="form-control" value={form.usuario_id} onChange={handleUsuario}>
+              <option value="">Seleccionar usuario...</option>
+              {usuarios.map(u => <option key={u.id} value={u.id}>{u.nombres} {u.apellidos} ({u.userName})</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Observación</label>
+            <textarea className="form-control" value={form.observacion} onChange={e => setForm(f => ({ ...f, observacion: e.target.value }))} rows={2} style={{ resize: 'vertical' }} placeholder="Motivo de la asignación..." />
+          </div>
+          {error && <div style={{ background: '#fce4e4', color: '#c62828', borderRadius: 8, padding: '10px 14px', fontSize: 13 }}>⚠️ {error}</div>}
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-primary" onClick={handleSubmit} disabled={loading}>
+            {loading ? <><span className="spinner" />Asignando...</> : '👤 Asignar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── MAIN PAGE ──────────────────────────────────────────────────────────────
 const InvItemsPage = () => {
   const { user } = useAuth()
   const [items, setItems] = useState([])
   const [grupos, setGrupos] = useState([])
+  const [usuarios, setUsuarios] = useState([])
   const [loading, setLoading] = useState(true)
   const [filtro, setFiltro] = useState('')
   const [filtroGrupo, setFiltroGrupo] = useState('todos')
@@ -213,17 +269,29 @@ const InvItemsPage = () => {
   const cargar = async () => {
     setLoading(true)
     try {
-      const [it, gr] = await Promise.all([
+      const [it, gr, us] = await Promise.all([
         apiCall('/qf/inv/items/listar'),
         apiCall('/qf/inv/grupos/listar'),
+        apiCall('/qf/usuarios/listar'),
       ])
       setItems(toArray(it))
       setGrupos(toArray(gr))
+      setUsuarios(toArray(us).filter(u => u.estado === 0))
     } catch (e) { show('Error al cargar items: ' + e.message, 'error') }
     finally { setLoading(false) }
   }
 
   useEffect(() => { cargar() }, [])
+
+  const handleAsignar = async (form) => {
+    const res = await apiCall('/qf/inv/asignaciones/asignar', {
+      method: 'POST',
+      body: JSON.stringify({ ...form, usr_realizo_id: user?.id, usr_realizo: user?.username || user?.userName })
+    })
+    if (!res?.success) throw new Error(res?.message || 'Error al asignar')
+    show('Item asignado correctamente')
+    cargar()
+  }
 
   const handleSave = async (form) => {
     const endpoint = form.id ? '/qf/inv/items/actualizar' : '/qf/inv/items/crear'
@@ -321,6 +389,9 @@ const InvItemsPage = () => {
                       <td>
                         <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'wrap' }}>
                           <button className="btn btn-secondary btn-sm" onClick={() => setModal({ type: 'historial', data: i })} title="Historial">📋</button>
+                          {i.estado === 'disponible' && (
+                            <button className="btn btn-success btn-sm" onClick={() => setModal({ type: 'asignar', data: i })} title="Asignar">👤</button>
+                          )}
                           <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'editar', data: i })} title="Editar">✏️</button>
                           <button className="btn btn-danger btn-sm" onClick={() => handleEliminar(i)} title="Eliminar" disabled={i.estado !== 'disponible'}>🗑️</button>
                         </div>
@@ -337,6 +408,7 @@ const InvItemsPage = () => {
       {modal?.type === 'nuevo' && <ModalItem grupos={grupos} onClose={() => setModal(null)} onSave={handleSave} />}
       {modal?.type === 'editar' && <ModalItem item={modal.data} grupos={grupos} onClose={() => setModal(null)} onSave={handleSave} />}
       {modal?.type === 'historial' && <ModalHistorial item={modal.data} onClose={() => setModal(null)} />}
+      {modal?.type === 'asignar' && <ModalAsignar item={modal.data} usuarios={usuarios} onClose={() => setModal(null)} onSave={handleAsignar} />}
     </div>
   )
 }
