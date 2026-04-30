@@ -258,6 +258,162 @@ const ModalAsignar = ({ item, usuarios, onClose, onSave }) => {
   )
 }
 
+
+// ── MODAL REPORTE ──────────────────────────────────────────────────────────
+const ModalReporte = ({ grupos, filtroGrupoActual, onClose }) => {
+  const REPORT_BASE_URL =
+    import.meta.env.VITE_N8N_INVENTARIO_REPORT_URL ||
+    'https://TU-N8N-DOMINIO/webhook/qf/reportes/inventario'
+
+  const [params, setParams] = useState({
+    grupo_id: filtroGrupoActual !== 'todos' ? String(filtroGrupoActual) : '0',
+    email: '',
+    enviar_email: false,
+  })
+
+  const [urlReporte, setUrlReporte] = useState('')
+  const [loadingPreview, setLoadingPreview] = useState(false)
+
+  const set = (k, v) => setParams(p => ({ ...p, [k]: v }))
+
+  const generarReporte = () => {
+    const qs = new URLSearchParams()
+    qs.set('grupo_id', params.grupo_id || '0')
+    qs.set('inline', '1')
+
+    if (params.enviar_email && params.email.trim()) {
+      qs.set('email', params.email.trim())
+    }
+
+    const url = `${REPORT_BASE_URL}?${qs.toString()}`
+    setLoadingPreview(true)
+    setUrlReporte(url)
+  }
+
+  const descargarUrl = () => {
+    if (!urlReporte) return '#'
+    const u = new URL(urlReporte)
+    u.searchParams.set('download', '1')
+    u.searchParams.delete('inline')
+    return u.toString()
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 1100, width: '94vw' }}>
+        <div className="modal-header">
+          <h3>📊 Reporte de Inventario</h3>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+
+        <div className="modal-body" style={{ maxHeight: '82vh', overflowY: 'auto' }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(180px, 1fr) minmax(220px, 1fr) auto auto',
+            gap: 12,
+            alignItems: 'end',
+            marginBottom: 16,
+            background: '#f8fafc',
+            border: '1px solid var(--qf-border)',
+            borderRadius: 12,
+            padding: 14
+          }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Grupo</label>
+              <select
+                className="form-control"
+                value={params.grupo_id}
+                onChange={e => set('grupo_id', e.target.value)}
+              >
+                <option value="0">Todos los grupos</option>
+                {grupos.map(g => (
+                  <option key={g.id} value={g.id}>{g.nombre}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Correo opcional</label>
+              <input
+                className="form-control"
+                placeholder="correo@qf-factoring.com"
+                value={params.email}
+                onChange={e => set('email', e.target.value)}
+              />
+            </div>
+
+            <label style={{
+              display: 'flex',
+              gap: 6,
+              alignItems: 'center',
+              height: 38,
+              fontSize: 13,
+              color: 'var(--qf-navy)',
+              fontWeight: 600
+            }}>
+              <input
+                type="checkbox"
+                checked={params.enviar_email}
+                onChange={e => set('enviar_email', e.target.checked)}
+              />
+              Enviar correo
+            </label>
+
+            <button className="btn btn-primary" onClick={generarReporte}>
+              📄 Generar
+            </button>
+          </div>
+
+          {!urlReporte ? (
+            <div className="empty-state">
+              <div className="icon">📊</div>
+              <p>Selecciona los parámetros y presiona “Generar”.</p>
+            </div>
+          ) : (
+            <div style={{
+              border: '1px solid var(--qf-border)',
+              borderRadius: 12,
+              overflow: 'hidden',
+              background: '#fff'
+            }}>
+              {loadingPreview && (
+                <div style={{
+                  padding: 10,
+                  fontSize: 12,
+                  color: 'var(--qf-text-light)',
+                  borderBottom: '1px solid var(--qf-border)'
+                }}>
+                  Cargando reporte...
+                </div>
+              )}
+              <iframe
+                src={urlReporte}
+                title="Reporte de Inventario"
+                style={{ width: '100%', height: '72vh', border: 0, display: 'block' }}
+                onLoad={() => setLoadingPreview(false)}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="modal-footer">
+          {urlReporte && (
+            <>
+              <a className="btn btn-secondary" href={urlReporte} target="_blank" rel="noreferrer">
+                🔎 Abrir en pestaña
+              </a>
+              <a className="btn btn-primary" href={descargarUrl()} target="_blank" rel="noreferrer">
+                ⬇️ Descargar PDF
+              </a>
+            </>
+          )}
+          <button className="btn btn-secondary" onClick={onClose}>Cerrar</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── MAIN PAGE ──────────────────────────────────────────────────────────────
 const InvItemsPage = () => {
   const { user } = useAuth()
@@ -366,6 +522,7 @@ const InvItemsPage = () => {
               <option value="baja">Baja</option>
             </select>
             <input className="filter-input" placeholder="🔍 Filtrar..." value={filtro} onChange={e => setFiltro(e.target.value)} />
+            <button className="btn btn-secondary btn-sm" onClick={() => setModal({ type: 'reporte' })} disabled={grupos.length === 0}>📊 Reporte</button>
             <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })} disabled={grupos.length === 0}>➕ Nuevo Item</button>
           </div>
         </div>
@@ -414,6 +571,13 @@ const InvItemsPage = () => {
       {modal?.type === 'editar' && <ModalItem item={modal.data} grupos={grupos} onClose={() => setModal(null)} onSave={handleSave} />}
       {modal?.type === 'historial' && <ModalHistorial item={modal.data} onClose={() => setModal(null)} />}
       {modal?.type === 'asignar' && <ModalAsignar item={modal.data} usuarios={usuarios} onClose={() => setModal(null)} onSave={handleAsignar} />}
+      {modal?.type === 'reporte' && (
+        <ModalReporte
+          grupos={grupos}
+          filtroGrupoActual={filtroGrupo}
+          onClose={() => setModal(null)}
+        />
+      )}
     </div>
   )
 }
