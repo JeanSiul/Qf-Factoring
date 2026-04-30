@@ -1,5 +1,5 @@
 const API_BASE =
-  import.meta.env.VITE_API_URL || '/api/webhook'
+  import.meta.env.VITE_API_URL || 'https://liissa-unfloatable-seditiously.ngrok-free.dev/webhook'
 
 export const apiCall = async (endpoint, options = {}) => {
   const url = `${API_BASE}${endpoint}`
