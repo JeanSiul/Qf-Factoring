@@ -261,9 +261,11 @@ const ModalAsignar = ({ item, usuarios, onClose, onSave }) => {
 
 // ── MODAL REPORTE ──────────────────────────────────────────────────────────
 const ModalReporte = ({ grupos, filtroGrupoActual, onClose }) => {
+  // En producción, configura VITE_N8N_INVENTARIO_REPORT_URL en Vercel.
+  // El fallback ngrok puede cambiar si reinicias ngrok.
   const REPORT_BASE_URL =
     import.meta.env.VITE_N8N_INVENTARIO_REPORT_URL ||
-    'https://TU-N8N-DOMINIO/webhook/qf/reportes/inventario'
+    'https://lissa-unfloatable-seditiously.ngrok-free.dev/webhook/qf/reportes/inventario'
 
   const [params, setParams] = useState({
     grupo_id: filtroGrupoActual !== 'todos' ? String(filtroGrupoActual) : '0',
@@ -281,8 +283,15 @@ const ModalReporte = ({ grupos, filtroGrupoActual, onClose }) => {
     qs.set('grupo_id', params.grupo_id || '0')
     qs.set('inline', '1')
 
-    if (params.enviar_email && params.email.trim()) {
-      qs.set('email', params.email.trim())
+    if (params.enviar_email) {
+      const email = params.email.trim()
+
+      if (!email || !email.includes('@')) {
+        alert('Ingresa un correo válido para enviar el reporte.')
+        return
+      }
+
+      qs.set('email', email)
     }
 
     const url = `${REPORT_BASE_URL}?${qs.toString()}`
