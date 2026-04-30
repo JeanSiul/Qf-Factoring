@@ -31,13 +31,22 @@ const menuItems = [
       { icon: '👤', label: 'Asignaciones', path: '/inventario/asignaciones' },
     ]
   },
+  {
+    icon: '💼', label: 'Operaciones', path: null,
+    children: [
+      { icon: '📊', label: 'Dashboard', path: '/operaciones/dashboard' },
+      { icon: '🧾', label: 'Facturas', path: '/operaciones/facturas' },
+      { icon: '💰', label: 'Finanzas', path: '/operaciones/finanzas' },
+      { icon: '📈', label: 'Reportes', path: '/operaciones/reportes' },
+    ]
+  },
 ]
 
 const Sidebar = ({ mobileOpen, onClose }) => {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [expanded, setExpanded] = useState({ '🔐': true, '🔔': false, '📦': false })
+  const [expanded, setExpanded] = useState({ '🔐': true, '🔔': false, '📦': false, '💼': false })
 
   const handleNav = (path) => { navigate(path); if (onClose) onClose() }
   const toggleMenu = (icon) => setExpanded(prev => ({ ...prev, [icon]: !prev[icon] }))
