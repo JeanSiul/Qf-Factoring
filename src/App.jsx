@@ -16,7 +16,7 @@ import InvGruposPage from './pages/InvGruposPage'
 import InvItemsPage from './pages/InvItemsPage'
 import InvAsignacionesPage from './pages/InvAsignacionesPage'
 import Layout from './components/Layout'
-import OperacionesRegistrosPage from './pages/OperacionesRegistrosPage'
+import OperacionesRegistrosPage from './pages/OperacionesFacturasPage'
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth()
@@ -59,7 +59,7 @@ const App = () => (
           <Route path="inventario/grupos" element={<InvGruposPage />} />
           <Route path="inventario/items" element={<InvItemsPage />} />
           <Route path="inventario/asignaciones" element={<InvAsignacionesPage />} />
-          <Route path="/operaciones/facturas" element={<OperacionesRegistrosPage />} />
+          <Route path="/operaciones/facturas" element={<OperacionesFacturasPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
