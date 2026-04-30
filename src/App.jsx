@@ -16,7 +16,7 @@ import InvGruposPage from './pages/InvGruposPage'
 import InvItemsPage from './pages/InvItemsPage'
 import InvAsignacionesPage from './pages/InvAsignacionesPage'
 import Layout from './components/Layout'
-import OperacionesRegistrosPage from './pages/OperacionesFacturasPage'
+import OperacionesFacturasPage from './pages/OperacionesFacturasPage'
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth()
