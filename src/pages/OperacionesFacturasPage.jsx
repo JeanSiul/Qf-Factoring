@@ -1,10 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { apiCall, toArray } from '../utils/api'
 import { useToast } from '../hooks/useToast'
 import ToastContainer from '../components/ToastContainer'
 
 const PAGE_SIZE = 50
-const DEBOUNCE_MS = 450
 
 const camposBusqueda = [
   { value: 'all', label: 'Todos' },
@@ -52,24 +51,15 @@ const formatDate = value => {
   return d.toLocaleDateString('es-PE')
 }
 
-const miniBar = (value, max) => {
-  const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0
-  return (
-    <div style={styles.miniBarTrack}>
-      <div style={{ ...styles.miniBarFill, width: `${pct}%` }} />
-    </div>
-  )
-}
-
 const ModalDetalle = ({ item, onClose }) => (
   <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-    <div className="modal" style={{ maxWidth: 840 }}>
+    <div className="modal" style={{ maxWidth: 760 }}>
       <div className="modal-header">
         <h3>📋 Detalles factura — {factura(item)}</h3>
         <button className="modal-close" onClick={onClose}>×</button>
       </div>
       <div className="modal-body">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           {[
             ['Cliente', cliente(item)],
             ['Pagador', pagador(item)],
@@ -87,9 +77,9 @@ const ModalDetalle = ({ item, onClose }) => (
             ['Estado general', item.status || '—'],
             ['Estado operativo', estadoOperativo(item)],
           ].map(([k, v]) => (
-            <div key={k} style={styles.detailBox}>
-              <div style={styles.detailLabel}>{k}</div>
-              <div style={styles.detailValue}>{v}</div>
+            <div key={k} style={{ background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 10 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--qf-text-light)', textTransform: 'uppercase' }}>{k}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--qf-navy)' }}>{v}</div>
             </div>
           ))}
         </div>
@@ -109,7 +99,6 @@ const OperacionesFacturasPage = () => {
   const [busqueda, setBusqueda] = useState('')
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
-  const [compactMode, setCompactMode] = useState(true)
   const { toasts, show } = useToast()
 
   const cargar = async (opts = {}) => {
@@ -141,15 +130,10 @@ const OperacionesFacturasPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page])
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setPage(1)
-      cargar({ page: 1 })
-    }, DEBOUNCE_MS)
-
-    return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [busqueda, campo])
+  const buscar = () => {
+    setPage(1)
+    cargar({ page: 1 })
+  }
 
   const limpiar = () => {
     setCampo('all')
@@ -158,133 +142,131 @@ const OperacionesFacturasPage = () => {
     cargar({ page: 1, campo: 'all', busqueda: '' })
   }
 
+
+  const handleEliminar = async (item) => {
+    if (!confirm(`¿Eliminar la factura ${factura(item)}?`)) return
+    try {
+      const res = await apiCall('/qf/ops/billings/eliminar', {
+        method: 'POST',
+        body: JSON.stringify({ id: item.id })
+      })
+      if (!res?.success) throw new Error(res?.message || 'No se pudo eliminar')
+      show('Factura eliminada')
+      cargar()
+    } catch (e) {
+      show(e.message, 'error')
+    }
+  }
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const from = total === 0 ? 0 : ((page - 1) * PAGE_SIZE) + 1
   const to = Math.min(page * PAGE_SIZE, total)
 
-  const metrics = useMemo(() => {
-    const totalNeto = facturas.reduce((s, f) => s + Number(f.net_amount || 0), 0)
-    const totalMonto = facturas.reduce((s, f) => s + Number(f.amount || 0), 0)
-    const registradas = facturas.filter(f => String(f.status || '').toLowerCase().includes('registr')).length
-    const fondos = new Set(facturas.map(f => fondo(f)).filter(v => v && v !== '—')).size
-    return { totalNeto, totalMonto, registradas, fondos }
-  }, [facturas])
-
-  const maxNeto = useMemo(() => Math.max(...facturas.map(f => Number(f.net_amount || 0)), 0), [facturas])
+  const totalNeto = facturas.reduce((s, f) => s + Number(f.net_amount || 0), 0)
+  const totalMonto = facturas.reduce((s, f) => s + Number(f.amount || 0), 0)
+  const totalRegistradas = facturas.filter(f => String(f.status || '').toLowerCase().includes('registr')).length
 
   return (
-    <div className="fade-in" style={styles.page}>
+    <div className="fade-in">
       <ToastContainer toasts={toasts} />
 
-      <div style={styles.topHeader}>
-        <div>
-          <h1 style={styles.title}>🧾 Facturas</h1>
-          <p style={styles.subtitle}>Gestión premium de facturas registradas en operaciones</p>
-        </div>
-        <button className="btn btn-secondary btn-sm" onClick={() => setCompactMode(v => !v)}>
-          {compactMode ? 'Vista cómoda' : 'Vista compacta'}
-        </button>
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ fontFamily: 'Montserrat', fontSize: 22, fontWeight: 700, color: 'var(--qf-navy)', marginBottom: 4 }}>🧾 Facturas</h1>
+        <p style={{ color: 'var(--qf-text-light)', fontSize: 13 }}>Gestión de facturas registradas en operaciones</p>
       </div>
 
-      <div style={styles.kpiGrid}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 20 }}>
         {[
-          { label: 'Total facturas', value: total, color: 'var(--qf-navy)', border: '#2196f3' },
+          { label: 'Facturas', value: total, color: 'var(--qf-navy)', border: '#2196f3' },
           { label: 'Mostradas', value: facturas.length, color: '#185FA5', border: '#03a9f4' },
-          { label: 'Neto página', value: money(metrics.totalNeto), color: '#2e7d32', border: '#4caf50' },
-          { label: 'Monto página', value: money(metrics.totalMonto), color: '#e65100', border: '#ff9800' },
-          { label: 'Registradas', value: metrics.registradas, color: '#c62828', border: '#f44336' },
-          { label: 'Fondos pág.', value: metrics.fondos, color: '#5e35b1', border: '#7e57c2' },
+          { label: 'Neto pág.', value: money(totalNeto), color: '#2e7d32', border: '#4caf50' },
+          { label: 'Monto pág.', value: money(totalMonto), color: '#e65100', border: '#ff9800' },
+          { label: 'Registradas pág.', value: totalRegistradas, color: '#c62828', border: '#f44336' },
         ].map(s => (
-          <div key={s.label} style={{ ...styles.kpiCard, borderTop: `3px solid ${s.border}` }}>
-            <div style={styles.kpiLabel}>{s.label}</div>
-            <div style={{ ...styles.kpiValue, color: s.color, fontSize: typeof s.value === 'string' && s.value.length > 12 ? 17 : 24 }}>{s.value}</div>
+          <div key={s.label} style={{ background: '#fff', borderRadius: 12, padding: '14px 18px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', borderTop: `3px solid ${s.border}` }}>
+            <div style={{ fontSize: 10, color: 'var(--qf-text-light)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>{s.label}</div>
+            <div style={{ fontSize: typeof s.value === 'string' && s.value.length > 12 ? 18 : 28, fontWeight: 800, color: s.color, fontFamily: 'Montserrat', lineHeight: 1.2 }}>{s.value}</div>
           </div>
         ))}
       </div>
 
-      <div className="page-card" style={styles.card}>
-        <div style={styles.stickyTools}>
-          <div style={styles.cardTitleWrap}>
-            <h2 style={styles.cardTitle}>Lista de Facturas</h2>
-            <span style={styles.resultPill}>{from}-{to} de {total}</span>
-          </div>
-
-          <div style={styles.filtersRow}>
-            <select className="filter-input" value={campo} onChange={e => setCampo(e.target.value)} style={styles.fieldSelect}>
+      <div className="page-card">
+        <div className="page-card-header">
+          <h2>Lista de Facturas</h2>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <select className="filter-input" value={campo} onChange={e => setCampo(e.target.value)} style={{ width: 'auto', minWidth: 145 }}>
               {camposBusqueda.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
 
             <input
               className="filter-input"
-              placeholder={campo === 'all' ? '🔍 Buscar mientras escribes...' : `🔍 Buscar por ${camposBusqueda.find(f => f.value === campo)?.label || ''}...`}
+              placeholder={campo === 'all' ? '🔍 Buscar...' : `🔍 ${camposBusqueda.find(f => f.value === campo)?.label || ''}...`}
               value={busqueda}
               onChange={e => setBusqueda(e.target.value)}
-              style={styles.searchInput}
+              onKeyDown={e => e.key === 'Enter' && buscar()}
+              style={{ minWidth: 220 }}
             />
 
+            <button className="btn btn-secondary btn-sm" onClick={buscar}>Filtros</button>
             <button className="btn btn-secondary btn-sm" onClick={limpiar}>Limpiar</button>
-          </div>
-
-          <div style={styles.paginationRow}>
-            <button className="btn btn-secondary btn-sm" disabled={page <= 1 || loading} onClick={() => setPage(1)}>Primera</button>
-            <button className="btn btn-secondary btn-sm" disabled={page <= 1 || loading} onClick={() => setPage(p => Math.max(1, p - 1))}>Anterior</button>
-            <span style={styles.pageInfo}>Página <strong>{page}</strong> de <strong>{totalPages}</strong></span>
-            <button className="btn btn-secondary btn-sm" disabled={page >= totalPages || loading} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>Siguiente</button>
-            <button className="btn btn-secondary btn-sm" disabled={page >= totalPages || loading} onClick={() => setPage(totalPages)}>Última</button>
-            {loading && <span style={styles.loadingMini}>Actualizando...</span>}
+            <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })}>➕ Nueva Factura</button>
           </div>
         </div>
 
-        <div style={{ ...styles.tableViewport, maxHeight: compactMode ? 'calc(100vh - 330px)' : 'calc(100vh - 390px)' }}>
-          {loading && facturas.length === 0 ? (
+        <div style={{ padding: '10px 24px', borderBottom: '1px solid var(--qf-border)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 12, color: 'var(--qf-text-light)' }}>
+          <button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>Anterior</button>
+          <span>Página <strong>{page}</strong> de <strong>{totalPages}</strong> · {from}-{to} de {total}</span>
+          <button className="btn btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>Siguiente</button>
+        </div>
+
+        <div style={{ overflowX: 'auto' }}>
+          {loading ? (
             <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner dark" /></div>
           ) : facturas.length === 0 ? (
             <div className="empty-state"><div className="icon">🧾</div><p>No se encontraron facturas</p></div>
           ) : (
-            <table className="qf-table" style={{ ...styles.table, fontSize: compactMode ? 11.5 : 12.5 }}>
+            <table className="qf-table">
               <thead>
                 <tr>
-                  <th style={styles.th}>Cliente</th>
-                  <th style={styles.th}>Pagador</th>
-                  <th style={styles.th}>Número</th>
-                  <th style={styles.th}>Moneda</th>
-                  <th style={styles.th}>Importe neto</th>
-                  <th style={styles.th}>Peso</th>
-                  <th style={styles.th}>Fecha pago</th>
-                  <th style={styles.th}>Fecha desembolso</th>
-                  <th style={styles.th}>Fondo</th>
-                  <th style={styles.th}>Comercial</th>
-                  <th style={styles.th}>Bloque</th>
-                  <th style={styles.th}>Estado general</th>
-                  <th style={styles.th}>Estado operativo</th>
-                  <th style={{ ...styles.th, textAlign: 'center' }}>Acciones</th>
+                  <th>Cliente</th>
+                  <th>Pagador</th>
+                  <th>Número</th>
+                  <th>Moneda</th>
+                  <th>Importe neto</th>
+                  <th>Fecha pago</th>
+                  <th>Fecha desembolso</th>
+                  <th>Fondo</th>
+                  <th>Comercial</th>
+                  <th>Bloque</th>
+                  <th>Estado general</th>
+                  <th>Estado operativo</th>
+                  <th style={{ textAlign: 'center' }}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {facturas.map(f => {
                   const general = f.status || '—'
                   const operativo = estadoOperativo(f)
-                  const neto = Number(f.net_amount || 0)
-
                   return (
-                    <tr key={f.id} style={compactMode ? styles.compactRow : undefined}>
-                      <td style={{ ...styles.td, minWidth: 210, fontWeight: 600 }}>{cliente(f)}</td>
-                      <td style={{ ...styles.td, minWidth: 230 }}>{pagador(f)}</td>
-                      <td style={{ ...styles.td, minWidth: 95 }}>
-                        <code style={styles.invoiceCode}>{factura(f)}</code>
-                      </td>
-                      <td style={styles.td}>{f.currency || '—'}</td>
-                      <td style={{ ...styles.td, fontWeight: 800, color: '#2e7d32', whiteSpace: 'nowrap' }}>{money(neto, f.currency)}</td>
-                      <td style={{ ...styles.td, minWidth: 95 }}>{miniBar(neto, maxNeto)}</td>
-                      <td style={styles.td}>{formatDate(f.date_payment)}</td>
-                      <td style={styles.td}>{formatDate(f.date_payout || f.date_emission)}</td>
-                      <td style={styles.td}><span style={styles.fundPill}>{fondo(f)}</span></td>
-                      <td style={{ ...styles.td, minWidth: 160 }}>{comercial(f)}</td>
-                      <td style={styles.td}>{f.Idbloque || '—'}</td>
-                      <td style={styles.td}><span className={`badge ${badgeClass(general)}`}>{String(general).toUpperCase()}</span></td>
-                      <td style={styles.td}><span className={`badge ${badgeClass(operativo)}`}>{String(operativo).toUpperCase()}</span></td>
-                      <td style={{ ...styles.td, textAlign: 'center' }}>
-                        <button className="btn btn-secondary btn-sm" onClick={() => setModal({ type: 'detalle', data: f })} title="Detalles">📋</button>
+                    <tr key={f.id}>
+                      <td style={{ minWidth: 240, fontWeight: 500 }}>{cliente(f)}</td>
+                      <td style={{ minWidth: 260 }}>{pagador(f)}</td>
+                      <td style={{ minWidth: 90 }}><code style={{ background: '#e8eef5', padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 700 }}>{factura(f)}</code></td>
+                      <td>{f.currency || '—'}</td>
+                      <td style={{ fontWeight: 700, color: '#2e7d32' }}>{money(f.net_amount, f.currency)}</td>
+                      <td>{formatDate(f.date_payment)}</td>
+                      <td>{formatDate(f.date_payout || f.date_emission)}</td>
+                      <td><span style={{ background: '#e8eef5', color: 'var(--qf-navy)', borderRadius: 4, padding: '2px 8px', fontSize: 10.5, fontWeight: 600 }}>{fondo(f)}</span></td>
+                      <td style={{ minWidth: 180 }}>{comercial(f)}</td>
+                      <td>{f.Idbloque || '—'}</td>
+                      <td><span className={`badge ${badgeClass(general)}`}>{String(general).toUpperCase()}</span></td>
+                      <td><span className={`badge ${badgeClass(operativo)}`}>{String(operativo).toUpperCase()}</span></td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'wrap' }}>
+                          <button className="btn btn-secondary btn-sm" onClick={() => setModal({ type: 'detalle', data: f })} title="Detalles">📋</button>
+                          <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'editar', data: f })} title="Editar">✏️</button>
+                          <button className="btn btn-danger btn-sm" onClick={() => handleEliminar?.(f)} title="Eliminar">🗑️</button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -294,211 +276,12 @@ const OperacionesFacturasPage = () => {
           )}
         </div>
 
-        {!loading && <div style={styles.footerCount}>{facturas.length} de {total} facturas</div>}
+        {!loading && <div style={{ padding: '12px 24px', borderTop: '1px solid var(--qf-border)', fontSize: 12, color: 'var(--qf-text-light)' }}>{facturas.length} de {total} facturas</div>}
       </div>
 
       {modal?.type === 'detalle' && <ModalDetalle item={modal.data} onClose={() => setModal(null)} />}
     </div>
   )
-}
-
-const styles = {
-  page: {
-    paddingBottom: 16,
-  },
-  topHeader: {
-    marginBottom: 14,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  title: {
-    fontFamily: 'Montserrat',
-    fontSize: 22,
-    fontWeight: 800,
-    color: 'var(--qf-navy)',
-    marginBottom: 3,
-  },
-  subtitle: {
-    color: 'var(--qf-text-light)',
-    fontSize: 12.5,
-  },
-  kpiGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))',
-    gap: 10,
-    marginBottom: 14,
-  },
-  kpiCard: {
-    background: '#fff',
-    borderRadius: 12,
-    padding: '10px 14px',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-    minHeight: 68,
-  },
-  kpiLabel: {
-    fontSize: 9.5,
-    color: 'var(--qf-text-light)',
-    fontWeight: 700,
-    textTransform: 'uppercase',
-    letterSpacing: 0.45,
-    marginBottom: 4,
-  },
-  kpiValue: {
-    fontWeight: 850,
-    fontFamily: 'Montserrat',
-    lineHeight: 1.1,
-  },
-  card: {
-    overflow: 'visible',
-  },
-  stickyTools: {
-    position: 'sticky',
-    top: 0,
-    zIndex: 20,
-    background: '#fff',
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    borderBottom: '1px solid var(--qf-border)',
-    boxShadow: '0 2px 10px rgba(15, 23, 42, 0.04)',
-  },
-  cardTitleWrap: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-    padding: '13px 18px 8px',
-  },
-  cardTitle: {
-    margin: 0,
-    fontSize: 18,
-    fontFamily: 'Montserrat',
-    color: 'var(--qf-navy)',
-  },
-  resultPill: {
-    fontSize: 11,
-    fontWeight: 700,
-    color: 'var(--qf-navy)',
-    background: '#e8eef5',
-    borderRadius: 999,
-    padding: '4px 10px',
-  },
-  filtersRow: {
-    display: 'flex',
-    gap: 8,
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    padding: '0 18px 8px',
-  },
-  fieldSelect: {
-    width: 'auto',
-    minWidth: 145,
-    height: 36,
-  },
-  searchInput: {
-    minWidth: 260,
-    maxWidth: 420,
-    height: 36,
-  },
-  paginationRow: {
-    display: 'flex',
-    gap: 7,
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    padding: '8px 18px 10px',
-    background: '#f8fafc',
-    borderTop: '1px solid var(--qf-border)',
-  },
-  pageInfo: {
-    fontSize: 12,
-    color: 'var(--qf-text-light)',
-    padding: '0 6px',
-  },
-  loadingMini: {
-    fontSize: 11,
-    color: '#185FA5',
-    fontWeight: 700,
-  },
-  tableViewport: {
-    overflow: 'auto',
-    width: '100%',
-  },
-  table: {
-    minWidth: 1550,
-    tableLayout: 'auto',
-  },
-  th: {
-    position: 'sticky',
-    top: 0,
-    zIndex: 10,
-    whiteSpace: 'nowrap',
-    fontSize: 11,
-    padding: '10px 10px',
-  },
-  td: {
-    padding: '8px 10px',
-    verticalAlign: 'middle',
-    lineHeight: 1.25,
-  },
-  compactRow: {
-    height: 42,
-  },
-  invoiceCode: {
-    background: '#e8eef5',
-    padding: '2px 8px',
-    borderRadius: 4,
-    fontSize: 11,
-    fontWeight: 800,
-    color: 'var(--qf-navy)',
-  },
-  fundPill: {
-    background: '#e8eef5',
-    color: 'var(--qf-navy)',
-    borderRadius: 4,
-    padding: '2px 8px',
-    fontSize: 11,
-    fontWeight: 700,
-    whiteSpace: 'nowrap',
-  },
-  miniBarTrack: {
-    height: 7,
-    width: 78,
-    background: '#e8eef5',
-    borderRadius: 999,
-    overflow: 'hidden',
-  },
-  miniBarFill: {
-    height: '100%',
-    background: '#2e7d32',
-    borderRadius: 999,
-  },
-  footerCount: {
-    padding: '10px 18px',
-    borderTop: '1px solid var(--qf-border)',
-    fontSize: 11.5,
-    color: 'var(--qf-text-light)',
-    background: '#fff',
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-  },
-  detailBox: {
-    background: '#f8fafc',
-    border: '1px solid var(--qf-border)',
-    borderRadius: 8,
-    padding: 10,
-  },
-  detailLabel: {
-    fontSize: 10,
-    fontWeight: 700,
-    color: 'var(--qf-text-light)',
-    textTransform: 'uppercase',
-  },
-  detailValue: {
-    fontSize: 13,
-    fontWeight: 600,
-    color: 'var(--qf-navy)',
-  },
 }
 
 export default OperacionesFacturasPage
