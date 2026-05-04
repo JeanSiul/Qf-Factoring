@@ -2,13 +2,15 @@ import React, { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
+// Cada item puede tener un 'claim' que controla su visibilidad
+// Si no tiene claim, siempre se muestra
 const menuItems = [
   { icon: '📊', label: 'Dashboard', path: '/dashboard' },
   {
     icon: '🔐', label: 'Seguridad', path: null,
     children: [
-      { icon: '👥', label: 'Usuarios', path: '/usuarios' },
-      { icon: '🏷️', label: 'Roles', path: '/roles' },
+      { icon: '👥', label: 'Usuarios', path: '/usuarios', claim: 'USRLIS' },
+      { icon: '🏷️', label: 'Roles', path: '/roles', claim: 'ROLLIS' },
     ]
   },
   {
@@ -35,7 +37,7 @@ const menuItems = [
     icon: '💼', label: 'Operaciones', path: null,
     children: [
       { icon: '📊', label: 'Dashboard', path: '/operaciones/dashboard' },
-      { icon: '🧾', label: 'Facturas', path: '/operaciones/facturas' },
+      { icon: '🧾', label: 'Facturas', path: '/operaciones/facturas', claim: 'FACLIS' },
       { icon: '💰', label: 'Finanzas', path: '/operaciones/finanzas' },
       { icon: '📈', label: 'Reportes', path: '/operaciones/reportes' },
     ]
@@ -43,7 +45,7 @@ const menuItems = [
 ]
 
 const Sidebar = ({ mobileOpen, onClose }) => {
-  const { user, logout } = useAuth()
+  const { user, permisos, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [expanded, setExpanded] = useState({ '🔐': true, '🔔': false, '📦': false, '💼': false })
@@ -52,6 +54,21 @@ const Sidebar = ({ mobileOpen, onClose }) => {
   const toggleMenu = (icon) => setExpanded(prev => ({ ...prev, [icon]: !prev[icon] }))
   const isActive = (path) => location.pathname === path
   const isGroupActive = (children) => children?.some(c => location.pathname === c.path)
+
+  // Verifica si un item del menú es visible según permisos
+  const isVisible = (item) => {
+    // Sin claim = siempre visible
+    if (!item.claim) return true
+    // Verificar bit 0 (Vista) del claim
+    const value = permisos?.[item.claim] || '00000000000'
+    return value[0] === '1'
+  }
+
+  // Filtra children visibles
+  const getVisibleChildren = (children) => {
+    if (!children) return []
+    return children.filter(c => isVisible(c))
+  }
 
   return (
     <>
@@ -67,18 +84,21 @@ const Sidebar = ({ mobileOpen, onClose }) => {
           </div>
         </div>
         <nav style={styles.nav}>
-          {menuItems.map(item => (
-            <div key={item.icon}>
-              {item.children ? (
-                <>
-                  <button onClick={() => toggleMenu(item.icon)} style={{ ...styles.navItem, ...(expanded[item.icon] || isGroupActive(item.children) ? styles.navItemExpanded : {}) }}>
+          {menuItems.map(item => {
+            if (item.children) {
+              const visibleChildren = getVisibleChildren(item.children)
+              // Si no hay hijos visibles, ocultar el grupo completo
+              if (visibleChildren.length === 0) return null
+              return (
+                <div key={item.icon}>
+                  <button onClick={() => toggleMenu(item.icon)} style={{ ...styles.navItem, ...(expanded[item.icon] || isGroupActive(visibleChildren) ? styles.navItemExpanded : {}) }}>
                     <span style={styles.navIcon}>{item.icon}</span>
                     <span style={styles.navLabel}>{item.label}</span>
                     <span style={{ marginLeft: 'auto', fontSize: 11, opacity: 0.7, transition: 'transform 0.2s', transform: expanded[item.icon] ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
                   </button>
                   {expanded[item.icon] && (
                     <div style={styles.subMenu}>
-                      {item.children.map(child => (
+                      {visibleChildren.map(child => (
                         <button key={child.path} onClick={() => handleNav(child.path)} style={{ ...styles.navItem, ...styles.subItem, ...(isActive(child.path) ? styles.navItemActive : {}) }}>
                           <span style={styles.navIcon}>{child.icon}</span>
                           <span style={styles.navLabel}>{child.label}</span>
@@ -87,16 +107,22 @@ const Sidebar = ({ mobileOpen, onClose }) => {
                       ))}
                     </div>
                   )}
-                </>
-              ) : (
+                </div>
+              )
+            }
+
+            // Items sin children
+            if (!isVisible(item)) return null
+            return (
+              <div key={item.icon}>
                 <button onClick={() => handleNav(item.path)} style={{ ...styles.navItem, ...(isActive(item.path) ? styles.navItemActive : {}) }}>
                   <span style={styles.navIcon}>{item.icon}</span>
                   <span style={styles.navLabel}>{item.label}</span>
                   {isActive(item.path) && <span style={styles.activeDot} />}
                 </button>
-              )}
-            </div>
-          ))}
+              </div>
+            )
+          })}
         </nav>
         <div style={styles.userArea}>
           <div style={styles.userAvatar}>{user?.nombres?.charAt(0) || user?.username?.charAt(0) || 'U'}</div>
