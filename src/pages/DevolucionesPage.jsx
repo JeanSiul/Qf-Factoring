@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext'
 
 // ── Claim para este módulo ──────────────────────────────
 // DEVLIS → bit 0: Vista, 1: Lista, 2: Crear, 3: Ver, 4: Modificar, 5: Eliminar
-const CLAIM = 'DEVLIS'
+const CLAIM = 'OPEDEV'
 
 const PAGE_SIZE = 50
 const DEBOUNCE_MS = 450
