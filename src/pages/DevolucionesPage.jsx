@@ -533,8 +533,8 @@ const DevolucionesPage = () => {
                   <th style={styles.th}>Fecha Op.</th>
                   <th style={styles.th}>Banco</th>
                   <th style={styles.th}>Cuenta cargo</th>
-                  <th style={styles.th}>Cuenta abono</th>
                   <th style={styles.th}>Mon. cargo</th>
+                  <th style={styles.th}>Cuenta abono</th>
                   <th style={styles.th}>Mon. abono</th>
                   <th style={{ ...styles.th, textAlign: 'right' }}>Imp. cargado</th>
                   <th style={{ ...styles.th, textAlign: 'right' }}>Imp. abonado</th>
@@ -560,8 +560,8 @@ const DevolucionesPage = () => {
                         <span style={styles.bankPill}>{getBancoNombre(r.banco, bancos)}</span>
                       </td>
                       <td style={{ ...styles.td, minWidth: 110 }}>{r.cuenta_cargo || '-'}</td>
-                      <td style={{ ...styles.td, minWidth: 110 }}>{r.cuenta_abono || '-'}</td>
                       <td style={{ ...styles.td, minWidth: 70 }}>{getMonedaNombre(r.moneda_cargo, monedas)}</td>
+                      <td style={{ ...styles.td, minWidth: 110 }}>{r.cuenta_abono || '-'}</td>
                       <td style={{ ...styles.td, minWidth: 70 }}>{getMonedaNombre(r.moneda_abono, monedas)}</td>
                       <td style={{ ...styles.td, fontWeight: 800, color: '#c62828', whiteSpace: 'nowrap', minWidth: 105, textAlign: 'right' }}>
                         {money(cargado, monCargoCode)}
