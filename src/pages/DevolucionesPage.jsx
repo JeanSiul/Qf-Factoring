@@ -5,18 +5,20 @@ import ToastContainer from '../components/ToastContainer'
 import { useAuth } from '../context/AuthContext'
 
 // ── Claim para este módulo ──────────────────────────────
-// OPEDEV → bit 0: Vista, 1: Lista, 2: Crear, 3: Ver, 4: Modificar, 5: Eliminar
 const CLAIM = 'OPEDEV'
 
 const PAGE_SIZE = 50
 const DEBOUNCE_MS = 450
 
+// Campos para el selector de filtro (solo uno)
 const camposBusqueda = [
-  { value: 'all', label: 'Todos' },
+  { value: 'all', label: 'Todos los campos' },
   { value: 'numero_operacion', label: 'Nro. Operación' },
   { value: 'referencia', label: 'Referencia' },
   { value: 'estado', label: 'Estado' },
   { value: 'banco', label: 'Banco' },
+  { value: 'cuenta_cargo', label: 'Cuenta cargo' },
+  { value: 'cuenta_abono', label: 'Cuenta abono' },
 ]
 
 // ── Helpers ──────────────────────────────────────────────
@@ -79,8 +81,34 @@ const getMonedaCodigo = (monedaId, monedas) => {
   return getField(m, 'VALORTEXTO', 'valortexto', 'ValorTexto') || 'PEN'
 }
 
-// ── Modal Detalle ───────────────────────────────────────
+// ── Ordenamiento ────────────────────────────────────────
+const sortData = (data, sortBy, sortOrder) => {
+  if (!sortBy) return data
+  return [...data].sort((a, b) => {
+    let valA = a[sortBy]
+    let valB = b[sortBy]
+    
+    // Fechas
+    if (sortBy === 'fecha_operacion') {
+      valA = new Date(valA || 0)
+      valB = new Date(valB || 0)
+    }
+    // Números
+    if (['importe_cargado', 'importe_abonado', 'comision'].includes(sortBy)) {
+      valA = Number(valA || 0)
+      valB = Number(valB || 0)
+    }
+    // Textos
+    if (typeof valA === 'string') valA = valA.toLowerCase()
+    if (typeof valB === 'string') valB = valB.toLowerCase()
+    
+    if (valA < valB) return sortOrder === 'asc' ? -1 : 1
+    if (valA > valB) return sortOrder === 'asc' ? 1 : -1
+    return 0
+  })
+}
 
+// ── Modal Detalle ───────────────────────────────────────
 const ModalDetalle = ({ item, bancos, monedas, onClose }) => (
   <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
     <div className="modal" style={{ maxWidth: 820 }}>
@@ -124,7 +152,6 @@ const ModalDetalle = ({ item, bancos, monedas, onClose }) => (
 )
 
 // ── Modal Crear / Editar ────────────────────────────────
-
 const ModalDevolucion = ({ item, bancos, monedas, onClose, onSave }) => {
   const isEdit = !!item?.id
   const [form, setForm] = useState({
@@ -302,6 +329,11 @@ const DevolucionesPage = () => {
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
   const [compactMode, setCompactMode] = useState(true)
+  
+  // Ordenamiento
+  const [sortBy, setSortBy] = useState(null)
+  const [sortOrder, setSortOrder] = useState('asc')
+  
   const { toasts, show } = useToast()
 
   // Lookups
@@ -372,8 +404,25 @@ const DevolucionesPage = () => {
     setCampo('all')
     setBusqueda('')
     setPage(1)
+    setSortBy(null)
+    setSortOrder('asc')
     cargar({ page: 1, campo: 'all', busqueda: '' })
   }
+
+  // Manejar ordenamiento al hacer clic en columna
+  const handleSort = (column) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortBy(column)
+      setSortOrder('asc')
+    }
+  }
+
+  // Aplicar ordenamiento a los datos
+  const sortedData = useMemo(() => {
+    return sortData(data, sortBy, sortOrder)
+  }, [data, sortBy, sortOrder])
 
   // ── CRUD handlers ─────────────────────────────────────
   const handleSave = async payload => {
@@ -402,12 +451,12 @@ const DevolucionesPage = () => {
   const to = Math.min(page * PAGE_SIZE, total)
 
   const metrics = useMemo(() => {
-    const totalCargado = data.reduce((s, r) => s + Number(r.importe_cargado || 0), 0)
-    const totalAbonado = data.reduce((s, r) => s + Number(r.importe_abonado || 0), 0)
-    const totalComision = data.reduce((s, r) => s + Number(r.comision || 0), 0)
-    const pendientes = data.filter(r => String(r.estado || '').toLowerCase().includes('pendiente')).length
+    const totalCargado = sortedData.reduce((s, r) => s + Number(r.importe_cargado || 0), 0)
+    const totalAbonado = sortedData.reduce((s, r) => s + Number(r.importe_abonado || 0), 0)
+    const totalComision = sortedData.reduce((s, r) => s + Number(r.comision || 0), 0)
+    const pendientes = sortedData.filter(r => String(r.estado || '').toLowerCase().includes('pendiente')).length
     return { totalCargado, totalAbonado, totalComision, pendientes }
-  }, [data])
+  }, [sortedData])
 
   // ── Si no tiene permiso de lista ──────────────────────
   if (!canList) {
@@ -431,13 +480,13 @@ const DevolucionesPage = () => {
         <p style={styles.subtitle}>Gestión de devoluciones bancarias</p>
       </div>
 
-      {/* Action bar con búsqueda integrada y botón nuevo */}
+      {/* Action bar - solo un campo de búsqueda con lupa */}
       <div style={styles.actionBar}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 1 }}>
-          <button className="btn btn-secondary btn-sm" onClick={() => setCompactMode(v => !v)}>
-            {compactMode ? 'Vista cómoda' : 'Vista compacta'}
-          </button>
-          <div style={{ flex: 1 }} />
+        <button className="btn btn-secondary btn-sm" onClick={() => setCompactMode(v => !v)}>
+          {compactMode ? 'Vista cómoda' : 'Vista compacta'}
+        </button>
+        <div style={{ flex: 1 }} />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <div style={{ position: 'relative' }}>
             <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5' }}>🔍</span>
             <input
@@ -445,7 +494,7 @@ const DevolucionesPage = () => {
               placeholder="Buscar devolución..."
               value={busqueda}
               onChange={e => setBusqueda(e.target.value)}
-              style={{ width: 240, paddingLeft: 32, height: 34 }}
+              style={{ width: 260, paddingLeft: 32, height: 34 }}
             />
           </div>
           {canCreate && (
@@ -460,7 +509,7 @@ const DevolucionesPage = () => {
       <div style={styles.kpiGrid}>
         {[
           { label: 'Total registros', value: total, color: 'var(--qf-navy)', border: '#2196f3' },
-          { label: 'Mostradas', value: data.length, color: '#185FA5', border: '#03a9f4' },
+          { label: 'Mostradas', value: sortedData.length, color: '#185FA5', border: '#03a9f4' },
           { label: 'Total cargado', value: money(metrics.totalCargado), color: '#c62828', border: '#f44336' },
           { label: 'Total abonado', value: money(metrics.totalAbonado), color: '#2e7d32', border: '#4caf50' },
           { label: 'Comisiones', value: money(metrics.totalComision), color: '#e65100', border: '#ff9800' },
@@ -480,19 +529,15 @@ const DevolucionesPage = () => {
             <h2 style={styles.cardTitle}>Lista de Devoluciones</h2>
             <span style={styles.resultPill}>{from}-{to} de {total}</span>
           </div>
+          
+          {/* Filtros - solo un selector de campo y limpiar */}
           <div style={styles.filtersRow}>
             <select className="filter-input" value={campo} onChange={e => setCampo(e.target.value)} style={styles.fieldSelect}>
               {camposBusqueda.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-            <input
-              className="filter-input"
-              placeholder={campo === 'all' ? 'Buscar...' : `Buscar por ${camposBusqueda.find(f => f.value === campo)?.label || ''}...`}
-              value={busqueda}
-              onChange={e => setBusqueda(e.target.value)}
-              style={styles.searchInput}
-            />
             <button className="btn btn-secondary btn-sm" onClick={limpiar}>Limpiar</button>
           </div>
+          
           <div style={styles.paginationRow}>
             <button className="btn btn-secondary btn-sm" disabled={page <= 1 || loading} onClick={() => setPage(1)}>Primera</button>
             <button className="btn btn-secondary btn-sm" disabled={page <= 1 || loading} onClick={() => setPage(p => Math.max(1, p - 1))}>Anterior</button>
@@ -504,29 +549,45 @@ const DevolucionesPage = () => {
         </div>
 
         <div style={{ ...styles.tableViewport, maxHeight: compactMode ? 'calc(100vh - 350px)' : 'calc(100vh - 410px)', overflowX: 'auto' }}>
-          {loading && data.length === 0 ? (
+          {loading && sortedData.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner dark" /></div>
-          ) : data.length === 0 ? (
+          ) : sortedData.length === 0 ? (
             <div className="empty-state"><div className="icon">↩</div><p>No se encontraron devoluciones</p></div>
           ) : (
-            <table className="qf-table" style={{ ...styles.table, fontSize: compactMode ? 11 : 12, minWidth: 1100 }}>
+            <table className="qf-table" style={{ ...styles.table, fontSize: compactMode ? 10.5 : 11.5, minWidth: 1100 }}>
               <thead>
                 <tr>
-                  <th style={styles.th}>Nro. Op.</th>
-                  <th style={styles.th}>Fecha Op.</th>
-                  <th style={styles.th}>Banco</th>
+                  <th style={styles.th} onClick={() => handleSort('numero_operacion')} className="sortable">
+                    Nro. Op. {sortBy === 'numero_operacion' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th style={styles.th} onClick={() => handleSort('fecha_operacion')} className="sortable">
+                    Fecha Op. {sortBy === 'fecha_operacion' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th style={styles.th} onClick={() => handleSort('banco')} className="sortable">
+                    Banco {sortBy === 'banco' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
                   <th style={styles.th}>Cuenta cargo</th>
                   <th style={styles.th}>Cuenta abono</th>
-                  <th style={{ ...styles.th, textAlign: 'right' }}>Imp. cargado</th>
-                  <th style={{ ...styles.th, textAlign: 'right' }}>Imp. abonado</th>
-                  <th style={{ ...styles.th, textAlign: 'right' }}>Comisión</th>
-                  <th style={styles.th}>Referencia</th>
-                  <th style={styles.th}>Estado</th>
+                  <th style={{ ...styles.th, textAlign: 'right' }} onClick={() => handleSort('importe_cargado')} className="sortable">
+                    Imp. cargado {sortBy === 'importe_cargado' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th style={{ ...styles.th, textAlign: 'right' }} onClick={() => handleSort('importe_abonado')} className="sortable">
+                    Imp. abonado {sortBy === 'importe_abonado' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th style={{ ...styles.th, textAlign: 'right' }} onClick={() => handleSort('comision')} className="sortable">
+                    Comisión {sortBy === 'comision' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th style={styles.th} onClick={() => handleSort('referencia')} className="sortable">
+                    Referencia {sortBy === 'referencia' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th style={styles.th} onClick={() => handleSort('estado')} className="sortable">
+                    Estado {sortBy === 'estado' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
                   <th style={{ ...styles.th, textAlign: 'center' }}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {data.map(r => {
+                {sortedData.map(r => {
                   const cargado = Number(r.importe_cargado || 0)
                   const monCargoCode = getMonedaCodigo(r.moneda_cargo, monedas)
                   const monAbonoCode = getMonedaCodigo(r.moneda_abono, monedas)
@@ -535,28 +596,28 @@ const DevolucionesPage = () => {
                       <td style={{ ...styles.td, minWidth: 75 }}>
                         <code style={styles.opCode}>{r.numero_operacion || '-'}</code>
                       </td>
-                      <td style={{ ...styles.td, minWidth: 75 }}>{formatDate(r.fecha_operacion)}</td>
-                      <td style={{ ...styles.td, minWidth: 90 }}>
+                      <td style={{ ...styles.td, minWidth: 75, whiteSpace: 'nowrap' }}>{formatDate(r.fecha_operacion)}</td>
+                      <td style={{ ...styles.td, minWidth: 85, whiteSpace: 'nowrap' }}>
                         <span style={styles.bankPill}>{getBancoNombre(r.banco, bancos)}</span>
                       </td>
-                      <td style={{ ...styles.td, minWidth: 110 }}>{r.cuenta_cargo || '-'}</td>
-                      <td style={{ ...styles.td, minWidth: 110 }}>{r.cuenta_abono || '-'}</td>
+                      <td style={{ ...styles.td, minWidth: 120, whiteSpace: 'nowrap', fontSize: compactMode ? 10 : 11 }}>{r.cuenta_cargo || '-'}</td>
+                      <td style={{ ...styles.td, minWidth: 120, whiteSpace: 'nowrap', fontSize: compactMode ? 10 : 11 }}>{r.cuenta_abono || '-'}</td>
                       <td style={{ ...styles.td, fontWeight: 800, color: '#c62828', whiteSpace: 'nowrap', minWidth: 95, textAlign: 'right' }}>
                         {money(cargado, monCargoCode)}
                       </td>
                       <td style={{ ...styles.td, fontWeight: 800, color: '#2e7d32', whiteSpace: 'nowrap', minWidth: 95, textAlign: 'right' }}>
                         {money(r.importe_abonado, monAbonoCode)}
                       </td>
-                      <td style={{ ...styles.td, whiteSpace: 'nowrap', minWidth: 75, textAlign: 'right' }}>
+                      <td style={{ ...styles.td, whiteSpace: 'nowrap', minWidth: 70, textAlign: 'right' }}>
                         {money(r.comision, monCargoCode)}
                       </td>
-                      <td style={{ ...styles.td, minWidth: 130, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <td style={{ ...styles.td, minWidth: 120, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {r.referencia || '-'}
                       </td>
-                      <td style={{ ...styles.td, minWidth: 95 }}>
+                      <td style={{ ...styles.td, minWidth: 90, whiteSpace: 'nowrap' }}>
                         <span className={`badge ${badgeClass(r.estado)}`}>{String(r.estado || 'Pendiente').toUpperCase()}</span>
                       </td>
-                      <td style={{ ...styles.td, textAlign: 'center', minWidth: 115 }}>
+                      <td style={{ ...styles.td, textAlign: 'center', minWidth: 115, whiteSpace: 'nowrap' }}>
                         <div style={styles.actionButtons}>
                           {canView && (
                             <button className="btn btn-secondary btn-sm" onClick={() => setModal({ type: 'detalle', data: r })}>Ver</button>
@@ -577,7 +638,7 @@ const DevolucionesPage = () => {
           )}
         </div>
 
-        {!loading && <div style={styles.footerCount}>{data.length} de {total} devoluciones</div>}
+        {!loading && <div style={styles.footerCount}>{sortedData.length} de {total} devoluciones</div>}
       </div>
 
       {/* Modales */}
@@ -604,20 +665,19 @@ const styles = {
   cardTitleWrap: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 16px 8px' },
   cardTitle: { margin: 0, fontSize: 18, fontFamily: 'Montserrat', color: 'var(--qf-navy)' },
   resultPill: { fontSize: 11, fontWeight: 700, color: 'var(--qf-navy)', background: '#e8eef5', borderRadius: 999, padding: '4px 10px' },
-  filtersRow: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '0 16px 8px' },
-  fieldSelect: { width: 'auto', minWidth: 145, height: 36 },
-  searchInput: { minWidth: 220, maxWidth: 350, height: 36 },
+  filtersRow: { display: 'flex', gap: 8, alignItems: 'center', padding: '0 16px 8px' },
+  fieldSelect: { width: 'auto', minWidth: 160, height: 36 },
   paginationRow: { display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap', padding: '8px 16px 10px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
   pageInfo: { fontSize: 12, color: 'var(--qf-text-light)', padding: '0 6px' },
   loadingMini: { fontSize: 11, color: '#185FA5', fontWeight: 700 },
   tableViewport: { overflow: 'auto', width: '100%' },
   table: { width: '100%', borderCollapse: 'collapse' },
-  th: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 10.3, padding: '8px 8px', lineHeight: 1.05, background: '#fff', borderBottom: '1px solid var(--qf-border)' },
-  td: { padding: '6px 8px', verticalAlign: 'middle', lineHeight: 1.15, borderBottom: '1px solid #f0f2f5' },
-  compactRow: { height: 38 },
-  opCode: { background: '#e8eef5', padding: '2px 7px', borderRadius: 4, fontSize: 10.5, fontWeight: 800, color: 'var(--qf-navy)' },
-  bankPill: { background: '#e8eef5', color: 'var(--qf-navy)', borderRadius: 4, padding: '2px 7px', fontSize: 10.5, fontWeight: 700, whiteSpace: 'nowrap' },
-  actionButtons: { display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'nowrap' },
+  th: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 10.3, padding: '8px 6px', lineHeight: 1.05, background: '#fff', borderBottom: '1px solid var(--qf-border)', cursor: 'pointer', userSelect: 'none' },
+  td: { padding: '5px 6px', verticalAlign: 'middle', lineHeight: 1.15, borderBottom: '1px solid #f0f2f5' },
+  compactRow: { height: 36 },
+  opCode: { background: '#e8eef5', padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 800, color: 'var(--qf-navy)' },
+  bankPill: { background: '#e8eef5', color: 'var(--qf-navy)', borderRadius: 4, padding: '2px 6px', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' },
+  actionButtons: { display: 'flex', gap: 3, justifyContent: 'center', flexWrap: 'nowrap' },
   footerCount: { padding: '10px 16px', borderTop: '1px solid var(--qf-border)', fontSize: 11.5, color: 'var(--qf-text-light)', background: '#fff' },
   detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10 },
   detailBox: { background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 9 },
@@ -628,5 +688,14 @@ const styles = {
   modalGrid4: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0 16px' },
   errorBox: { background: '#fce4e4', color: '#c62828', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginTop: 8 },
 }
+
+// Agregar estilos para sortable
+const styleSheet = document.createElement('style')
+styleSheet.textContent = `
+  .sortable:hover {
+    background-color: #f0f2f5;
+  }
+`
+document.head.appendChild(styleSheet)
 
 export default DevolucionesPage
