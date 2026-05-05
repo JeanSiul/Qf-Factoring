@@ -465,11 +465,6 @@ const DevolucionesPage = () => {
         <button className="btn btn-secondary btn-sm" onClick={() => setCompactMode(v => !v)}>
           {compactMode ? 'Vista cómoda' : 'Vista compacta'}
         </button>
-        {canCreate && (
-          <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })}>
-            + Nueva Devolución
-          </button>
-        )}
       </div>
 
       {/* KPIs */}
@@ -495,7 +490,23 @@ const DevolucionesPage = () => {
         <div style={styles.stickyTools}>
           <div style={styles.cardTitleWrap}>
             <h2 style={styles.cardTitle}>Lista de Devoluciones</h2>
-            <span style={styles.resultPill}>{from}-{to} de {total}</span>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5', pointerEvents: 'none' }}>🔍</span>
+                <input
+                  className="filter-input"
+                  placeholder="Filtrar..."
+                  value={busqueda}
+                  onChange={e => setBusqueda(e.target.value)}
+                  style={{ ...styles.searchInput, paddingLeft: 32 }}
+                />
+              </div>
+              {canCreate && (
+                <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ color: '#4CAF50', fontWeight: 800, fontSize: 16 }}>+</span> Nuevo Registro
+                </button>
+              )}
+            </div>
           </div>
           <div style={styles.filtersRow}>
             <select className="filter-input" value={campo} onChange={e => setCampo(e.target.value)} style={styles.fieldSelect}>
@@ -511,6 +522,7 @@ const DevolucionesPage = () => {
             <button className="btn btn-secondary btn-sm" onClick={limpiar}>Limpiar</button>
           </div>
           <div style={styles.paginationRow}>
+            <span style={styles.resultPill}>{from}-{to} de {total}</span>
             <button className="btn btn-secondary btn-sm" disabled={page <= 1 || loading} onClick={() => setPage(1)}>Primera</button>
             <button className="btn btn-secondary btn-sm" disabled={page <= 1 || loading} onClick={() => setPage(p => Math.max(1, p - 1))}>Anterior</button>
             <span style={styles.pageInfo}>Página <strong>{page}</strong> de <strong>{totalPages}</strong></span>
