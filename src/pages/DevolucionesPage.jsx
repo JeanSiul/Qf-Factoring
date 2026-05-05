@@ -14,9 +14,6 @@ const DEBOUNCE_MS = 450
 const camposBusqueda = [
   { value: 'all', label: 'Todos' },
   { value: 'numero_operacion', label: 'Nro. Operación' },
-  { value: 'archivo', label: 'Archivo' },
-  { value: 'cuenta_cargo', label: 'Cuenta cargo' },
-  { value: 'cuenta_abono', label: 'Cuenta abono' },
   { value: 'referencia', label: 'Referencia' },
   { value: 'estado', label: 'Estado' },
   { value: 'banco', label: 'Banco' },
@@ -51,13 +48,7 @@ const badgeClass = status => {
   return 'warning'
 }
 
-const MiniBar = ({ value, max }) => {
-  const pct = max > 0 ? Math.min(100, Math.round((Number(value || 0) / max) * 100)) : 0
-  return <div style={styles.miniBarTrack}><div style={{ ...styles.miniBarFill, width: `${pct}%` }} /></div>
-}
-
-// ── Lookup helpers (bancos y monedas) ───────────────────
-// n8n puede devolver campos en cualquier case, estas helpers normalizan
+// ── Lookup helpers ──────────────────────────────────────
 
 const getField = (obj, ...names) => {
   for (const n of names) {
@@ -187,7 +178,6 @@ const ModalDevolucion = ({ item, bancos, monedas, onClose, onSave }) => {
           <button className="modal-close" onClick={onClose}>x</button>
         </div>
         <div className="modal-body" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
-          {/* Fila 1: Operación */}
           <div style={styles.modalGrid3}>
             <div className="form-group">
               <label className="form-label">Nro. Operación *</label>
@@ -203,7 +193,6 @@ const ModalDevolucion = ({ item, bancos, monedas, onClose, onSave }) => {
             </div>
           </div>
 
-          {/* Fila 2: Banco y archivo */}
           <div style={styles.modalGrid3}>
             <div className="form-group">
               <label className="form-label">Banco *</label>
@@ -231,7 +220,6 @@ const ModalDevolucion = ({ item, bancos, monedas, onClose, onSave }) => {
             </div>
           </div>
 
-          {/* Fila 3: Cuentas y monedas */}
           <div style={styles.modalGrid4}>
             <div className="form-group">
               <label className="form-label">Cuenta cargo</label>
@@ -265,7 +253,6 @@ const ModalDevolucion = ({ item, bancos, monedas, onClose, onSave }) => {
             </div>
           </div>
 
-          {/* Fila 4: Importes */}
           <div style={styles.modalGrid3}>
             <div className="form-group">
               <label className="form-label">Importe cargado *</label>
@@ -281,7 +268,6 @@ const ModalDevolucion = ({ item, bancos, monedas, onClose, onSave }) => {
             </div>
           </div>
 
-          {/* Fila 5: Referencia y mensaje */}
           <div className="form-group">
             <label className="form-label">Referencia</label>
             <input className="form-control" value={form.referencia} onChange={e => set('referencia', e.target.value)} maxLength={100} />
@@ -323,15 +309,14 @@ const DevolucionesPage = () => {
   const [monedas, setMonedas] = useState([])
 
   // ── Permisos por bit ──────────────────────────────────
-  // OPEDEV bits: 0:Vista, 1:Lista, 2:Ver, 3:Modificar, 4:Total, 5:Crear, 6:Eliminar
   const claimValue = permisos?.[CLAIM] || '00000000000'
-  const canList   = claimValue[1] === '1'  // bit 1: Lista
-  const canView   = claimValue[2] === '1'  // bit 2: Ver
-  const canEdit   = claimValue[3] === '1'  // bit 3: Modificar
-  const canCreate = claimValue[5] === '1'  // bit 5: Crear
-  const canDelete = claimValue[6] === '1'  // bit 6: Eliminar
+  const canList   = claimValue[1] === '1'
+  const canView   = claimValue[2] === '1'
+  const canEdit   = claimValue[3] === '1'
+  const canCreate = claimValue[5] === '1'
+  const canDelete = claimValue[6] === '1'
 
-  // ── Cargar lookups al montar ──────────────────────────
+  // ── Cargar lookups ────────────────────────────────────
   useEffect(() => {
     const loadLookups = async () => {
       try {
@@ -339,10 +324,8 @@ const DevolucionesPage = () => {
           apiCall('/qf/devoluciones/bancos'),
           apiCall('/qf/devoluciones/monedas'),
         ])
-        // Bancos: n8n devuelve array directo o envuelto
         const bArr = Array.isArray(bRes) ? bRes : (bRes?.data || bRes?.items || [bRes])
         setBancos(bArr.filter(x => x && (x.id || x.ID)))
-        // Monedas: NO usar toArray porque campos son ID (mayúscula), toArray filtra por 'id' minúscula
         const mArr = Array.isArray(mRes) ? mRes : (mRes?.data || mRes?.items || [mRes])
         setMonedas(mArr.filter(x => x && (x.ID || x.id || x.Id)))
       } catch (e) {
@@ -393,11 +376,8 @@ const DevolucionesPage = () => {
   }
 
   // ── CRUD handlers ─────────────────────────────────────
-
   const handleSave = async payload => {
-    const endpoint = payload.id
-      ? '/qf/devoluciones/actualizar'
-      : '/qf/devoluciones/crear'
+    const endpoint = payload.id ? '/qf/devoluciones/actualizar' : '/qf/devoluciones/crear'
     const res = await apiCall(endpoint, { method: 'POST', body: JSON.stringify(payload) })
     if (!res?.success) throw new Error(res?.message || 'No se pudo guardar')
     show(payload.id ? 'Devolución actualizada' : 'Devolución registrada')
@@ -407,10 +387,7 @@ const DevolucionesPage = () => {
   const handleDelete = async item => {
     if (!confirm(`¿Eliminar la devolución ${item.numero_operacion || item.id}?`)) return
     try {
-      const res = await apiCall('/qf/devoluciones/eliminar', {
-        method: 'POST',
-        body: JSON.stringify({ id: item.id }),
-      })
+      const res = await apiCall('/qf/devoluciones/eliminar', { method: 'POST', body: JSON.stringify({ id: item.id }) })
       if (!res?.success) throw new Error(res?.message || 'No se pudo eliminar')
       show('Devolución eliminada')
       cargar()
@@ -420,7 +397,6 @@ const DevolucionesPage = () => {
   }
 
   // ── Cálculos de página ────────────────────────────────
-
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const from = total === 0 ? 0 : ((page - 1) * PAGE_SIZE) + 1
   const to = Math.min(page * PAGE_SIZE, total)
@@ -430,11 +406,8 @@ const DevolucionesPage = () => {
     const totalAbonado = data.reduce((s, r) => s + Number(r.importe_abonado || 0), 0)
     const totalComision = data.reduce((s, r) => s + Number(r.comision || 0), 0)
     const pendientes = data.filter(r => String(r.estado || '').toLowerCase().includes('pendiente')).length
-    const bancosUnicos = new Set(data.map(r => r.banco).filter(Boolean)).size
-    return { totalCargado, totalAbonado, totalComision, pendientes, bancosUnicos }
+    return { totalCargado, totalAbonado, totalComision, pendientes }
   }, [data])
-
-  const maxCargado = useMemo(() => Math.max(...data.map(r => Number(r.importe_cargado || 0)), 0), [data])
 
   // ── Si no tiene permiso de lista ──────────────────────
   if (!canList) {
@@ -449,22 +422,38 @@ const DevolucionesPage = () => {
   }
 
   // ── Render ────────────────────────────────────────────
-
   return (
     <div className="fade-in" style={styles.page}>
       <ToastContainer toasts={toasts} />
 
-      {/* Header */}
       <div style={styles.topHeader}>
         <h1 style={styles.title}>↩ Devoluciones</h1>
         <p style={styles.subtitle}>Gestión de devoluciones bancarias</p>
       </div>
 
-      {/* Action bar */}
+      {/* Action bar con búsqueda integrada y botón nuevo */}
       <div style={styles.actionBar}>
-        <button className="btn btn-secondary btn-sm" onClick={() => setCompactMode(v => !v)}>
-          {compactMode ? 'Vista cómoda' : 'Vista compacta'}
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 1 }}>
+          <button className="btn btn-secondary btn-sm" onClick={() => setCompactMode(v => !v)}>
+            {compactMode ? 'Vista cómoda' : 'Vista compacta'}
+          </button>
+          <div style={{ flex: 1 }} />
+          <div style={{ position: 'relative' }}>
+            <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5' }}>🔍</span>
+            <input
+              className="filter-input"
+              placeholder="Buscar devolución..."
+              value={busqueda}
+              onChange={e => setBusqueda(e.target.value)}
+              style={{ width: 240, paddingLeft: 32, height: 34 }}
+            />
+          </div>
+          {canCreate && (
+            <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })}>
+              + Nuevo Registro
+            </button>
+          )}
+        </div>
       </div>
 
       {/* KPIs */}
@@ -484,29 +473,12 @@ const DevolucionesPage = () => {
         ))}
       </div>
 
-      {/* Table card */}
+      {/* Tabla */}
       <div className="page-card" style={styles.card}>
-        {/* Sticky tools */}
         <div style={styles.stickyTools}>
           <div style={styles.cardTitleWrap}>
             <h2 style={styles.cardTitle}>Lista de Devoluciones</h2>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-              <div style={{ position: 'relative' }}>
-                <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5', pointerEvents: 'none' }}>🔍</span>
-                <input
-                  className="filter-input"
-                  placeholder="Filtrar..."
-                  value={busqueda}
-                  onChange={e => setBusqueda(e.target.value)}
-                  style={{ ...styles.searchInput, paddingLeft: 32 }}
-                />
-              </div>
-              {canCreate && (
-                <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span style={{ color: '#4CAF50', fontWeight: 800, fontSize: 16 }}>+</span> Nuevo Registro
-                </button>
-              )}
-            </div>
+            <span style={styles.resultPill}>{from}-{to} de {total}</span>
           </div>
           <div style={styles.filtersRow}>
             <select className="filter-input" value={campo} onChange={e => setCampo(e.target.value)} style={styles.fieldSelect}>
@@ -514,7 +486,7 @@ const DevolucionesPage = () => {
             </select>
             <input
               className="filter-input"
-              placeholder={campo === 'all' ? 'Buscar mientras escribes...' : `Buscar por ${camposBusqueda.find(f => f.value === campo)?.label || ''}...`}
+              placeholder={campo === 'all' ? 'Buscar...' : `Buscar por ${camposBusqueda.find(f => f.value === campo)?.label || ''}...`}
               value={busqueda}
               onChange={e => setBusqueda(e.target.value)}
               style={styles.searchInput}
@@ -522,7 +494,6 @@ const DevolucionesPage = () => {
             <button className="btn btn-secondary btn-sm" onClick={limpiar}>Limpiar</button>
           </div>
           <div style={styles.paginationRow}>
-            <span style={styles.resultPill}>{from}-{to} de {total}</span>
             <button className="btn btn-secondary btn-sm" disabled={page <= 1 || loading} onClick={() => setPage(1)}>Primera</button>
             <button className="btn btn-secondary btn-sm" disabled={page <= 1 || loading} onClick={() => setPage(p => Math.max(1, p - 1))}>Anterior</button>
             <span style={styles.pageInfo}>Página <strong>{page}</strong> de <strong>{totalPages}</strong></span>
@@ -532,29 +503,25 @@ const DevolucionesPage = () => {
           </div>
         </div>
 
-        {/* Table */}
-        <div style={{ ...styles.tableViewport, maxHeight: compactMode ? 'calc(100vh - 350px)' : 'calc(100vh - 410px)' }}>
+        <div style={{ ...styles.tableViewport, maxHeight: compactMode ? 'calc(100vh - 350px)' : 'calc(100vh - 410px)', overflowX: 'auto' }}>
           {loading && data.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner dark" /></div>
           ) : data.length === 0 ? (
             <div className="empty-state"><div className="icon">↩</div><p>No se encontraron devoluciones</p></div>
           ) : (
-            <table className="qf-table" style={{ ...styles.table, fontSize: compactMode ? 11.5 : 12.5 }}>
+            <table className="qf-table" style={{ ...styles.table, fontSize: compactMode ? 11 : 12, minWidth: 1100 }}>
               <thead>
                 <tr>
                   <th style={styles.th}>Nro. Op.</th>
                   <th style={styles.th}>Fecha Op.</th>
                   <th style={styles.th}>Banco</th>
                   <th style={styles.th}>Cuenta cargo</th>
-                  <th style={styles.th}>Mon. cargo</th>
                   <th style={styles.th}>Cuenta abono</th>
-                  <th style={styles.th}>Mon. abono</th>
                   <th style={{ ...styles.th, textAlign: 'right' }}>Imp. cargado</th>
                   <th style={{ ...styles.th, textAlign: 'right' }}>Imp. abonado</th>
                   <th style={{ ...styles.th, textAlign: 'right' }}>Comisión</th>
                   <th style={styles.th}>Referencia</th>
                   <th style={styles.th}>Estado</th>
-                  <th style={styles.th}>Peso</th>
                   <th style={{ ...styles.th, textAlign: 'center' }}>Acciones</th>
                 </tr>
               </thead>
@@ -565,45 +532,40 @@ const DevolucionesPage = () => {
                   const monAbonoCode = getMonedaCodigo(r.moneda_abono, monedas)
                   return (
                     <tr key={r.id} style={compactMode ? styles.compactRow : undefined}>
-                      <td style={{ ...styles.td, minWidth: 82 }}>
+                      <td style={{ ...styles.td, minWidth: 75 }}>
                         <code style={styles.opCode}>{r.numero_operacion || '-'}</code>
                       </td>
-                      <td style={{ ...styles.td, minWidth: 78 }}>{formatDate(r.fecha_operacion)}</td>
-                      <td style={{ ...styles.td, minWidth: 110 }}>
+                      <td style={{ ...styles.td, minWidth: 75 }}>{formatDate(r.fecha_operacion)}</td>
+                      <td style={{ ...styles.td, minWidth: 90 }}>
                         <span style={styles.bankPill}>{getBancoNombre(r.banco, bancos)}</span>
                       </td>
                       <td style={{ ...styles.td, minWidth: 110 }}>{r.cuenta_cargo || '-'}</td>
-                      <td style={{ ...styles.td, minWidth: 70 }}>{getMonedaNombre(r.moneda_cargo, monedas)}</td>
                       <td style={{ ...styles.td, minWidth: 110 }}>{r.cuenta_abono || '-'}</td>
-                      <td style={{ ...styles.td, minWidth: 70 }}>{getMonedaNombre(r.moneda_abono, monedas)}</td>
-                      <td style={{ ...styles.td, fontWeight: 800, color: '#c62828', whiteSpace: 'nowrap', minWidth: 105, textAlign: 'right' }}>
+                      <td style={{ ...styles.td, fontWeight: 800, color: '#c62828', whiteSpace: 'nowrap', minWidth: 95, textAlign: 'right' }}>
                         {money(cargado, monCargoCode)}
                       </td>
-                      <td style={{ ...styles.td, fontWeight: 800, color: '#2e7d32', whiteSpace: 'nowrap', minWidth: 105, textAlign: 'right' }}>
+                      <td style={{ ...styles.td, fontWeight: 800, color: '#2e7d32', whiteSpace: 'nowrap', minWidth: 95, textAlign: 'right' }}>
                         {money(r.importe_abonado, monAbonoCode)}
                       </td>
-                      <td style={{ ...styles.td, whiteSpace: 'nowrap', minWidth: 80, textAlign: 'right' }}>
+                      <td style={{ ...styles.td, whiteSpace: 'nowrap', minWidth: 75, textAlign: 'right' }}>
                         {money(r.comision, monCargoCode)}
                       </td>
-                      <td style={{ ...styles.td, minWidth: 120, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <td style={{ ...styles.td, minWidth: 130, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {r.referencia || '-'}
                       </td>
-                      <td style={{ ...styles.td, minWidth: 100 }}>
+                      <td style={{ ...styles.td, minWidth: 95 }}>
                         <span className={`badge ${badgeClass(r.estado)}`}>{String(r.estado || 'Pendiente').toUpperCase()}</span>
                       </td>
-                      <td style={{ ...styles.td, minWidth: 84 }}>
-                        <MiniBar value={cargado} max={maxCargado} />
-                      </td>
-                      <td style={{ ...styles.td, textAlign: 'center', minWidth: 126 }}>
+                      <td style={{ ...styles.td, textAlign: 'center', minWidth: 115 }}>
                         <div style={styles.actionButtons}>
                           {canView && (
-                            <button className="btn btn-secondary btn-sm" onClick={() => setModal({ type: 'detalle', data: r })} title="Ver detalle">Ver</button>
+                            <button className="btn btn-secondary btn-sm" onClick={() => setModal({ type: 'detalle', data: r })}>Ver</button>
                           )}
                           {canEdit && (
-                            <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'editar', data: r })} title="Editar">Edit</button>
+                            <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'editar', data: r })}>Editar</button>
                           )}
                           {canDelete && (
-                            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r)} title="Eliminar">Del</button>
+                            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r)}>Eliminar</button>
                           )}
                         </div>
                       </td>
@@ -619,27 +581,20 @@ const DevolucionesPage = () => {
       </div>
 
       {/* Modales */}
-      {modal?.type === 'detalle' && (
-        <ModalDetalle item={modal.data} bancos={bancos} monedas={monedas} onClose={() => setModal(null)} />
-      )}
-      {modal?.type === 'nuevo' && (
-        <ModalDevolucion bancos={bancos} monedas={monedas} onClose={() => setModal(null)} onSave={handleSave} />
-      )}
-      {modal?.type === 'editar' && (
-        <ModalDevolucion item={modal.data} bancos={bancos} monedas={monedas} onClose={() => setModal(null)} onSave={handleSave} />
-      )}
+      {modal?.type === 'detalle' && <ModalDetalle item={modal.data} bancos={bancos} monedas={monedas} onClose={() => setModal(null)} />}
+      {modal?.type === 'nuevo' && <ModalDevolucion bancos={bancos} monedas={monedas} onClose={() => setModal(null)} onSave={handleSave} />}
+      {modal?.type === 'editar' && <ModalDevolucion item={modal.data} bancos={bancos} monedas={monedas} onClose={() => setModal(null)} onSave={handleSave} />}
     </div>
   )
 }
 
-// ── Estilos (mismos de OperacionesFacturasPage) ─────────
-
+// ── Estilos ─────────────────────────────────────────────
 const styles = {
   page: { paddingBottom: 16, maxWidth: '100%', overflowX: 'hidden' },
   topHeader: { marginBottom: 8 },
   title: { fontFamily: 'Montserrat', fontSize: 22, fontWeight: 800, color: 'var(--qf-navy)', marginBottom: 3 },
   subtitle: { color: 'var(--qf-text-light)', fontSize: 12.5 },
-  actionBar: { display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: 8, marginBottom: 10 },
+  actionBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' },
   kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: 10, marginBottom: 14 },
   kpiCard: { background: '#fff', borderRadius: 12, padding: '9px 13px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', minHeight: 62 },
   kpiLabel: { fontSize: 9.2, color: 'var(--qf-text-light)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
@@ -651,19 +606,17 @@ const styles = {
   resultPill: { fontSize: 11, fontWeight: 700, color: 'var(--qf-navy)', background: '#e8eef5', borderRadius: 999, padding: '4px 10px' },
   filtersRow: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '0 16px 8px' },
   fieldSelect: { width: 'auto', minWidth: 145, height: 36 },
-  searchInput: { minWidth: 260, maxWidth: 420, height: 36 },
+  searchInput: { minWidth: 220, maxWidth: 350, height: 36 },
   paginationRow: { display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap', padding: '8px 16px 10px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
   pageInfo: { fontSize: 12, color: 'var(--qf-text-light)', padding: '0 6px' },
   loadingMini: { fontSize: 11, color: '#185FA5', fontWeight: 700 },
   tableViewport: { overflow: 'auto', width: '100%' },
-  table: { minWidth: 1480, tableLayout: 'auto' },
-  th: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 10.3, padding: '8px 8px', lineHeight: 1.05 },
-  td: { padding: '6px 8px', verticalAlign: 'middle', lineHeight: 1.15 },
+  table: { width: '100%', borderCollapse: 'collapse' },
+  th: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 10.3, padding: '8px 8px', lineHeight: 1.05, background: '#fff', borderBottom: '1px solid var(--qf-border)' },
+  td: { padding: '6px 8px', verticalAlign: 'middle', lineHeight: 1.15, borderBottom: '1px solid #f0f2f5' },
   compactRow: { height: 38 },
   opCode: { background: '#e8eef5', padding: '2px 7px', borderRadius: 4, fontSize: 10.5, fontWeight: 800, color: 'var(--qf-navy)' },
   bankPill: { background: '#e8eef5', color: 'var(--qf-navy)', borderRadius: 4, padding: '2px 7px', fontSize: 10.5, fontWeight: 700, whiteSpace: 'nowrap' },
-  miniBarTrack: { height: 7, width: 70, background: '#e8eef5', borderRadius: 999, overflow: 'hidden' },
-  miniBarFill: { height: '100%', background: '#c62828', borderRadius: 999 },
   actionButtons: { display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'nowrap' },
   footerCount: { padding: '10px 16px', borderTop: '1px solid var(--qf-border)', fontSize: 11.5, color: 'var(--qf-text-light)', background: '#fff' },
   detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10 },
