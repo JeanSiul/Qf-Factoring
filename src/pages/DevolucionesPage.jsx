@@ -80,7 +80,7 @@ const getMonedaNombre = (monedaId, monedas) => {
   if (!monedaId) return '-'
   const m = monedas.find(x => String(getField(x, 'ID', 'id')) === String(monedaId))
   if (!m) return monedaId
-  return getField(m, 'CODIGO', 'codigo', 'Codigo') || getField(m, 'DESCRIPCION', 'descripcion') || monedaId
+  return getField(m, 'VALORTEXTO1', 'valortexto1') || getField(m, 'CODIGO', 'codigo') || monedaId
 }
 
 const getMonedaCodigo = (monedaId, monedas) => {
@@ -615,22 +615,22 @@ const DevolucionesPage = () => {
                         <span style={styles.bankPill}>{getBancoNombre(r.banco, bancos)}</span>
                       </td>
                       <td style={{ ...styles.td, minWidth: 165, fontSize: 10.5 }}>{r.cuenta_cargo || '-'}</td>
-                      <td style={{ ...styles.td, minWidth: 45, fontSize: 10.5 }}>{getMonedaNombre(r.moneda_cargo, monedas)}</td>
+                      <td style={{ ...styles.td, minWidth: 32, fontSize: 10.5 }}>{getMonedaNombre(r.moneda_cargo, monedas)}</td>
                       <td style={{ ...styles.td, minWidth: 165, fontSize: 10.5 }}>{r.cuenta_abono || '-'}</td>
-                      <td style={{ ...styles.td, minWidth: 45, fontSize: 10.5 }}>{getMonedaNombre(r.moneda_abono, monedas)}</td>
+                      <td style={{ ...styles.td, minWidth: 32, fontSize: 10.5 }}>{getMonedaNombre(r.moneda_abono, monedas)}</td>
                       <td style={{ ...styles.td, fontWeight: 800, color: '#c62828', whiteSpace: 'nowrap', minWidth: 85, textAlign: 'right', fontSize: 11 }}>
                         {money(cargado, monCargoCode)}
                       </td>
                       <td style={{ ...styles.td, fontWeight: 800, color: '#2e7d32', whiteSpace: 'nowrap', minWidth: 85, textAlign: 'right', fontSize: 11 }}>
                         {money(r.importe_abonado, monAbonoCode)}
                       </td>
-                      <td style={{ ...styles.td, whiteSpace: 'nowrap', minWidth: 40, textAlign: 'right', fontSize: 11 }}>
+                      <td style={{ ...styles.td, whiteSpace: 'nowrap', minWidth: 40, maxWidth: 50, textAlign: 'right', fontSize: 11 }}>
                         {money(r.comision, monCargoCode)}
                       </td>
                       <td style={{ ...styles.td, minWidth: 90, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10.5 }}>
                         {r.referencia || '-'}
                       </td>
-                      <td style={{ ...styles.td, minWidth: 80 }}>
+                      <td style={{ ...styles.td, minWidth: 80, maxWidth: 100 }}>
                         <span className={`badge ${badgeClass(r.estado)}`} style={{ fontSize: 8 }}>{String(r.estado || 'Pendiente').toUpperCase()}</span>
                       </td>
                       <td style={{ ...styles.td, textAlign: 'center', minWidth: 100 }}>
