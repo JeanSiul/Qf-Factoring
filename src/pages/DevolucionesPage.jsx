@@ -631,7 +631,7 @@ const DevolucionesPage = () => {
                         {r.referencia || '-'}
                       </td>
                       <td style={{ ...styles.td, minWidth: 80 }}>
-                        <span className={`badge ${badgeClass(r.estado)}`} style={{ fontSize: 9 }}>{String(r.estado || 'Pendiente').toUpperCase()}</span>
+                        <span className={`badge ${badgeClass(r.estado)}`} style={{ fontSize: 8 }}>{String(r.estado || 'Pendiente').toUpperCase()}</span>
                       </td>
                       <td style={{ ...styles.td, textAlign: 'center', minWidth: 100 }}>
                         <div style={styles.actionButtons}>
