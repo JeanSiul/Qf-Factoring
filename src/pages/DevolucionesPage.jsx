@@ -5,22 +5,21 @@ import ToastContainer from '../components/ToastContainer'
 import { useAuth } from '../context/AuthContext'
 
 // ── Claim para este módulo ──────────────────────────────
+// OPEDEV → bit 0: Vista, 1: Lista, 2: Crear, 3: Ver, 4: Modificar, 5: Eliminar
 const CLAIM = 'OPEDEV'
 
 const PAGE_SIZE = 50
 const DEBOUNCE_MS = 450
 
-// Campos para el selector de filtro
 const camposBusqueda = [
-  { value: 'all', label: 'Todos los campos' },
+  { value: 'all', label: 'Todos' },
   { value: 'numero_operacion', label: 'Nro. Operación' },
+  { value: 'archivo', label: 'Archivo' },
+  { value: 'cuenta_cargo', label: 'Cuenta cargo' },
+  { value: 'cuenta_abono', label: 'Cuenta abono' },
   { value: 'referencia', label: 'Referencia' },
   { value: 'estado', label: 'Estado' },
   { value: 'banco', label: 'Banco' },
-  { value: 'cuenta_cargo', label: 'Cuenta cargo' },
-  { value: 'cuenta_abono', label: 'Cuenta abono' },
-  { value: 'moneda_cargo', label: 'Moneda cargo' },
-  { value: 'moneda_abono', label: 'Moneda abono' },
 ]
 
 // ── Helpers ──────────────────────────────────────────────
@@ -52,7 +51,13 @@ const badgeClass = status => {
   return 'warning'
 }
 
-// ── Lookup helpers ──────────────────────────────────────
+const MiniBar = ({ value, max }) => {
+  const pct = max > 0 ? Math.min(100, Math.round((Number(value || 0) / max) * 100)) : 0
+  return <div style={styles.miniBarTrack}><div style={{ ...styles.miniBarFill, width: `${pct}%` }} /></div>
+}
+
+// ── Lookup helpers (bancos y monedas) ───────────────────
+// n8n puede devolver campos en cualquier case, estas helpers normalizan
 
 const getField = (obj, ...names) => {
   for (const n of names) {
@@ -83,31 +88,8 @@ const getMonedaCodigo = (monedaId, monedas) => {
   return getField(m, 'VALORTEXTO', 'valortexto', 'ValorTexto') || 'PEN'
 }
 
-// ── Ordenamiento ────────────────────────────────────────
-const sortData = (data, sortBy, sortOrder) => {
-  if (!sortBy) return data
-  return [...data].sort((a, b) => {
-    let valA = a[sortBy]
-    let valB = b[sortBy]
-    
-    if (sortBy === 'fecha_operacion') {
-      valA = new Date(valA || 0)
-      valB = new Date(valB || 0)
-    }
-    if (['importe_cargado', 'importe_abonado', 'comision'].includes(sortBy)) {
-      valA = Number(valA || 0)
-      valB = Number(valB || 0)
-    }
-    if (typeof valA === 'string') valA = valA.toLowerCase()
-    if (typeof valB === 'string') valB = valB.toLowerCase()
-    
-    if (valA < valB) return sortOrder === 'asc' ? -1 : 1
-    if (valA > valB) return sortOrder === 'asc' ? 1 : -1
-    return 0
-  })
-}
-
 // ── Modal Detalle ───────────────────────────────────────
+
 const ModalDetalle = ({ item, bancos, monedas, onClose }) => (
   <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
     <div className="modal" style={{ maxWidth: 820 }}>
@@ -151,6 +133,7 @@ const ModalDetalle = ({ item, bancos, monedas, onClose }) => (
 )
 
 // ── Modal Crear / Editar ────────────────────────────────
+
 const ModalDevolucion = ({ item, bancos, monedas, onClose, onSave }) => {
   const isEdit = !!item?.id
   const [form, setForm] = useState({
@@ -204,6 +187,7 @@ const ModalDevolucion = ({ item, bancos, monedas, onClose, onSave }) => {
           <button className="modal-close" onClick={onClose}>x</button>
         </div>
         <div className="modal-body" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
+          {/* Fila 1: Operación */}
           <div style={styles.modalGrid3}>
             <div className="form-group">
               <label className="form-label">Nro. Operación *</label>
@@ -219,6 +203,7 @@ const ModalDevolucion = ({ item, bancos, monedas, onClose, onSave }) => {
             </div>
           </div>
 
+          {/* Fila 2: Banco y archivo */}
           <div style={styles.modalGrid3}>
             <div className="form-group">
               <label className="form-label">Banco *</label>
@@ -246,6 +231,7 @@ const ModalDevolucion = ({ item, bancos, monedas, onClose, onSave }) => {
             </div>
           </div>
 
+          {/* Fila 3: Cuentas y monedas */}
           <div style={styles.modalGrid4}>
             <div className="form-group">
               <label className="form-label">Cuenta cargo</label>
@@ -279,6 +265,7 @@ const ModalDevolucion = ({ item, bancos, monedas, onClose, onSave }) => {
             </div>
           </div>
 
+          {/* Fila 4: Importes */}
           <div style={styles.modalGrid3}>
             <div className="form-group">
               <label className="form-label">Importe cargado *</label>
@@ -294,6 +281,7 @@ const ModalDevolucion = ({ item, bancos, monedas, onClose, onSave }) => {
             </div>
           </div>
 
+          {/* Fila 5: Referencia y mensaje */}
           <div className="form-group">
             <label className="form-label">Referencia</label>
             <input className="form-control" value={form.referencia} onChange={e => set('referencia', e.target.value)} maxLength={100} />
@@ -328,24 +316,22 @@ const DevolucionesPage = () => {
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
   const [compactMode, setCompactMode] = useState(true)
-  
-  const [sortBy, setSortBy] = useState(null)
-  const [sortOrder, setSortOrder] = useState('asc')
-  
   const { toasts, show } = useToast()
 
+  // Lookups
   const [bancos, setBancos] = useState([])
   const [monedas, setMonedas] = useState([])
 
-  // Permisos
+  // ── Permisos por bit ──────────────────────────────────
+  // OPEDEV bits: 0:Vista, 1:Lista, 2:Ver, 3:Modificar, 4:Total, 5:Crear, 6:Eliminar
   const claimValue = permisos?.[CLAIM] || '00000000000'
-  const canList   = claimValue[1] === '1'
-  const canView   = claimValue[2] === '1'
-  const canEdit   = claimValue[3] === '1'
-  const canCreate = claimValue[5] === '1'
-  const canDelete = claimValue[6] === '1'
+  const canList   = claimValue[1] === '1'  // bit 1: Lista
+  const canView   = claimValue[2] === '1'  // bit 2: Ver
+  const canEdit   = claimValue[3] === '1'  // bit 3: Modificar
+  const canCreate = claimValue[5] === '1'  // bit 5: Crear
+  const canDelete = claimValue[6] === '1'  // bit 6: Eliminar
 
-  // Cargar lookups
+  // ── Cargar lookups al montar ──────────────────────────
   useEffect(() => {
     const loadLookups = async () => {
       try {
@@ -353,8 +339,10 @@ const DevolucionesPage = () => {
           apiCall('/qf/devoluciones/bancos'),
           apiCall('/qf/devoluciones/monedas'),
         ])
+        // Bancos: n8n devuelve array directo o envuelto
         const bArr = Array.isArray(bRes) ? bRes : (bRes?.data || bRes?.items || [bRes])
         setBancos(bArr.filter(x => x && (x.id || x.ID)))
+        // Monedas: NO usar toArray porque campos son ID (mayúscula), toArray filtra por 'id' minúscula
         const mArr = Array.isArray(mRes) ? mRes : (mRes?.data || mRes?.items || [mRes])
         setMonedas(mArr.filter(x => x && (x.ID || x.id || x.Id)))
       } catch (e) {
@@ -364,7 +352,7 @@ const DevolucionesPage = () => {
     loadLookups()
   }, [])
 
-  // Cargar devoluciones
+  // ── Cargar devoluciones ───────────────────────────────
   const cargar = async (opts = {}) => {
     const nextPage = opts.page || page
     const nextCampo = opts.campo ?? campo
@@ -401,26 +389,15 @@ const DevolucionesPage = () => {
     setCampo('all')
     setBusqueda('')
     setPage(1)
-    setSortBy(null)
-    setSortOrder('asc')
     cargar({ page: 1, campo: 'all', busqueda: '' })
   }
 
-  const handleSort = (column) => {
-    if (sortBy === column) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortBy(column)
-      setSortOrder('asc')
-    }
-  }
-
-  const sortedData = useMemo(() => {
-    return sortData(data, sortBy, sortOrder)
-  }, [data, sortBy, sortOrder])
+  // ── CRUD handlers ─────────────────────────────────────
 
   const handleSave = async payload => {
-    const endpoint = payload.id ? '/qf/devoluciones/actualizar' : '/qf/devoluciones/crear'
+    const endpoint = payload.id
+      ? '/qf/devoluciones/actualizar'
+      : '/qf/devoluciones/crear'
     const res = await apiCall(endpoint, { method: 'POST', body: JSON.stringify(payload) })
     if (!res?.success) throw new Error(res?.message || 'No se pudo guardar')
     show(payload.id ? 'Devolución actualizada' : 'Devolución registrada')
@@ -430,7 +407,10 @@ const DevolucionesPage = () => {
   const handleDelete = async item => {
     if (!confirm(`¿Eliminar la devolución ${item.numero_operacion || item.id}?`)) return
     try {
-      const res = await apiCall('/qf/devoluciones/eliminar', { method: 'POST', body: JSON.stringify({ item }) })
+      const res = await apiCall('/qf/devoluciones/eliminar', {
+        method: 'POST',
+        body: JSON.stringify({ id: item.id }),
+      })
       if (!res?.success) throw new Error(res?.message || 'No se pudo eliminar')
       show('Devolución eliminada')
       cargar()
@@ -439,18 +419,24 @@ const DevolucionesPage = () => {
     }
   }
 
+  // ── Cálculos de página ────────────────────────────────
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const from = total === 0 ? 0 : ((page - 1) * PAGE_SIZE) + 1
   const to = Math.min(page * PAGE_SIZE, total)
 
   const metrics = useMemo(() => {
-    const totalCargado = sortedData.reduce((s, r) => s + Number(r.importe_cargado || 0), 0)
-    const totalAbonado = sortedData.reduce((s, r) => s + Number(r.importe_abonado || 0), 0)
-    const totalComision = sortedData.reduce((s, r) => s + Number(r.comision || 0), 0)
-    const pendientes = sortedData.filter(r => String(r.estado || '').toLowerCase().includes('pendiente')).length
-    return { totalCargado, totalAbonado, totalComision, pendientes }
-  }, [sortedData])
+    const totalCargado = data.reduce((s, r) => s + Number(r.importe_cargado || 0), 0)
+    const totalAbonado = data.reduce((s, r) => s + Number(r.importe_abonado || 0), 0)
+    const totalComision = data.reduce((s, r) => s + Number(r.comision || 0), 0)
+    const pendientes = data.filter(r => String(r.estado || '').toLowerCase().includes('pendiente')).length
+    const bancosUnicos = new Set(data.map(r => r.banco).filter(Boolean)).size
+    return { totalCargado, totalAbonado, totalComision, pendientes, bancosUnicos }
+  }, [data])
 
+  const maxCargado = useMemo(() => Math.max(...data.map(r => Number(r.importe_cargado || 0)), 0), [data])
+
+  // ── Si no tiene permiso de lista ──────────────────────
   if (!canList) {
     return (
       <div className="fade-in" style={styles.page}>
@@ -462,31 +448,30 @@ const DevolucionesPage = () => {
     )
   }
 
+  // ── Render ────────────────────────────────────────────
+
   return (
     <div className="fade-in" style={styles.page}>
       <ToastContainer toasts={toasts} />
 
+      {/* Header */}
       <div style={styles.topHeader}>
         <h1 style={styles.title}>↩ Devoluciones</h1>
         <p style={styles.subtitle}>Gestión de devoluciones bancarias</p>
       </div>
 
+      {/* Action bar */}
       <div style={styles.actionBar}>
         <button className="btn btn-secondary btn-sm" onClick={() => setCompactMode(v => !v)}>
           {compactMode ? 'Vista cómoda' : 'Vista compacta'}
         </button>
-        {canCreate && (
-          <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })}>
-            + Nuevo Registro
-          </button>
-        )}
       </div>
 
       {/* KPIs */}
       <div style={styles.kpiGrid}>
         {[
           { label: 'Total registros', value: total, color: 'var(--qf-navy)', border: '#2196f3' },
-          { label: 'Mostradas', value: sortedData.length, color: '#185FA5', border: '#03a9f4' },
+          { label: 'Mostradas', value: data.length, color: '#185FA5', border: '#03a9f4' },
           { label: 'Total cargado', value: money(metrics.totalCargado), color: '#c62828', border: '#f44336' },
           { label: 'Total abonado', value: money(metrics.totalAbonado), color: '#2e7d32', border: '#4caf50' },
           { label: 'Comisiones', value: money(metrics.totalComision), color: '#e65100', border: '#ff9800' },
@@ -499,33 +484,38 @@ const DevolucionesPage = () => {
         ))}
       </div>
 
-      {/* Tabla */}
+      {/* Table card */}
       <div className="page-card" style={styles.card}>
+        {/* Sticky tools */}
         <div style={styles.stickyTools}>
           <div style={styles.cardTitleWrap}>
             <h2 style={styles.cardTitle}>Lista de Devoluciones</h2>
-            <span style={styles.resultPill}>{from}-{to} de {total}</span>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5', pointerEvents: 'none' }}>🔍</span>
+                <input
+                  className="filter-input"
+                  placeholder="Filtrar..."
+                  value={busqueda}
+                  onChange={e => setBusqueda(e.target.value)}
+                  style={{ ...styles.searchInput, paddingLeft: 32 }}
+                />
+              </div>
+              {canCreate && (
+                <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ color: '#4CAF50', fontWeight: 800, fontSize: 16 }}>+</span> Nuevo Registro
+                </button>
+              )}
+            </div>
           </div>
-          
-          {/* Filtros: selector + búsqueda con lupa + limpiar */}
           <div style={styles.filtersRow}>
             <select className="filter-input" value={campo} onChange={e => setCampo(e.target.value)} style={styles.fieldSelect}>
               {camposBusqueda.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-            <div style={{ position: 'relative' }}>
-              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5' }}>🔍</span>
-              <input
-                className="filter-input"
-                placeholder="Buscar..."
-                value={busqueda}
-                onChange={e => setBusqueda(e.target.value)}
-                style={{ width: 200, paddingLeft: 32, height: 36 }}
-              />
-            </div>
             <button className="btn btn-secondary btn-sm" onClick={limpiar}>Limpiar</button>
           </div>
-          
           <div style={styles.paginationRow}>
+            <span style={styles.resultPill}>{from}-{to} de {total}</span>
             <button className="btn btn-secondary btn-sm" disabled={page <= 1 || loading} onClick={() => setPage(1)}>Primera</button>
             <button className="btn btn-secondary btn-sm" disabled={page <= 1 || loading} onClick={() => setPage(p => Math.max(1, p - 1))}>Anterior</button>
             <span style={styles.pageInfo}>Página <strong>{page}</strong> de <strong>{totalPages}</strong></span>
@@ -535,87 +525,74 @@ const DevolucionesPage = () => {
           </div>
         </div>
 
-        <div style={{ ...styles.tableViewport, maxHeight: compactMode ? 'calc(100vh - 350px)' : 'calc(100vh - 410px)', overflowX: 'auto' }}>
-          {loading && sortedData.length === 0 ? (
+        {/* Table */}
+        <div style={{ ...styles.tableViewport, maxHeight: compactMode ? 'calc(100vh - 350px)' : 'calc(100vh - 410px)' }}>
+          {loading && data.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner dark" /></div>
-          ) : sortedData.length === 0 ? (
+          ) : data.length === 0 ? (
             <div className="empty-state"><div className="icon">↩</div><p>No se encontraron devoluciones</p></div>
           ) : (
-            <table className="qf-table" style={{ ...styles.table, fontSize: compactMode ? 10 : 11, minWidth: 1100 }}>
+            <table className="qf-table" style={{ ...styles.table, fontSize: compactMode ? 11 : 12 }}>
               <thead>
                 <tr>
-                  <th style={styles.th} onClick={() => handleSort('numero_operacion')}>
-                    Nro. Op. {sortBy === 'numero_operacion' && (sortOrder === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th style={styles.th} onClick={() => handleSort('fecha_operacion')}>
-                    Fecha Op. {sortBy === 'fecha_operacion' && (sortOrder === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th style={styles.th} onClick={() => handleSort('banco')}>
-                    Banco {sortBy === 'banco' && (sortOrder === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th style={styles.th}>Cuenta cargo</th>
-                  <th style={styles.th}>Cuenta abono</th>
-                  <th style={{ ...styles.th, textAlign: 'right' }} onClick={() => handleSort('importe_cargado')}>
-                    Imp. cargado {sortBy === 'importe_cargado' && (sortOrder === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th style={{ ...styles.th, textAlign: 'right' }} onClick={() => handleSort('importe_abonado')}>
-                    Imp. abonado {sortBy === 'importe_abonado' && (sortOrder === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th style={{ ...styles.th, textAlign: 'right' }} onClick={() => handleSort('comision')}>
-                    Comisión {sortBy === 'comision' && (sortOrder === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th style={styles.th} onClick={() => handleSort('referencia')}>
-                    Referencia {sortBy === 'referencia' && (sortOrder === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th style={styles.th} onClick={() => handleSort('estado')}>
-                    Estado {sortBy === 'estado' && (sortOrder === 'asc' ? '↑' : '↓')}
-                  </th>
+                  <th style={styles.th}>Nro. Op.</th>
+                  <th style={styles.th}>Fecha</th>
+                  <th style={styles.th}>Banco</th>
+                  <th style={styles.th}>Cta. cargo</th>
+                  <th style={styles.th}>Mon.</th>
+                  <th style={styles.th}>Cta. abono</th>
+                  <th style={styles.th}>Mon.</th>
+                  <th style={{ ...styles.th, textAlign: 'right' }}>Cargado</th>
+                  <th style={{ ...styles.th, textAlign: 'right' }}>Abonado</th>
+                  <th style={{ ...styles.th, textAlign: 'right' }}>Comisión</th>
+                  <th style={styles.th}>Referencia</th>
+                  <th style={styles.th}>Estado</th>
                   <th style={{ ...styles.th, textAlign: 'center' }}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {sortedData.map(r => {
+                {data.map(r => {
                   const cargado = Number(r.importe_cargado || 0)
                   const monCargoCode = getMonedaCodigo(r.moneda_cargo, monedas)
                   const monAbonoCode = getMonedaCodigo(r.moneda_abono, monedas)
                   return (
                     <tr key={r.id} style={compactMode ? styles.compactRow : undefined}>
-                      <td style={{ ...styles.td, minWidth: 70, whiteSpace: 'nowrap' }}>
+                      <td style={{ ...styles.td, minWidth: 60 }}>
                         <code style={styles.opCode}>{r.numero_operacion || '-'}</code>
                       </td>
-                      <td style={{ ...styles.td, minWidth: 70, whiteSpace: 'nowrap' }}>{formatDate(r.fecha_operacion)}</td>
-                      <td style={{ ...styles.td, minWidth: 80, whiteSpace: 'nowrap' }}>
+                      <td style={{ ...styles.td, minWidth: 68, fontSize: 10.5 }}>{formatDate(r.fecha_operacion)}</td>
+                      <td style={{ ...styles.td, minWidth: 50 }}>
                         <span style={styles.bankPill}>{getBancoNombre(r.banco, bancos)}</span>
                       </td>
-                      <td style={{ ...styles.td, minWidth: 110, whiteSpace: 'nowrap', fontSize: compactMode ? 9.5 : 10.5 }}>{r.cuenta_cargo || '-'}</td>
-                      <td style={{ ...styles.td, minWidth: 110, whiteSpace: 'nowrap', fontSize: compactMode ? 9.5 : 10.5 }}>{r.cuenta_abono || '-'}</td>
-                      <td style={{ ...styles.td, fontWeight: 800, color: '#c62828', whiteSpace: 'nowrap', minWidth: 90, textAlign: 'right' }}>
+                      <td style={{ ...styles.td, minWidth: 90, fontSize: 10.5 }}>{r.cuenta_cargo || '-'}</td>
+                      <td style={{ ...styles.td, minWidth: 45, fontSize: 10.5 }}>{getMonedaNombre(r.moneda_cargo, monedas)}</td>
+                      <td style={{ ...styles.td, minWidth: 90, fontSize: 10.5 }}>{r.cuenta_abono || '-'}</td>
+                      <td style={{ ...styles.td, minWidth: 45, fontSize: 10.5 }}>{getMonedaNombre(r.moneda_abono, monedas)}</td>
+                      <td style={{ ...styles.td, fontWeight: 800, color: '#c62828', whiteSpace: 'nowrap', minWidth: 85, textAlign: 'right', fontSize: 11 }}>
                         {money(cargado, monCargoCode)}
                       </td>
-                      <td style={{ ...styles.td, fontWeight: 800, color: '#2e7d32', whiteSpace: 'nowrap', minWidth: 90, textAlign: 'right' }}>
+                      <td style={{ ...styles.td, fontWeight: 800, color: '#2e7d32', whiteSpace: 'nowrap', minWidth: 85, textAlign: 'right', fontSize: 11 }}>
                         {money(r.importe_abonado, monAbonoCode)}
                       </td>
-                      <td style={{ ...styles.td, whiteSpace: 'nowrap', minWidth: 65, textAlign: 'right' }}>
+                      <td style={{ ...styles.td, whiteSpace: 'nowrap', minWidth: 65, textAlign: 'right', fontSize: 11 }}>
                         {money(r.comision, monCargoCode)}
                       </td>
-                      <td style={{ ...styles.td, minWidth: 110, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <td style={{ ...styles.td, minWidth: 90, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10.5 }}>
                         {r.referencia || '-'}
                       </td>
-                      <td style={{ ...styles.td, minWidth: 80, whiteSpace: 'nowrap' }}>
-                        <span className={`badge ${badgeClass(r.estado)}`} style={{ fontSize: compactMode ? 9 : 10, padding: '2px 6px' }}>
-                          {String(r.estado || 'Pendiente').toUpperCase()}
-                        </span>
+                      <td style={{ ...styles.td, minWidth: 80 }}>
+                        <span className={`badge ${badgeClass(r.estado)}`} style={{ fontSize: 9 }}>{String(r.estado || 'Pendiente').toUpperCase()}</span>
                       </td>
-                      <td style={{ ...styles.td, textAlign: 'center', minWidth: 105, whiteSpace: 'nowrap' }}>
+                      <td style={{ ...styles.td, textAlign: 'center', minWidth: 100 }}>
                         <div style={styles.actionButtons}>
                           {canView && (
-                            <button className="btn btn-secondary btn-sm" onClick={() => setModal({ type: 'detalle', data: r })} style={{ fontSize: compactMode ? 9 : 10 }}>Ver</button>
+                            <button className="btn btn-secondary btn-sm" onClick={() => setModal({ type: 'detalle', data: r })} title="Ver detalle" style={{ fontSize: 10, padding: '2px 6px' }}>Ver</button>
                           )}
                           {canEdit && (
-                            <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'editar', data: r })} style={{ fontSize: compactMode ? 9 : 10 }}>Edit</button>
+                            <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'editar', data: r })} title="Editar" style={{ fontSize: 10, padding: '2px 6px' }}>Edit</button>
                           )}
                           {canDelete && (
-                            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r)} style={{ fontSize: compactMode ? 9 : 10 }}>Del</button>
+                            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r)} title="Eliminar" style={{ fontSize: 10, padding: '2px 6px' }}>Del</button>
                           )}
                         </div>
                       </td>
@@ -627,63 +604,65 @@ const DevolucionesPage = () => {
           )}
         </div>
 
-        {!loading && <div style={styles.footerCount}>{sortedData.length} de {total} devoluciones</div>}
+        {!loading && <div style={styles.footerCount}>{data.length} de {total} devoluciones</div>}
       </div>
 
-      {modal?.type === 'detalle' && <ModalDetalle item={modal.data} bancos={bancos} monedas={monedas} onClose={() => setModal(null)} />}
-      {modal?.type === 'nuevo' && <ModalDevolucion bancos={bancos} monedas={monedas} onClose={() => setModal(null)} onSave={handleSave} />}
-      {modal?.type === 'editar' && <ModalDevolucion item={modal.data} bancos={bancos} monedas={monedas} onClose={() => setModal(null)} onSave={handleSave} />}
+      {/* Modales */}
+      {modal?.type === 'detalle' && (
+        <ModalDetalle item={modal.data} bancos={bancos} monedas={monedas} onClose={() => setModal(null)} />
+      )}
+      {modal?.type === 'nuevo' && (
+        <ModalDevolucion bancos={bancos} monedas={monedas} onClose={() => setModal(null)} onSave={handleSave} />
+      )}
+      {modal?.type === 'editar' && (
+        <ModalDevolucion item={modal.data} bancos={bancos} monedas={monedas} onClose={() => setModal(null)} onSave={handleSave} />
+      )}
     </div>
   )
 }
 
-// ── Estilos ─────────────────────────────────────────────
+// ── Estilos (mismos de OperacionesFacturasPage) ─────────
+
 const styles = {
   page: { paddingBottom: 16, maxWidth: '100%', overflowX: 'hidden' },
   topHeader: { marginBottom: 8 },
   title: { fontFamily: 'Montserrat', fontSize: 22, fontWeight: 800, color: 'var(--qf-navy)', marginBottom: 3 },
   subtitle: { color: 'var(--qf-text-light)', fontSize: 12.5 },
-  actionBar: { display: 'flex', justifyContent: 'flex-start', gap: 8, marginBottom: 10, flexWrap: 'wrap' },
-  kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 14 },
-  kpiCard: { background: '#fff', borderRadius: 12, padding: '8px 12px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', minHeight: 58 },
-  kpiLabel: { fontSize: 9, color: 'var(--qf-text-light)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 3 },
-  kpiValue: { fontWeight: 800, fontFamily: 'Montserrat', lineHeight: 1.1, fontSize: 18 },
+  actionBar: { display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: 8, marginBottom: 10 },
+  kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: 10, marginBottom: 14 },
+  kpiCard: { background: '#fff', borderRadius: 12, padding: '9px 13px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', minHeight: 62 },
+  kpiLabel: { fontSize: 9.2, color: 'var(--qf-text-light)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
+  kpiValue: { fontWeight: 850, fontFamily: 'Montserrat', lineHeight: 1.1, fontSize: 21 },
   card: { overflow: 'hidden' },
   stickyTools: { background: '#fff', borderTopLeftRadius: 12, borderTopRightRadius: 12, borderBottom: '1px solid var(--qf-border)' },
-  cardTitleWrap: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 16px 6px' },
-  cardTitle: { margin: 0, fontSize: 16, fontFamily: 'Montserrat', color: 'var(--qf-navy)' },
-  resultPill: { fontSize: 10, fontWeight: 700, color: 'var(--qf-navy)', background: '#e8eef5', borderRadius: 999, padding: '3px 8px' },
-  filtersRow: { display: 'flex', gap: 8, alignItems: 'center', padding: '0 16px 8px' },
-  fieldSelect: { width: 'auto', minWidth: 150, height: 34, fontSize: 12 },
-  paginationRow: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '6px 16px 8px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
-  pageInfo: { fontSize: 11.5, color: 'var(--qf-text-light)', padding: '0 4px' },
-  loadingMini: { fontSize: 10, color: '#185FA5', fontWeight: 700 },
+  cardTitleWrap: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 16px 8px' },
+  cardTitle: { margin: 0, fontSize: 18, fontFamily: 'Montserrat', color: 'var(--qf-navy)' },
+  resultPill: { fontSize: 11, fontWeight: 700, color: 'var(--qf-navy)', background: '#e8eef5', borderRadius: 999, padding: '4px 10px' },
+  filtersRow: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '0 16px 8px' },
+  fieldSelect: { width: 'auto', minWidth: 145, height: 36 },
+  searchInput: { minWidth: 260, maxWidth: 420, height: 36 },
+  paginationRow: { display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap', padding: '8px 16px 10px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
+  pageInfo: { fontSize: 12, color: 'var(--qf-text-light)', padding: '0 6px' },
+  loadingMini: { fontSize: 11, color: '#185FA5', fontWeight: 700 },
   tableViewport: { overflow: 'auto', width: '100%' },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 10, padding: '6px 5px', lineHeight: 1.1, background: '#fff', borderBottom: '1px solid var(--qf-border)', cursor: 'pointer', userSelect: 'none' },
-  td: { padding: '4px 5px', verticalAlign: 'middle', lineHeight: 1.2, borderBottom: '1px solid #f0f2f5' },
-  compactRow: { height: 34 },
-  opCode: { background: '#e8eef5', padding: '1px 5px', borderRadius: 4, fontSize: 9.5, fontWeight: 800, color: 'var(--qf-navy)' },
-  bankPill: { background: '#e8eef5', color: 'var(--qf-navy)', borderRadius: 4, padding: '1px 5px', fontSize: 9.5, fontWeight: 700, whiteSpace: 'nowrap' },
-  actionButtons: { display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'nowrap' },
-  footerCount: { padding: '8px 16px', borderTop: '1px solid var(--qf-border)', fontSize: 11, color: 'var(--qf-text-light)', background: '#fff' },
+  table: { minWidth: 1100, tableLayout: 'auto' },
+  th: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 10.3, padding: '8px 8px', lineHeight: 1.05 },
+  td: { padding: '6px 8px', verticalAlign: 'middle', lineHeight: 1.15 },
+  compactRow: { height: 38 },
+  opCode: { background: '#e8eef5', padding: '2px 7px', borderRadius: 4, fontSize: 10.5, fontWeight: 800, color: 'var(--qf-navy)' },
+  bankPill: { background: '#e8eef5', color: 'var(--qf-navy)', borderRadius: 4, padding: '2px 7px', fontSize: 10.5, fontWeight: 700, whiteSpace: 'nowrap' },
+  miniBarTrack: { height: 7, width: 70, background: '#e8eef5', borderRadius: 999, overflow: 'hidden' },
+  miniBarFill: { height: '100%', background: '#c62828', borderRadius: 999 },
+  actionButtons: { display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'nowrap' },
+  footerCount: { padding: '10px 16px', borderTop: '1px solid var(--qf-border)', fontSize: 11.5, color: 'var(--qf-text-light)', background: '#fff' },
   detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10 },
-  detailBox: { background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 8 },
-  detailLabel: { fontSize: 9, fontWeight: 700, color: 'var(--qf-text-light)', textTransform: 'uppercase' },
-  detailValue: { fontSize: 12, fontWeight: 600, color: 'var(--qf-navy)' },
+  detailBox: { background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 9 },
+  detailLabel: { fontSize: 9.5, fontWeight: 700, color: 'var(--qf-text-light)', textTransform: 'uppercase' },
+  detailValue: { fontSize: 12.5, fontWeight: 600, color: 'var(--qf-navy)' },
   modalGrid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' },
   modalGrid3: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' },
   modalGrid4: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0 16px' },
-  errorBox: { background: '#fce4e4', color: '#c62828', borderRadius: 8, padding: '8px 12px', fontSize: 12, marginTop: 6 },
+  errorBox: { background: '#fce4e4', color: '#c62828', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginTop: 8 },
 }
-
-// Agregar estilos para sortable
-const styleSheet = document.createElement('style')
-styleSheet.textContent = `
-  .sortable:hover {
-    background-color: #f0f2f5;
-  }
-`
-document.head.appendChild(styleSheet)
 
 export default DevolucionesPage
