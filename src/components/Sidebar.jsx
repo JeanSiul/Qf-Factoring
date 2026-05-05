@@ -11,6 +11,7 @@ const menuItems = [
     children: [
       { icon: '👥', label: 'Usuarios', path: '/usuarios', claim: 'USRLIS' },
       { icon: '🏷️', label: 'Roles', path: '/roles', claim: 'ROLLIS' },
+      { icon: '⚙️', label: 'Módulos Permisos', path: '/seguridad/modulos-permisos', claim: 'CFGPER' },
     ]
   },
   {
