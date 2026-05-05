@@ -607,10 +607,10 @@ const DevolucionesPage = () => {
                   const monAbonoCode = getMonedaCodigo(r.moneda_abono, monedas)
                   return (
                     <tr key={r.id} style={compactMode ? styles.compactRow : undefined}>
-                      <td style={{ ...styles.td, minWidth: 60 }}>
+                      <td style={{ ...styles.td, minWidth: 50 }}>
                         <code style={styles.opCode}>{r.numero_operacion || '-'}</code>
                       </td>
-                      <td style={{ ...styles.td, minWidth: 68, fontSize: 10.5 }}>{formatDate(r.fecha_operacion)}</td>
+                      <td style={{ ...styles.td, minWidth: 60, fontSize: 10.5 }}>{formatDate(r.fecha_operacion)}</td>
                       <td style={{ ...styles.td, minWidth: 50 }}>
                         <span style={styles.bankPill}>{getBancoNombre(r.banco, bancos)}</span>
                       </td>
