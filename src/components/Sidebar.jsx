@@ -2,8 +2,8 @@ import React, { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-// Cada item puede tener un 'claim' que controla su visibilidad
-// Si no tiene claim, siempre se muestra
+// Cada item DEBE tener un 'claim' para controlar su visibilidad
+// Sin claim = siempre visible (solo para Dashboard principal)
 const menuItems = [
   { icon: '📊', label: 'Dashboard', path: '/dashboard' },
   {
@@ -17,30 +17,30 @@ const menuItems = [
   {
     icon: '🔔', label: 'Alertas', path: null,
     children: [
-      { icon: '📊', label: 'Dashboard', path: '/alertas/dashboard' },
-      { icon: '📡', label: 'Canales', path: '/alertas/canales' },
-      { icon: '👤', label: 'Destinatarios', path: '/alertas/destinatarios' },
-      { icon: '⚙️', label: 'Procesos', path: '/alertas/procesos' },
-      { icon: '🔗', label: 'Asignaciones', path: '/alertas/asignaciones' },
-      { icon: '📬', label: 'Cola de envíos', path: '/alertas/cola' },
+      { icon: '📊', label: 'Dashboard', path: '/alertas/dashboard', claim: 'ALTDSH' },
+      { icon: '📡', label: 'Canales', path: '/alertas/canales', claim: 'ALTCAN' },
+      { icon: '👤', label: 'Destinatarios', path: '/alertas/destinatarios', claim: 'ALTDES' },
+      { icon: '⚙️', label: 'Procesos', path: '/alertas/procesos', claim: 'ALTPRO' },
+      { icon: '🔗', label: 'Asignaciones', path: '/alertas/asignaciones', claim: 'ALTASI' },
+      { icon: '📬', label: 'Cola de envíos', path: '/alertas/cola', claim: 'ALTCOL' },
     ]
   },
   {
     icon: '📦', label: 'Inventario', path: null,
     children: [
-      { icon: '📊', label: 'Dashboard', path: '/inventario/dashboard' },
-      { icon: '🗂️', label: 'Grupos y Atributos', path: '/inventario/grupos' },
-      { icon: '📦', label: 'Items', path: '/inventario/items' },
-      { icon: '👤', label: 'Asignaciones', path: '/inventario/asignaciones' },
+      { icon: '📊', label: 'Dashboard', path: '/inventario/dashboard', claim: 'IVNDSH' },
+      { icon: '🗂️', label: 'Grupos y Atributos', path: '/inventario/grupos', claim: 'IVNGRP' },
+      { icon: '📦', label: 'Items', path: '/inventario/items', claim: 'IVNITM' },
+      { icon: '👤', label: 'Asignaciones', path: '/inventario/asignaciones', claim: 'IVNASI' },
     ]
   },
   {
     icon: '💼', label: 'Operaciones', path: null,
     children: [
-      { icon: '📊', label: 'Dashboard', path: '/operaciones/dashboard' },
+      { icon: '📊', label: 'Dashboard', path: '/operaciones/dashboard', claim: 'OPELIS' },
       { icon: '🧾', label: 'Facturas', path: '/operaciones/facturas', claim: 'FACLIS' },
-      { icon: '💰', label: 'Finanzas', path: '/operaciones/finanzas' },
-      { icon: '📈', label: 'Reportes', path: '/operaciones/reportes' },
+      { icon: '💰', label: 'Finanzas', path: '/operaciones/finanzas', claim: 'OPELIS' },
+      { icon: '📈', label: 'Reportes', path: '/operaciones/reportes', claim: 'RPTOPE' },
     ]
   },
 ]
@@ -58,7 +58,7 @@ const Sidebar = ({ mobileOpen, onClose }) => {
 
   // Verifica si un item del menú es visible según permisos
   const isVisible = (item) => {
-    // Sin claim = siempre visible
+    // Sin claim = siempre visible (solo Dashboard principal)
     if (!item.claim) return true
     // Verificar bit 0 (Vista) del claim
     const value = permisos?.[item.claim] || '00000000000'
