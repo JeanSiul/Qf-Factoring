@@ -16,7 +16,9 @@ const camposBusqueda = [
   { value: 'numero_operacion', label: 'Nro. Operación' },
   { value: 'archivo', label: 'Archivo' },
   { value: 'cuenta_cargo', label: 'Cuenta cargo' },
+  { value: 'moneda_cargo', label: 'Mon. cargo' },
   { value: 'cuenta_abono', label: 'Cuenta abono' },
+  { value: 'moneda_abono', label: 'Mon. abono' },
   { value: 'referencia', label: 'Referencia' },
   { value: 'estado', label: 'Estado' },
   { value: 'banco', label: 'Banco' },
@@ -316,6 +318,8 @@ const DevolucionesPage = () => {
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
   const [compactMode, setCompactMode] = useState(true)
+  const [sortField, setSortField] = useState(null)
+  const [sortDir, setSortDir] = useState('asc')
   const { toasts, show } = useToast()
 
   // Lookups
@@ -434,7 +438,55 @@ const DevolucionesPage = () => {
     return { totalCargado, totalAbonado, totalComision, pendientes, bancosUnicos }
   }, [data])
 
-  const maxCargado = useMemo(() => Math.max(...data.map(r => Number(r.importe_cargado || 0)), 0), [data])
+  // ── Ordenamiento local ────────────────────────────────
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDir('asc')
+    }
+  }
+
+  const sortedData = useMemo(() => {
+    if (!sortField) return data
+    const sorted = [...data].sort((a, b) => {
+      let va = a[sortField]
+      let vb = b[sortField]
+      // Para campos numéricos
+      if (['importe_cargado', 'importe_abonado', 'comision'].includes(sortField)) {
+        va = Number(va || 0)
+        vb = Number(vb || 0)
+        return sortDir === 'asc' ? va - vb : vb - va
+      }
+      // Para banco (resolver nombre)
+      if (sortField === 'banco_nombre') {
+        va = getBancoNombre(a.banco, bancos)
+        vb = getBancoNombre(b.banco, bancos)
+      }
+      // Para monedas (resolver nombre)
+      if (sortField === 'moneda_cargo_nombre') {
+        va = getMonedaNombre(a.moneda_cargo, monedas)
+        vb = getMonedaNombre(b.moneda_abono, monedas)
+      }
+      if (sortField === 'moneda_abono_nombre') {
+        va = getMonedaNombre(a.moneda_abono, monedas)
+        vb = getMonedaNombre(b.moneda_abono, monedas)
+      }
+      // String comparison
+      va = String(va || '').toLowerCase()
+      vb = String(vb || '').toLowerCase()
+      if (va < vb) return sortDir === 'asc' ? -1 : 1
+      if (va > vb) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
+    return sorted
+  }, [data, sortField, sortDir, bancos, monedas])
+
+  const sortIcon = (field) => {
+    if (sortField !== field) return ' ↕'
+    return sortDir === 'asc' ? ' ▲' : ' ▼'
+  }
 
   // ── Si no tiene permiso de lista ──────────────────────
   if (!canList) {
@@ -490,28 +542,26 @@ const DevolucionesPage = () => {
         <div style={styles.stickyTools}>
           <div style={styles.cardTitleWrap}>
             <h2 style={styles.cardTitle}>Lista de Devoluciones</h2>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-              <div style={{ position: 'relative' }}>
-                <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5', pointerEvents: 'none' }}>🔍</span>
-                <input
-                  className="filter-input"
-                  placeholder="Filtrar..."
-                  value={busqueda}
-                  onChange={e => setBusqueda(e.target.value)}
-                  style={{ ...styles.searchInput, paddingLeft: 32 }}
-                />
-              </div>
-              {canCreate && (
-                <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span style={{ color: '#4CAF50', fontWeight: 800, fontSize: 16 }}>+</span> Nuevo Registro
-                </button>
-              )}
-            </div>
+            {canCreate && (
+              <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ color: '#4CAF50', fontWeight: 800, fontSize: 16 }}>+</span> Nuevo Registro
+              </button>
+            )}
           </div>
           <div style={styles.filtersRow}>
             <select className="filter-input" value={campo} onChange={e => setCampo(e.target.value)} style={styles.fieldSelect}>
               {camposBusqueda.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
+            <div style={{ position: 'relative', flex: 1, maxWidth: 360 }}>
+              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5', pointerEvents: 'none' }}>🔍</span>
+              <input
+                className="filter-input"
+                placeholder={campo === 'all' ? 'Buscar...' : `Buscar por ${camposBusqueda.find(f => f.value === campo)?.label || ''}...`}
+                value={busqueda}
+                onChange={e => setBusqueda(e.target.value)}
+                style={{ ...styles.searchInput, paddingLeft: 32, width: '100%' }}
+              />
+            </div>
             <button className="btn btn-secondary btn-sm" onClick={limpiar}>Limpiar</button>
           </div>
           <div style={styles.paginationRow}>
@@ -535,23 +585,23 @@ const DevolucionesPage = () => {
             <table className="qf-table" style={{ ...styles.table, fontSize: compactMode ? 11 : 12 }}>
               <thead>
                 <tr>
-                  <th style={styles.th}>Nro. Op.</th>
-                  <th style={styles.th}>Fecha</th>
-                  <th style={styles.th}>Banco</th>
-                  <th style={styles.th}>Cta. cargo</th>
-                  <th style={styles.th}>Mon.</th>
-                  <th style={styles.th}>Cta. abono</th>
-                  <th style={styles.th}>Mon.</th>
-                  <th style={{ ...styles.th, textAlign: 'right' }}>Cargado</th>
-                  <th style={{ ...styles.th, textAlign: 'right' }}>Abonado</th>
-                  <th style={{ ...styles.th, textAlign: 'right' }}>Comisión</th>
-                  <th style={styles.th}>Referencia</th>
-                  <th style={styles.th}>Estado</th>
+                  <th style={styles.thSort} onClick={() => handleSort('numero_operacion')}>Nro. Op.<span style={styles.sortIcon}>{sortIcon('numero_operacion')}</span></th>
+                  <th style={styles.thSort} onClick={() => handleSort('fecha_operacion')}>Fecha<span style={styles.sortIcon}>{sortIcon('fecha_operacion')}</span></th>
+                  <th style={styles.thSort} onClick={() => handleSort('banco_nombre')}>Banco<span style={styles.sortIcon}>{sortIcon('banco_nombre')}</span></th>
+                  <th style={styles.thSort} onClick={() => handleSort('cuenta_cargo')}>Cta. cargo<span style={styles.sortIcon}>{sortIcon('cuenta_cargo')}</span></th>
+                  <th style={styles.thSort} onClick={() => handleSort('moneda_cargo_nombre')}>Mon.<span style={styles.sortIcon}>{sortIcon('moneda_cargo_nombre')}</span></th>
+                  <th style={styles.thSort} onClick={() => handleSort('cuenta_abono')}>Cta. abono<span style={styles.sortIcon}>{sortIcon('cuenta_abono')}</span></th>
+                  <th style={styles.thSort} onClick={() => handleSort('moneda_abono_nombre')}>Mon.<span style={styles.sortIcon}>{sortIcon('moneda_abono_nombre')}</span></th>
+                  <th style={{ ...styles.thSort, textAlign: 'right' }} onClick={() => handleSort('importe_cargado')}>Cargado<span style={styles.sortIcon}>{sortIcon('importe_cargado')}</span></th>
+                  <th style={{ ...styles.thSort, textAlign: 'right' }} onClick={() => handleSort('importe_abonado')}>Abonado<span style={styles.sortIcon}>{sortIcon('importe_abonado')}</span></th>
+                  <th style={{ ...styles.thSort, textAlign: 'right' }} onClick={() => handleSort('comision')}>Comisión<span style={styles.sortIcon}>{sortIcon('comision')}</span></th>
+                  <th style={styles.thSort} onClick={() => handleSort('referencia')}>Referencia<span style={styles.sortIcon}>{sortIcon('referencia')}</span></th>
+                  <th style={styles.thSort} onClick={() => handleSort('estado')}>Estado<span style={styles.sortIcon}>{sortIcon('estado')}</span></th>
                   <th style={{ ...styles.th, textAlign: 'center' }}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {data.map(r => {
+                {sortedData.map(r => {
                   const cargado = Number(r.importe_cargado || 0)
                   const monCargoCode = getMonedaCodigo(r.moneda_cargo, monedas)
                   const monAbonoCode = getMonedaCodigo(r.moneda_abono, monedas)
@@ -647,6 +697,8 @@ const styles = {
   tableViewport: { overflow: 'auto', width: '100%' },
   table: { minWidth: 1100, tableLayout: 'auto' },
   th: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 10.3, padding: '8px 8px', lineHeight: 1.05 },
+  thSort: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 10.3, padding: '8px 8px', lineHeight: 1.05, cursor: 'pointer', userSelect: 'none', transition: 'background 0.15s' },
+  sortIcon: { fontSize: 8, opacity: 0.5, marginLeft: 2 },
   td: { padding: '6px 8px', verticalAlign: 'middle', lineHeight: 1.15 },
   compactRow: { height: 38 },
   opCode: { background: '#e8eef5', padding: '2px 7px', borderRadius: 4, fontSize: 10.5, fontWeight: 800, color: 'var(--qf-navy)' },
