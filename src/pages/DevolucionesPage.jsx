@@ -5,7 +5,7 @@ import ToastContainer from '../components/ToastContainer'
 import { useAuth } from '../context/AuthContext'
 
 // ── Claim para este módulo ──────────────────────────────
-// DEVLIS → bit 0: Vista, 1: Lista, 2: Crear, 3: Ver, 4: Modificar, 5: Eliminar
+// OPEDEV → bit 0: Vista, 1: Lista, 2: Crear, 3: Ver, 4: Modificar, 5: Eliminar
 const CLAIM = 'OPEDEV'
 
 const PAGE_SIZE = 50
@@ -57,23 +57,35 @@ const MiniBar = ({ value, max }) => {
 }
 
 // ── Lookup helpers (bancos y monedas) ───────────────────
+// n8n puede devolver campos en cualquier case, estas helpers normalizan
+
+const getField = (obj, ...names) => {
+  for (const n of names) {
+    if (obj[n] !== undefined) return obj[n]
+    if (obj[n.toLowerCase()] !== undefined) return obj[n.toLowerCase()]
+    if (obj[n.toUpperCase()] !== undefined) return obj[n.toUpperCase()]
+  }
+  return undefined
+}
 
 const getBancoNombre = (bancoId, bancos) => {
   if (!bancoId) return '-'
-  const b = bancos.find(x => String(x.id) === String(bancoId))
-  return b?.name || bancoId
+  const b = bancos.find(x => String(getField(x, 'id', 'ID')) === String(bancoId))
+  return b ? (getField(b, 'name', 'Name', 'NAME') || bancoId) : bancoId
 }
 
 const getMonedaNombre = (monedaId, monedas) => {
   if (!monedaId) return '-'
-  const m = monedas.find(x => String(x.ID) === String(monedaId))
-  return m?.DESCRIPCION || m?.VALORTEXTO || monedaId
+  const m = monedas.find(x => String(getField(x, 'ID', 'id')) === String(monedaId))
+  if (!m) return monedaId
+  return getField(m, 'CODIGO', 'codigo', 'Codigo') || getField(m, 'DESCRIPCION', 'descripcion') || monedaId
 }
 
 const getMonedaCodigo = (monedaId, monedas) => {
   if (!monedaId) return 'PEN'
-  const m = monedas.find(x => String(x.ID) === String(monedaId))
-  return m?.VALORTEXTO || 'PEN'
+  const m = monedas.find(x => String(getField(x, 'ID', 'id')) === String(monedaId))
+  if (!m) return 'PEN'
+  return getField(m, 'VALORTEXTO', 'valortexto', 'ValorTexto') || 'PEN'
 }
 
 // ── Modal Detalle ───────────────────────────────────────
@@ -229,9 +241,11 @@ const ModalDevolucion = ({ item, bancos, monedas, onClose, onSave }) => {
               <label className="form-label">Moneda cargo</label>
               <select className="form-control" value={form.moneda_cargo} onChange={e => set('moneda_cargo', e.target.value)}>
                 <option value="">-- Seleccionar --</option>
-                {monedas.map(m => (
-                  <option key={m.ID} value={m.ID}>{m.DESCRIPCION} ({m.VALORTEXTO})</option>
-                ))}
+                {monedas.map(m => {
+                  const mId = getField(m, 'ID', 'id')
+                  const mCodigo = getField(m, 'CODIGO', 'codigo', 'Codigo') || ''
+                  return <option key={mId} value={mId}>{mCodigo}</option>
+                })}
               </select>
             </div>
             <div className="form-group">
@@ -242,9 +256,11 @@ const ModalDevolucion = ({ item, bancos, monedas, onClose, onSave }) => {
               <label className="form-label">Moneda abono</label>
               <select className="form-control" value={form.moneda_abono} onChange={e => set('moneda_abono', e.target.value)}>
                 <option value="">-- Seleccionar --</option>
-                {monedas.map(m => (
-                  <option key={m.ID} value={m.ID}>{m.DESCRIPCION} ({m.VALORTEXTO})</option>
-                ))}
+                {monedas.map(m => {
+                  const mId = getField(m, 'ID', 'id')
+                  const mCodigo = getField(m, 'CODIGO', 'codigo', 'Codigo') || ''
+                  return <option key={mId} value={mId}>{mCodigo}</option>
+                })}
               </select>
             </div>
           </div>
@@ -322,8 +338,12 @@ const DevolucionesPage = () => {
           apiCall('/qf/devoluciones/bancos'),
           apiCall('/qf/devoluciones/monedas'),
         ])
-        setBancos(Array.isArray(bRes) ? bRes : toArray(bRes))
-        setMonedas(Array.isArray(mRes) ? mRes : toArray(mRes))
+        // Bancos: n8n devuelve array directo o envuelto
+        const bArr = Array.isArray(bRes) ? bRes : (bRes?.data || bRes?.items || [bRes])
+        setBancos(bArr.filter(x => x && (x.id || x.ID)))
+        // Monedas: NO usar toArray porque campos son ID (mayúscula), toArray filtra por 'id' minúscula
+        const mArr = Array.isArray(mRes) ? mRes : (mRes?.data || mRes?.items || [mRes])
+        setMonedas(mArr.filter(x => x && (x.ID || x.id || x.Id)))
       } catch (e) {
         console.warn('Error cargando lookups:', e.message)
       }
@@ -516,9 +536,9 @@ const DevolucionesPage = () => {
                   <th style={styles.th}>Cuenta abono</th>
                   <th style={styles.th}>Mon. cargo</th>
                   <th style={styles.th}>Mon. abono</th>
-                  <th style={styles.th}>Imp. cargado</th>
-                  <th style={styles.th}>Imp. abonado</th>
-                  <th style={styles.th}>Comisión</th>
+                  <th style={{ ...styles.th, textAlign: 'right' }}>Imp. cargado</th>
+                  <th style={{ ...styles.th, textAlign: 'right' }}>Imp. abonado</th>
+                  <th style={{ ...styles.th, textAlign: 'right' }}>Comisión</th>
                   <th style={styles.th}>Referencia</th>
                   <th style={styles.th}>Estado</th>
                   <th style={styles.th}>Peso</th>
@@ -543,13 +563,13 @@ const DevolucionesPage = () => {
                       <td style={{ ...styles.td, minWidth: 110 }}>{r.cuenta_abono || '-'}</td>
                       <td style={{ ...styles.td, minWidth: 70 }}>{getMonedaNombre(r.moneda_cargo, monedas)}</td>
                       <td style={{ ...styles.td, minWidth: 70 }}>{getMonedaNombre(r.moneda_abono, monedas)}</td>
-                      <td style={{ ...styles.td, fontWeight: 800, color: '#c62828', whiteSpace: 'nowrap', minWidth: 105 }}>
+                      <td style={{ ...styles.td, fontWeight: 800, color: '#c62828', whiteSpace: 'nowrap', minWidth: 105, textAlign: 'right' }}>
                         {money(cargado, monCargoCode)}
                       </td>
-                      <td style={{ ...styles.td, fontWeight: 800, color: '#2e7d32', whiteSpace: 'nowrap', minWidth: 105 }}>
+                      <td style={{ ...styles.td, fontWeight: 800, color: '#2e7d32', whiteSpace: 'nowrap', minWidth: 105, textAlign: 'right' }}>
                         {money(r.importe_abonado, monAbonoCode)}
                       </td>
-                      <td style={{ ...styles.td, whiteSpace: 'nowrap', minWidth: 80 }}>
+                      <td style={{ ...styles.td, whiteSpace: 'nowrap', minWidth: 80, textAlign: 'right' }}>
                         {money(r.comision, monCargoCode)}
                       </td>
                       <td style={{ ...styles.td, minWidth: 120, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
