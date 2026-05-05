@@ -614,9 +614,9 @@ const DevolucionesPage = () => {
                       <td style={{ ...styles.td, minWidth: 50 }}>
                         <span style={styles.bankPill}>{getBancoNombre(r.banco, bancos)}</span>
                       </td>
-                      <td style={{ ...styles.td, minWidth: 90, fontSize: 10.5 }}>{r.cuenta_cargo || '-'}</td>
+                      <td style={{ ...styles.td, minWidth: 155, fontSize: 10.5 }}>{r.cuenta_cargo || '-'}</td>
                       <td style={{ ...styles.td, minWidth: 45, fontSize: 10.5 }}>{getMonedaNombre(r.moneda_cargo, monedas)}</td>
-                      <td style={{ ...styles.td, minWidth: 90, fontSize: 10.5 }}>{r.cuenta_abono || '-'}</td>
+                      <td style={{ ...styles.td, minWidth: 155, fontSize: 10.5 }}>{r.cuenta_abono || '-'}</td>
                       <td style={{ ...styles.td, minWidth: 45, fontSize: 10.5 }}>{getMonedaNombre(r.moneda_abono, monedas)}</td>
                       <td style={{ ...styles.td, fontWeight: 800, color: '#c62828', whiteSpace: 'nowrap', minWidth: 85, textAlign: 'right', fontSize: 11 }}>
                         {money(cargado, monCargoCode)}
