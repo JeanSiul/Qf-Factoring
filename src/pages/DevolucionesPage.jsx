@@ -624,7 +624,7 @@ const DevolucionesPage = () => {
                       <td style={{ ...styles.td, fontWeight: 800, color: '#2e7d32', whiteSpace: 'nowrap', minWidth: 85, textAlign: 'right', fontSize: 11 }}>
                         {money(r.importe_abonado, monAbonoCode)}
                       </td>
-                      <td style={{ ...styles.td, whiteSpace: 'nowrap', minWidth: 65, textAlign: 'right', fontSize: 11 }}>
+                      <td style={{ ...styles.td, whiteSpace: 'nowrap', minWidth: 60, textAlign: 'right', fontSize: 11 }}>
                         {money(r.comision, monCargoCode)}
                       </td>
                       <td style={{ ...styles.td, minWidth: 90, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10.5 }}>
