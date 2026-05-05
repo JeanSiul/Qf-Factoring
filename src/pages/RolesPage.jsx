@@ -1,96 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { apiCall } from '../utils/api'
+import { apiCall, toArray } from '../utils/api'
 import { useToast } from '../hooks/useToast'
 import ToastContainer from '../components/ToastContainer'
 
-// ── MAPA COMPLETO DE PERMISOS ──────────────────────────────────────────────
-const TABS_PERMISOS = [
-  {
-    key: "seguridad",
-    label: "Seguridad",
-    grupos: [
-      { claim: "USRLIS", nombre: "Usuario", cols: ["Vista", "Lista", "Ver", "Modificar", "Total", "Password"] },
-      { claim: "ROLLIS", nombre: "Rol", cols: ["Vista", "Lista", "Usuarios", "Ver", "Modificar", "Total"] },
-    ],
-  },
-  {
-    key: "parametros",
-    label: "Parámetros",
-    grupos: [
-      { claim: "TABLIS", nombre: "Tablas", cols: ["Vista", "Lista", "Elementos", "Ver", "Modificar", "Total"] },
-      { claim: "ECOLIS", nombre: "Estructura comercial", cols: ["Vista", "Lista", "Ver", "Modificar", "Total"] },
-      { claim: "METLIS", nombre: "Metas", cols: ["Vista", "Lista", "Ver", "Modificar", "Total"] },
-    ],
-  },
-  {
-    key: "maestros",
-    label: "Maestros",
-    grupos: [
-      {
-        claim: "EMPLIS", nombre: "Empresarios", cols: ["Vista", "Lista", "Lista nuevos", "Ver", "Modificar", "Total"],
-        subgrupos: [
-          { claim: "EMPPER", nombre: "Datos personales", cols: ["Ver", "Modificar"] },
-          { claim: "EMPDOM", nombre: "Domicilio", cols: ["Ver", "Modificar"] },
-          { claim: "EMPEMP", nombre: "Datos empresa", cols: ["Ver", "Modificar"] },
-          { claim: "EMPREP", nombre: "Representante legal", cols: ["Ver", "Modificar"] },
-          { claim: "EMPDOC", nombre: "Documentos", cols: ["Ver", "Modificar"] },
-          { claim: "EMPCTA", nombre: "Cuentas bancarias", cols: ["Ver", "Modificar"] },
-          { claim: "EMPCON", nombre: "Contraseña", cols: ["Ver", "Modificar"] },
-        ],
-      },
-      {
-        claim: "PAGLIS", nombre: "Pagadores", cols: ["Vista", "Lista", "Lista nuevos", "Ver", "Modificar", "Total"],
-        subgrupos: [
-          { claim: "PAGPER", nombre: "Empresa", cols: ["Ver", "Modificar"] },
-          { claim: "PAGCON", nombre: "Personas contacto", cols: ["Ver", "Modificar"] },
-          { claim: "PAGHIS", nombre: "Historial y riesgo", cols: ["Ver", "Modificar"] },
-        ],
-      },
-      {
-        claim: "INVLIS", nombre: "Inversionistas", cols: ["Vista", "Lista", "Lista nuevos", "Ver", "Modificar", "Total"],
-        subgrupos: [
-          { claim: "INVPER", nombre: "Datos personales", cols: ["Ver", "Modificar"] },
-          { claim: "INVDOM", nombre: "Domicilio", cols: ["Ver", "Modificar"] },
-          { claim: "INVEMP", nombre: "Datos empresa", cols: ["Ver", "Modificar"] },
-          { claim: "INVREP", nombre: "Representante legal", cols: ["Ver", "Modificar"] },
-          { claim: "INVDOC", nombre: "Documentos", cols: ["Ver", "Modificar"] },
-          { claim: "INVCTA", nombre: "Cuentas bancarias", cols: ["Ver", "Modificar"] },
-          { claim: "INVCON", nombre: "Contraseña", cols: ["Ver", "Modificar"] },
-        ],
-      },
-    ],
-  },
-  {
-    key: "operaciones",
-    label: "Operaciones",
-    grupos: [
-      {
-        claim: "FACLIS", nombre: "Facturas", cols: ["Vista", "Lista", "Ver", "Modificar", "Total", "Cargar Excel"],
-        subgrupos: [
-          { claim: "FACDET", nombre: "Detalle factura", cols: ["Ver", "Modificar"] },
-          { claim: "FACDOC", nombre: "Documentos", cols: ["Ver", "Modificar"] },
-          { claim: "FACCON", nombre: "Condiciones", cols: ["Ver", "Modificar"] },
-        ],
-      },
-      {
-        claim: "OPELIS", nombre: "Operaciones", cols: ["Vista", "Lista", "Trabajar con", "Ver", "Modificar", "Total"],
-        subgrupos: [
-          { claim: "OPECOM", nombre: "Comercial", cols: ["Ver", "Modificar"] },
-          { claim: "OPEOPE", nombre: "Operaciones", cols: ["Ver", "Modificar"] },
-          { claim: "OPEFIN", nombre: "Finanzas", cols: ["Ver", "Modificar"] },
-          { claim: "OPEADM", nombre: "Administración", cols: ["Ver", "Modificar"] },
-          { claim: "OPESEG", nombre: "Seguimiento", cols: ["Ver", "Modificar"] },
-        ],
-      },
-    ],
-  },
-  {
-    key: "configuracion",
-    label: "Configuración",
-    grupos: [],
-  },
-]
-
+// ── UTILIDADES DE BITS ─────────────────────────────────────────────────────
 const strToBits = (str, len) => {
   const bits = []
   for (let i = 0; i < len; i++) bits.push(str?.[i] === '1')
@@ -101,41 +14,32 @@ const bitsToStr = (bits, totalLen = 11) => {
   return bits.map(b => b ? '1' : '0').join('').padEnd(totalLen, '0')
 }
 
-const CLAIMS_VACIOS = {
-  USRLIS: '00000000000', ROLLIS: '00000000000',
-  TABLIS: '00000000000', ECOLIS: '00000000000', METLIS: '00000000000',
-  EMPLIS: '00000000000', EMPPER: '00000000000', EMPDOM: '00000000000',
-  EMPEMP: '00000000000', EMPREP: '00000000000', EMPDOC: '00000000000',
-  EMPCTA: '00000000000', EMPCON: '00000000000',
-  PAGLIS: '00000000000', PAGPER: '00000000000', PAGCON: '00000000000', PAGHIS: '00000000000',
-  INVLIS: '00000000000', INVPER: '00000000000', INVDOM: '00000000000',
-  INVEMP: '00000000000', INVREP: '00000000000', INVDOC: '00000000000',
-  INVCTA: '00000000000', INVCON: '00000000000',
-  FACLIS: '00000000000', FACDET: '00000000000', FACDOC: '00000000000', FACCON: '00000000000',
-  OPELIS: '00000000000', OPECOM: '00000000000', OPEOPE: '00000000000',
-  OPEFIN: '00000000000', OPEADM: '00000000000', OPESEG: '00000000000',
+const parseBits = (bits_config) => {
+  try {
+    const parsed = typeof bits_config === 'string' ? JSON.parse(bits_config) : bits_config
+    return Array.isArray(parsed) ? parsed : []
+  } catch { return [] }
 }
 
 // ── CHECK ROW ──────────────────────────────────────────────────────────────
-const CheckRow = ({ grupo, permisos, onChange, isSubgrupo = false }) => {
-  const bits = strToBits(permisos[grupo.claim] || '00000000000', grupo.cols.length)
+const CheckRow = ({ modulo, permisos, onChange, isSubgrupo = false }) => {
+  const cols = parseBits(modulo.bits_config)
+  const bits = strToBits(permisos[modulo.codigo] || '00000000000', cols.length)
   const MAX_COLS = 6
-  const emptyCols = MAX_COLS - grupo.cols.length
+  const emptyCols = Math.max(0, MAX_COLS - cols.length)
 
   const toggle = (i) => {
     const newBits = [...bits]
     newBits[i] = !newBits[i]
-    onChange(grupo.claim, bitsToStr(newBits))
+    onChange(modulo.codigo, bitsToStr(newBits))
   }
 
   return (
-    <tr style={{
-      borderTop: isSubgrupo ? 'none' : '2px solid #e8eef5',
-    }}>
+    <tr style={{ borderTop: isSubgrupo ? 'none' : '2px solid #e8eef5' }}>
       <td style={{ padding: isSubgrupo ? '4px 10px' : '12px 10px 4px', width: 200 }}>
         {isSubgrupo && <span style={{ color: '#b0bdd0', marginRight: 6, fontSize: 11 }}>↳</span>}
         <span style={{ fontWeight: isSubgrupo ? 500 : 700, color: isSubgrupo ? '#4a5a7a' : '#0a2540', fontSize: isSubgrupo ? 12 : 13 }}>
-          {grupo.nombre}
+          {modulo.nombre}
         </span>
       </td>
       {bits.map((checked, i) => (
@@ -167,10 +71,11 @@ const CheckRow = ({ grupo, permisos, onChange, isSubgrupo = false }) => {
   )
 }
 
-// ── MODAL PERMISOS ─────────────────────────────────────────────────────────
+// ── MODAL PERMISOS DINÁMICO ────────────────────────────────────────────────
 const ModalPermisos = ({ rol, onClose, onSave }) => {
-  const [activeTab, setActiveTab] = useState('seguridad')
-  const [permisos, setPermisos] = useState({ ...CLAIMS_VACIOS })
+  const [modulos, setModulos] = useState([])
+  const [activeTab, setActiveTab] = useState('')
+  const [permisos, setPermisos] = useState({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -179,15 +84,34 @@ const ModalPermisos = ({ rol, onClose, onSave }) => {
     const cargar = async () => {
       setLoading(true)
       try {
-        const res = await apiCall(`/qf/roles/permisos?rolId=${rol.id}`)
-        // res debe ser array de {ClaimType, ClaimValue}
-        const map = { ...CLAIMS_VACIOS }
-        if (Array.isArray(res)) {
-          res.forEach(c => { if (map[c.ClaimType] !== undefined) map[c.ClaimType] = c.ClaimValue })
-        }
+        // Cargar módulos dinámicos y claims del rol en paralelo
+        const [modsRes, claimsRes] = await Promise.all([
+          apiCall('/qf/permisos/modulos/listar'),
+          apiCall(`/qf/roles/permisos?rolId=${rol.id}`)
+        ])
+
+        const mods = toArray(modsRes).filter(m => m.activo === 1)
+        setModulos(mods)
+
+        // Inicializar permisos vacíos para todos los módulos
+        const map = {}
+        mods.forEach(m => { map[m.codigo] = '00000000000' })
+
+        // Llenar con claims existentes del rol
+        const claims = Array.isArray(claimsRes) ? claimsRes : toArray(claimsRes)
+        claims.forEach(c => {
+          if (c.ClaimType && map[c.ClaimType] !== undefined) {
+            map[c.ClaimType] = c.ClaimValue || '00000000000'
+          }
+        })
+
         setPermisos(map)
+
+        // Seleccionar primer tab
+        const grupos = [...new Set(mods.map(m => m.grupo))]
+        if (grupos.length > 0) setActiveTab(grupos[0])
       } catch (e) {
-        console.warn('No se pudieron cargar permisos, usando vacíos')
+        console.warn('No se pudieron cargar datos:', e.message)
       } finally {
         setLoading(false)
       }
@@ -213,7 +137,25 @@ const ModalPermisos = ({ rol, onClose, onSave }) => {
     }
   }
 
-  const tab = TABS_PERMISOS.find(t => t.key === activeTab)
+  // Agrupar módulos por grupo, ordenados
+  const gruposOrdenados = [...new Set(modulos.map(m => m.grupo))].sort((a, b) => {
+    const oa = modulos.find(m => m.grupo === a)?.grupo_orden || 0
+    const ob = modulos.find(m => m.grupo === b)?.grupo_orden || 0
+    return oa - ob
+  })
+
+  // Módulos del tab activo (principales + sub)
+  const modulosTab = modulos.filter(m => m.grupo === activeTab).sort((a, b) => a.orden - b.orden)
+  const principales = modulosTab.filter(m => !m.padre_codigo)
+
+  // Header cols — tomar el máximo de bits del tab activo
+  const maxCols = Math.min(6, Math.max(...modulosTab.map(m => parseBits(m.bits_config).length), 0))
+  // Para los headers usamos los bits del primer módulo principal como referencia
+  const headerBits = principales.length > 0 ? parseBits(principales[0].bits_config) : []
+  const headerCols = []
+  for (let i = 0; i < Math.max(maxCols, headerBits.length); i++) {
+    headerCols.push(headerBits[i] || `Col ${i + 1}`)
+  }
 
   return (
     <div
@@ -229,7 +171,7 @@ const ModalPermisos = ({ rol, onClose, onSave }) => {
     >
       <div style={{
         background: '#fff', borderRadius: 16,
-        width: '100%', maxWidth: 820, maxHeight: '90vh',
+        width: '100%', maxWidth: 860, maxHeight: '90vh',
         display: 'flex', flexDirection: 'column',
         boxShadow: '0 24px 80px rgba(0,0,0,0.18)',
         overflow: 'hidden', fontFamily: 'Montserrat, sans-serif',
@@ -243,7 +185,7 @@ const ModalPermisos = ({ rol, onClose, onSave }) => {
         }}>
           <div>
             <h2 style={{ margin: 0, color: '#fff', fontSize: 18, fontWeight: 700 }}>🔐 Permisos — {rol.name}</h2>
-            <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.65)', fontSize: 12 }}>{rol.descripcion}</p>
+            <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.65)', fontSize: 12 }}>{rol.descripcion || 'Gestión de permisos del rol'}</p>
           </div>
           <button onClick={onClose} style={{
             background: 'rgba(255,255,255,0.15)', border: 'none',
@@ -252,17 +194,17 @@ const ModalPermisos = ({ rol, onClose, onSave }) => {
           }}>×</button>
         </div>
 
-        {/* Tabs */}
+        {/* Tabs dinámicos */}
         <div style={{ display: 'flex', borderBottom: '2px solid #e8eef5', background: '#f8fafc', flexShrink: 0, overflowX: 'auto' }}>
-          {TABS_PERMISOS.map(t => (
-            <button key={t.key} onClick={() => setActiveTab(t.key)} style={{
+          {gruposOrdenados.map(g => (
+            <button key={g} onClick={() => setActiveTab(g)} style={{
               padding: '12px 22px', fontSize: 13, fontWeight: 600,
-              color: activeTab === t.key ? '#185FA5' : '#6b7a9a',
-              cursor: 'pointer', border: 'none', background: activeTab === t.key ? '#fff' : 'none',
-              borderBottom: activeTab === t.key ? '2px solid #185FA5' : '2px solid transparent',
+              color: activeTab === g ? '#185FA5' : '#6b7a9a',
+              cursor: 'pointer', border: 'none', background: activeTab === g ? '#fff' : 'none',
+              borderBottom: activeTab === g ? '2px solid #185FA5' : '2px solid transparent',
               marginBottom: -2, whiteSpace: 'nowrap', fontFamily: 'inherit',
             }}>
-              {t.label}
+              {g}
             </button>
           ))}
         </div>
@@ -271,30 +213,40 @@ const ModalPermisos = ({ rol, onClose, onSave }) => {
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 28px' }}>
           {loading ? (
             <div style={{ padding: 60, textAlign: 'center' }}><span className="spinner dark" /></div>
-          ) : tab?.grupos.length === 0 ? (
+          ) : principales.length === 0 ? (
             <div style={{ padding: 60, textAlign: 'center', color: '#8a9bb5', fontSize: 13 }}>
-              Sin permisos configurados para esta sección
+              Sin módulos configurados para esta sección
             </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr>
-                  <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: 10, fontWeight: 700, letterSpacing: '0.8px', color: '#8a9bb5', textTransform: 'uppercase', borderBottom: '1px solid #e8eef5' }}>Módulo</th>
-                  {['Vista', 'Lista', 'Col 3', 'Ver', 'Modificar', 'Col 6'].map(c => (
-                    <th key={c} style={{ textAlign: 'center', padding: '8px 10px', fontSize: 10, fontWeight: 700, letterSpacing: '0.8px', color: '#8a9bb5', textTransform: 'uppercase', borderBottom: '1px solid #e8eef5', width: 70 }}>{c}</th>
+                  <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: 10, fontWeight: 700, letterSpacing: '0.8px', color: '#8a9bb5', textTransform: 'uppercase', borderBottom: '1px solid #e8eef5' }}>
+                    Módulo
+                  </th>
+                  {headerCols.slice(0, 6).map((c, i) => (
+                    <th key={i} style={{ textAlign: 'center', padding: '8px 10px', fontSize: 10, fontWeight: 700, letterSpacing: '0.8px', color: '#8a9bb5', textTransform: 'uppercase', borderBottom: '1px solid #e8eef5', width: 70 }}>
+                      {c}
+                    </th>
+                  ))}
+                  {headerCols.length < 6 && Array.from({ length: 6 - headerCols.length }).map((_, i) => (
+                    <th key={`empty-${i}`} style={{ width: 70, borderBottom: '1px solid #e8eef5' }} />
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {tab?.grupos.map(grupo => (
-                  <React.Fragment key={grupo.claim}>
-                    <CheckRow grupo={grupo} permisos={permisos} onChange={handleChange} />
-                    {grupo.subgrupos?.map(sub => (
-                      <CheckRow key={sub.claim} grupo={sub} permisos={permisos} onChange={handleChange} isSubgrupo />
-                    ))}
-                    <tr><td colSpan={7} style={{ height: 8 }} /></tr>
-                  </React.Fragment>
-                ))}
+                {principales.map(mod => {
+                  const hijos = modulosTab.filter(m => m.padre_codigo === mod.codigo).sort((a, b) => a.orden - b.orden)
+                  return (
+                    <React.Fragment key={mod.codigo}>
+                      <CheckRow modulo={mod} permisos={permisos} onChange={handleChange} />
+                      {hijos.map(sub => (
+                        <CheckRow key={sub.codigo} modulo={sub} permisos={permisos} onChange={handleChange} isSubgrupo />
+                      ))}
+                      <tr><td colSpan={7} style={{ height: 8 }} /></tr>
+                    </React.Fragment>
+                  )
+                })}
               </tbody>
             </table>
           )}
@@ -339,18 +291,14 @@ const ModalRol = ({ rol, onClose, onSave }) => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const isEdit = !!rol?.id
-
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const handleSubmit = async () => {
     if (!form.name) { setError('El nombre del rol es requerido'); return }
     setLoading(true); setError('')
-    try {
-      await onSave(form)
-      onClose()
-    } catch (e) {
-      setError(e.message || 'Error al guardar')
-    } finally { setLoading(false) }
+    try { await onSave(form); onClose() }
+    catch (e) { setError(e.message || 'Error al guardar') }
+    finally { setLoading(false) }
   }
 
   return (
@@ -401,7 +349,7 @@ const RolesPage = () => {
     setLoading(true)
     try {
       const rs = await apiCall('/qf/roles/listar')
-      setRoles(rs)
+      setRoles(Array.isArray(rs) ? rs : toArray(rs))
     } catch (e) {
       show('Error al cargar roles: ' + e.message, 'error')
     } finally { setLoading(false) }
@@ -412,26 +360,25 @@ const RolesPage = () => {
   const handleSave = async (form) => {
     const endpoint = form.id ? '/qf/roles/actualizar' : '/qf/roles/crear'
     const res = await apiCall(endpoint, { method: 'POST', body: JSON.stringify(form) })
-    if (!res.success) throw new Error(res.message)
+    if (res !== null && res?.success === false) throw new Error(res.message)
     show(form.id ? 'Rol actualizado correctamente' : 'Rol creado correctamente')
     cargar()
   }
 
   const handleSavePermisos = async (rolId, permisos) => {
-    // Convierte el mapa a array de claims
     const claims = Object.entries(permisos).map(([ClaimType, ClaimValue]) => ({ ClaimType, ClaimValue }))
     const res = await apiCall('/qf/roles/permisos/guardar', {
       method: 'POST',
       body: JSON.stringify({ rolId, claims })
     })
-    if (!res.success) throw new Error(res.message || 'Error al guardar permisos')
+    if (res !== null && res?.success === false) throw new Error(res.message || 'Error al guardar permisos')
     show('Permisos guardados correctamente')
   }
 
   const handleDelete = async (id) => {
     try {
       const res = await apiCall('/qf/roles/eliminar', { method: 'POST', body: JSON.stringify({ id }) })
-      if (!res.success) throw new Error(res.message)
+      if (res !== null && res?.success === false) throw new Error(res.message)
       show('Rol eliminado')
       cargar()
     } catch (e) { show(e.message, 'error') }
