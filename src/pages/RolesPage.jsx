@@ -22,11 +22,10 @@ const parseBits = (bits_config) => {
 }
 
 // ── CHECK ROW ──────────────────────────────────────────────────────────────
-const CheckRow = ({ modulo, permisos, onChange, isSubgrupo = false }) => {
+const CheckRow = ({ modulo, permisos, onChange, isSubgrupo = false, maxCols }) => {
   const cols = parseBits(modulo.bits_config)
   const bits = strToBits(permisos[modulo.codigo] || '00000000000', cols.length)
-  const MAX_COLS = 6
-  const emptyCols = Math.max(0, MAX_COLS - cols.length)
+  const emptyCols = Math.max(0, maxCols - cols.length)
 
   const toggle = (i) => {
     const newBits = [...bits]
@@ -148,12 +147,20 @@ const ModalPermisos = ({ rol, onClose, onSave }) => {
   const modulosTab = modulos.filter(m => m.grupo === activeTab).sort((a, b) => a.orden - b.orden)
   const principales = modulosTab.filter(m => !m.padre_codigo)
 
-  // Header cols — tomar el máximo de bits del tab activo
-  const maxCols = Math.min(6, Math.max(...modulosTab.map(m => parseBits(m.bits_config).length), 0))
-  // Para los headers usamos los bits del primer módulo principal como referencia
-  const headerBits = principales.length > 0 ? parseBits(principales[0].bits_config) : []
+  // Calcular el máximo de columnas necesarias en este tab (basado en TODOS los módulos del tab)
+  const maxCols = Math.max(...modulosTab.map(m => parseBits(m.bits_config).length), 0)
+
+  // Generar headers dinámicos: buscar el módulo con más bits y usar sus nombres
+  // Si hay módulos con diferente cantidad de bits, usar el que tenga más
+  const moduloConMasBits = modulosTab.reduce((best, m) => {
+    const bits = parseBits(m.bits_config)
+    return bits.length > (best ? parseBits(best.bits_config).length : 0) ? m : best
+  }, null)
+  const headerBits = moduloConMasBits ? parseBits(moduloConMasBits.bits_config) : []
+
+  // Construir headers: usar nombres reales de los bits
   const headerCols = []
-  for (let i = 0; i < Math.max(maxCols, headerBits.length); i++) {
+  for (let i = 0; i < maxCols; i++) {
     headerCols.push(headerBits[i] || `Col ${i + 1}`)
   }
 
@@ -171,7 +178,7 @@ const ModalPermisos = ({ rol, onClose, onSave }) => {
     >
       <div style={{
         background: '#fff', borderRadius: 16,
-        width: '100%', maxWidth: 860, maxHeight: '90vh',
+        width: '100%', maxWidth: 920, maxHeight: '90vh',
         display: 'flex', flexDirection: 'column',
         boxShadow: '0 24px 80px rgba(0,0,0,0.18)',
         overflow: 'hidden', fontFamily: 'Montserrat, sans-serif',
@@ -210,7 +217,7 @@ const ModalPermisos = ({ rol, onClose, onSave }) => {
         </div>
 
         {/* Body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 28px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto', padding: '20px 28px' }}>
           {loading ? (
             <div style={{ padding: 60, textAlign: 'center' }}><span className="spinner dark" /></div>
           ) : principales.length === 0 ? (
@@ -224,13 +231,10 @@ const ModalPermisos = ({ rol, onClose, onSave }) => {
                   <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: 10, fontWeight: 700, letterSpacing: '0.8px', color: '#8a9bb5', textTransform: 'uppercase', borderBottom: '1px solid #e8eef5' }}>
                     Módulo
                   </th>
-                  {headerCols.slice(0, 6).map((c, i) => (
+                  {headerCols.map((c, i) => (
                     <th key={i} style={{ textAlign: 'center', padding: '8px 10px', fontSize: 10, fontWeight: 700, letterSpacing: '0.8px', color: '#8a9bb5', textTransform: 'uppercase', borderBottom: '1px solid #e8eef5', width: 70 }}>
                       {c}
                     </th>
-                  ))}
-                  {headerCols.length < 6 && Array.from({ length: 6 - headerCols.length }).map((_, i) => (
-                    <th key={`empty-${i}`} style={{ width: 70, borderBottom: '1px solid #e8eef5' }} />
                   ))}
                 </tr>
               </thead>
@@ -239,11 +243,11 @@ const ModalPermisos = ({ rol, onClose, onSave }) => {
                   const hijos = modulosTab.filter(m => m.padre_codigo === mod.codigo).sort((a, b) => a.orden - b.orden)
                   return (
                     <React.Fragment key={mod.codigo}>
-                      <CheckRow modulo={mod} permisos={permisos} onChange={handleChange} />
+                      <CheckRow modulo={mod} permisos={permisos} onChange={handleChange} maxCols={maxCols} />
                       {hijos.map(sub => (
-                        <CheckRow key={sub.codigo} modulo={sub} permisos={permisos} onChange={handleChange} isSubgrupo />
+                        <CheckRow key={sub.codigo} modulo={sub} permisos={permisos} onChange={handleChange} isSubgrupo maxCols={maxCols} />
                       ))}
-                      <tr><td colSpan={7} style={{ height: 8 }} /></tr>
+                      <tr><td colSpan={maxCols + 1} style={{ height: 8 }} /></tr>
                     </React.Fragment>
                   )
                 })}
