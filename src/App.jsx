@@ -18,7 +18,7 @@ import InvAsignacionesPage from './pages/InvAsignacionesPage'
 import Layout from './components/Layout'
 import OperacionesFacturasPage from './pages/OperacionesFacturasPage'
 import PermisosModulosPage from './pages/PermisosModulosPage'
-import DevolucionesPage from './pages/operaciones/DevolucionesPage'
+import DevolucionesPage from './pages/DevolucionesPage'
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth()
