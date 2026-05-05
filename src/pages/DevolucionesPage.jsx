@@ -10,7 +10,7 @@ const CLAIM = 'OPEDEV'
 const PAGE_SIZE = 50
 const DEBOUNCE_MS = 450
 
-// Campos para el selector de filtro (solo uno)
+// Campos para el selector de filtro
 const camposBusqueda = [
   { value: 'all', label: 'Todos los campos' },
   { value: 'numero_operacion', label: 'Nro. Operación' },
@@ -19,6 +19,8 @@ const camposBusqueda = [
   { value: 'banco', label: 'Banco' },
   { value: 'cuenta_cargo', label: 'Cuenta cargo' },
   { value: 'cuenta_abono', label: 'Cuenta abono' },
+  { value: 'moneda_cargo', label: 'Moneda cargo' },
+  { value: 'moneda_abono', label: 'Moneda abono' },
 ]
 
 // ── Helpers ──────────────────────────────────────────────
@@ -88,17 +90,14 @@ const sortData = (data, sortBy, sortOrder) => {
     let valA = a[sortBy]
     let valB = b[sortBy]
     
-    // Fechas
     if (sortBy === 'fecha_operacion') {
       valA = new Date(valA || 0)
       valB = new Date(valB || 0)
     }
-    // Números
     if (['importe_cargado', 'importe_abonado', 'comision'].includes(sortBy)) {
       valA = Number(valA || 0)
       valB = Number(valB || 0)
     }
-    // Textos
     if (typeof valA === 'string') valA = valA.toLowerCase()
     if (typeof valB === 'string') valB = valB.toLowerCase()
     
@@ -330,17 +329,15 @@ const DevolucionesPage = () => {
   const [modal, setModal] = useState(null)
   const [compactMode, setCompactMode] = useState(true)
   
-  // Ordenamiento
   const [sortBy, setSortBy] = useState(null)
   const [sortOrder, setSortOrder] = useState('asc')
   
   const { toasts, show } = useToast()
 
-  // Lookups
   const [bancos, setBancos] = useState([])
   const [monedas, setMonedas] = useState([])
 
-  // ── Permisos por bit ──────────────────────────────────
+  // Permisos
   const claimValue = permisos?.[CLAIM] || '00000000000'
   const canList   = claimValue[1] === '1'
   const canView   = claimValue[2] === '1'
@@ -348,7 +345,7 @@ const DevolucionesPage = () => {
   const canCreate = claimValue[5] === '1'
   const canDelete = claimValue[6] === '1'
 
-  // ── Cargar lookups ────────────────────────────────────
+  // Cargar lookups
   useEffect(() => {
     const loadLookups = async () => {
       try {
@@ -367,7 +364,7 @@ const DevolucionesPage = () => {
     loadLookups()
   }, [])
 
-  // ── Cargar devoluciones ───────────────────────────────
+  // Cargar devoluciones
   const cargar = async (opts = {}) => {
     const nextPage = opts.page || page
     const nextCampo = opts.campo ?? campo
@@ -409,7 +406,6 @@ const DevolucionesPage = () => {
     cargar({ page: 1, campo: 'all', busqueda: '' })
   }
 
-  // Manejar ordenamiento al hacer clic en columna
   const handleSort = (column) => {
     if (sortBy === column) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
@@ -419,12 +415,10 @@ const DevolucionesPage = () => {
     }
   }
 
-  // Aplicar ordenamiento a los datos
   const sortedData = useMemo(() => {
     return sortData(data, sortBy, sortOrder)
   }, [data, sortBy, sortOrder])
 
-  // ── CRUD handlers ─────────────────────────────────────
   const handleSave = async payload => {
     const endpoint = payload.id ? '/qf/devoluciones/actualizar' : '/qf/devoluciones/crear'
     const res = await apiCall(endpoint, { method: 'POST', body: JSON.stringify(payload) })
@@ -436,7 +430,7 @@ const DevolucionesPage = () => {
   const handleDelete = async item => {
     if (!confirm(`¿Eliminar la devolución ${item.numero_operacion || item.id}?`)) return
     try {
-      const res = await apiCall('/qf/devoluciones/eliminar', { method: 'POST', body: JSON.stringify({ id: item.id }) })
+      const res = await apiCall('/qf/devoluciones/eliminar', { method: 'POST', body: JSON.stringify({ item }) })
       if (!res?.success) throw new Error(res?.message || 'No se pudo eliminar')
       show('Devolución eliminada')
       cargar()
@@ -445,7 +439,6 @@ const DevolucionesPage = () => {
     }
   }
 
-  // ── Cálculos de página ────────────────────────────────
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const from = total === 0 ? 0 : ((page - 1) * PAGE_SIZE) + 1
   const to = Math.min(page * PAGE_SIZE, total)
@@ -458,7 +451,6 @@ const DevolucionesPage = () => {
     return { totalCargado, totalAbonado, totalComision, pendientes }
   }, [sortedData])
 
-  // ── Si no tiene permiso de lista ──────────────────────
   if (!canList) {
     return (
       <div className="fade-in" style={styles.page}>
@@ -470,7 +462,6 @@ const DevolucionesPage = () => {
     )
   }
 
-  // ── Render ────────────────────────────────────────────
   return (
     <div className="fade-in" style={styles.page}>
       <ToastContainer toasts={toasts} />
@@ -480,29 +471,15 @@ const DevolucionesPage = () => {
         <p style={styles.subtitle}>Gestión de devoluciones bancarias</p>
       </div>
 
-      {/* Action bar - solo un campo de búsqueda con lupa */}
       <div style={styles.actionBar}>
         <button className="btn btn-secondary btn-sm" onClick={() => setCompactMode(v => !v)}>
           {compactMode ? 'Vista cómoda' : 'Vista compacta'}
         </button>
-        <div style={{ flex: 1 }} />
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <div style={{ position: 'relative' }}>
-            <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5' }}>🔍</span>
-            <input
-              className="filter-input"
-              placeholder="Buscar devolución..."
-              value={busqueda}
-              onChange={e => setBusqueda(e.target.value)}
-              style={{ width: 260, paddingLeft: 32, height: 34 }}
-            />
-          </div>
-          {canCreate && (
-            <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })}>
-              + Nuevo Registro
-            </button>
-          )}
-        </div>
+        {canCreate && (
+          <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })}>
+            + Nuevo Registro
+          </button>
+        )}
       </div>
 
       {/* KPIs */}
@@ -530,11 +507,21 @@ const DevolucionesPage = () => {
             <span style={styles.resultPill}>{from}-{to} de {total}</span>
           </div>
           
-          {/* Filtros - solo un selector de campo y limpiar */}
+          {/* Filtros: selector + búsqueda con lupa + limpiar */}
           <div style={styles.filtersRow}>
             <select className="filter-input" value={campo} onChange={e => setCampo(e.target.value)} style={styles.fieldSelect}>
               {camposBusqueda.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
+            <div style={{ position: 'relative' }}>
+              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5' }}>🔍</span>
+              <input
+                className="filter-input"
+                placeholder="Buscar..."
+                value={busqueda}
+                onChange={e => setBusqueda(e.target.value)}
+                style={{ width: 200, paddingLeft: 32, height: 36 }}
+              />
+            </div>
             <button className="btn btn-secondary btn-sm" onClick={limpiar}>Limpiar</button>
           </div>
           
@@ -554,33 +541,33 @@ const DevolucionesPage = () => {
           ) : sortedData.length === 0 ? (
             <div className="empty-state"><div className="icon">↩</div><p>No se encontraron devoluciones</p></div>
           ) : (
-            <table className="qf-table" style={{ ...styles.table, fontSize: compactMode ? 10.5 : 11.5, minWidth: 1100 }}>
+            <table className="qf-table" style={{ ...styles.table, fontSize: compactMode ? 10 : 11, minWidth: 1100 }}>
               <thead>
                 <tr>
-                  <th style={styles.th} onClick={() => handleSort('numero_operacion')} className="sortable">
+                  <th style={styles.th} onClick={() => handleSort('numero_operacion')}>
                     Nro. Op. {sortBy === 'numero_operacion' && (sortOrder === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th style={styles.th} onClick={() => handleSort('fecha_operacion')} className="sortable">
+                  <th style={styles.th} onClick={() => handleSort('fecha_operacion')}>
                     Fecha Op. {sortBy === 'fecha_operacion' && (sortOrder === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th style={styles.th} onClick={() => handleSort('banco')} className="sortable">
+                  <th style={styles.th} onClick={() => handleSort('banco')}>
                     Banco {sortBy === 'banco' && (sortOrder === 'asc' ? '↑' : '↓')}
                   </th>
                   <th style={styles.th}>Cuenta cargo</th>
                   <th style={styles.th}>Cuenta abono</th>
-                  <th style={{ ...styles.th, textAlign: 'right' }} onClick={() => handleSort('importe_cargado')} className="sortable">
+                  <th style={{ ...styles.th, textAlign: 'right' }} onClick={() => handleSort('importe_cargado')}>
                     Imp. cargado {sortBy === 'importe_cargado' && (sortOrder === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th style={{ ...styles.th, textAlign: 'right' }} onClick={() => handleSort('importe_abonado')} className="sortable">
+                  <th style={{ ...styles.th, textAlign: 'right' }} onClick={() => handleSort('importe_abonado')}>
                     Imp. abonado {sortBy === 'importe_abonado' && (sortOrder === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th style={{ ...styles.th, textAlign: 'right' }} onClick={() => handleSort('comision')} className="sortable">
+                  <th style={{ ...styles.th, textAlign: 'right' }} onClick={() => handleSort('comision')}>
                     Comisión {sortBy === 'comision' && (sortOrder === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th style={styles.th} onClick={() => handleSort('referencia')} className="sortable">
+                  <th style={styles.th} onClick={() => handleSort('referencia')}>
                     Referencia {sortBy === 'referencia' && (sortOrder === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th style={styles.th} onClick={() => handleSort('estado')} className="sortable">
+                  <th style={styles.th} onClick={() => handleSort('estado')}>
                     Estado {sortBy === 'estado' && (sortOrder === 'asc' ? '↑' : '↓')}
                   </th>
                   <th style={{ ...styles.th, textAlign: 'center' }}>Acciones</th>
@@ -593,40 +580,42 @@ const DevolucionesPage = () => {
                   const monAbonoCode = getMonedaCodigo(r.moneda_abono, monedas)
                   return (
                     <tr key={r.id} style={compactMode ? styles.compactRow : undefined}>
-                      <td style={{ ...styles.td, minWidth: 75 }}>
+                      <td style={{ ...styles.td, minWidth: 70, whiteSpace: 'nowrap' }}>
                         <code style={styles.opCode}>{r.numero_operacion || '-'}</code>
                       </td>
-                      <td style={{ ...styles.td, minWidth: 75, whiteSpace: 'nowrap' }}>{formatDate(r.fecha_operacion)}</td>
-                      <td style={{ ...styles.td, minWidth: 85, whiteSpace: 'nowrap' }}>
+                      <td style={{ ...styles.td, minWidth: 70, whiteSpace: 'nowrap' }}>{formatDate(r.fecha_operacion)}</td>
+                      <td style={{ ...styles.td, minWidth: 80, whiteSpace: 'nowrap' }}>
                         <span style={styles.bankPill}>{getBancoNombre(r.banco, bancos)}</span>
                       </td>
-                      <td style={{ ...styles.td, minWidth: 120, whiteSpace: 'nowrap', fontSize: compactMode ? 10 : 11 }}>{r.cuenta_cargo || '-'}</td>
-                      <td style={{ ...styles.td, minWidth: 120, whiteSpace: 'nowrap', fontSize: compactMode ? 10 : 11 }}>{r.cuenta_abono || '-'}</td>
-                      <td style={{ ...styles.td, fontWeight: 800, color: '#c62828', whiteSpace: 'nowrap', minWidth: 95, textAlign: 'right' }}>
+                      <td style={{ ...styles.td, minWidth: 110, whiteSpace: 'nowrap', fontSize: compactMode ? 9.5 : 10.5 }}>{r.cuenta_cargo || '-'}</td>
+                      <td style={{ ...styles.td, minWidth: 110, whiteSpace: 'nowrap', fontSize: compactMode ? 9.5 : 10.5 }}>{r.cuenta_abono || '-'}</td>
+                      <td style={{ ...styles.td, fontWeight: 800, color: '#c62828', whiteSpace: 'nowrap', minWidth: 90, textAlign: 'right' }}>
                         {money(cargado, monCargoCode)}
                       </td>
-                      <td style={{ ...styles.td, fontWeight: 800, color: '#2e7d32', whiteSpace: 'nowrap', minWidth: 95, textAlign: 'right' }}>
+                      <td style={{ ...styles.td, fontWeight: 800, color: '#2e7d32', whiteSpace: 'nowrap', minWidth: 90, textAlign: 'right' }}>
                         {money(r.importe_abonado, monAbonoCode)}
                       </td>
-                      <td style={{ ...styles.td, whiteSpace: 'nowrap', minWidth: 70, textAlign: 'right' }}>
+                      <td style={{ ...styles.td, whiteSpace: 'nowrap', minWidth: 65, textAlign: 'right' }}>
                         {money(r.comision, monCargoCode)}
                       </td>
-                      <td style={{ ...styles.td, minWidth: 120, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <td style={{ ...styles.td, minWidth: 110, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {r.referencia || '-'}
                       </td>
-                      <td style={{ ...styles.td, minWidth: 90, whiteSpace: 'nowrap' }}>
-                        <span className={`badge ${badgeClass(r.estado)}`}>{String(r.estado || 'Pendiente').toUpperCase()}</span>
+                      <td style={{ ...styles.td, minWidth: 80, whiteSpace: 'nowrap' }}>
+                        <span className={`badge ${badgeClass(r.estado)}`} style={{ fontSize: compactMode ? 9 : 10, padding: '2px 6px' }}>
+                          {String(r.estado || 'Pendiente').toUpperCase()}
+                        </span>
                       </td>
-                      <td style={{ ...styles.td, textAlign: 'center', minWidth: 115, whiteSpace: 'nowrap' }}>
+                      <td style={{ ...styles.td, textAlign: 'center', minWidth: 105, whiteSpace: 'nowrap' }}>
                         <div style={styles.actionButtons}>
                           {canView && (
-                            <button className="btn btn-secondary btn-sm" onClick={() => setModal({ type: 'detalle', data: r })}>Ver</button>
+                            <button className="btn btn-secondary btn-sm" onClick={() => setModal({ type: 'detalle', data: r })} style={{ fontSize: compactMode ? 9 : 10 }}>Ver</button>
                           )}
                           {canEdit && (
-                            <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'editar', data: r })}>Editar</button>
+                            <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'editar', data: r })} style={{ fontSize: compactMode ? 9 : 10 }}>Edit</button>
                           )}
                           {canDelete && (
-                            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r)}>Eliminar</button>
+                            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r)} style={{ fontSize: compactMode ? 9 : 10 }}>Del</button>
                           )}
                         </div>
                       </td>
@@ -641,7 +630,6 @@ const DevolucionesPage = () => {
         {!loading && <div style={styles.footerCount}>{sortedData.length} de {total} devoluciones</div>}
       </div>
 
-      {/* Modales */}
       {modal?.type === 'detalle' && <ModalDetalle item={modal.data} bancos={bancos} monedas={monedas} onClose={() => setModal(null)} />}
       {modal?.type === 'nuevo' && <ModalDevolucion bancos={bancos} monedas={monedas} onClose={() => setModal(null)} onSave={handleSave} />}
       {modal?.type === 'editar' && <ModalDevolucion item={modal.data} bancos={bancos} monedas={monedas} onClose={() => setModal(null)} onSave={handleSave} />}
@@ -655,38 +643,38 @@ const styles = {
   topHeader: { marginBottom: 8 },
   title: { fontFamily: 'Montserrat', fontSize: 22, fontWeight: 800, color: 'var(--qf-navy)', marginBottom: 3 },
   subtitle: { color: 'var(--qf-text-light)', fontSize: 12.5 },
-  actionBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' },
-  kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: 10, marginBottom: 14 },
-  kpiCard: { background: '#fff', borderRadius: 12, padding: '9px 13px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', minHeight: 62 },
-  kpiLabel: { fontSize: 9.2, color: 'var(--qf-text-light)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
-  kpiValue: { fontWeight: 850, fontFamily: 'Montserrat', lineHeight: 1.1, fontSize: 21 },
+  actionBar: { display: 'flex', justifyContent: 'flex-start', gap: 8, marginBottom: 10, flexWrap: 'wrap' },
+  kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 14 },
+  kpiCard: { background: '#fff', borderRadius: 12, padding: '8px 12px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', minHeight: 58 },
+  kpiLabel: { fontSize: 9, color: 'var(--qf-text-light)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 3 },
+  kpiValue: { fontWeight: 800, fontFamily: 'Montserrat', lineHeight: 1.1, fontSize: 18 },
   card: { overflow: 'hidden' },
   stickyTools: { background: '#fff', borderTopLeftRadius: 12, borderTopRightRadius: 12, borderBottom: '1px solid var(--qf-border)' },
-  cardTitleWrap: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 16px 8px' },
-  cardTitle: { margin: 0, fontSize: 18, fontFamily: 'Montserrat', color: 'var(--qf-navy)' },
-  resultPill: { fontSize: 11, fontWeight: 700, color: 'var(--qf-navy)', background: '#e8eef5', borderRadius: 999, padding: '4px 10px' },
+  cardTitleWrap: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 16px 6px' },
+  cardTitle: { margin: 0, fontSize: 16, fontFamily: 'Montserrat', color: 'var(--qf-navy)' },
+  resultPill: { fontSize: 10, fontWeight: 700, color: 'var(--qf-navy)', background: '#e8eef5', borderRadius: 999, padding: '3px 8px' },
   filtersRow: { display: 'flex', gap: 8, alignItems: 'center', padding: '0 16px 8px' },
-  fieldSelect: { width: 'auto', minWidth: 160, height: 36 },
-  paginationRow: { display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap', padding: '8px 16px 10px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
-  pageInfo: { fontSize: 12, color: 'var(--qf-text-light)', padding: '0 6px' },
-  loadingMini: { fontSize: 11, color: '#185FA5', fontWeight: 700 },
+  fieldSelect: { width: 'auto', minWidth: 150, height: 34, fontSize: 12 },
+  paginationRow: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '6px 16px 8px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
+  pageInfo: { fontSize: 11.5, color: 'var(--qf-text-light)', padding: '0 4px' },
+  loadingMini: { fontSize: 10, color: '#185FA5', fontWeight: 700 },
   tableViewport: { overflow: 'auto', width: '100%' },
   table: { width: '100%', borderCollapse: 'collapse' },
-  th: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 10.3, padding: '8px 6px', lineHeight: 1.05, background: '#fff', borderBottom: '1px solid var(--qf-border)', cursor: 'pointer', userSelect: 'none' },
-  td: { padding: '5px 6px', verticalAlign: 'middle', lineHeight: 1.15, borderBottom: '1px solid #f0f2f5' },
-  compactRow: { height: 36 },
-  opCode: { background: '#e8eef5', padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 800, color: 'var(--qf-navy)' },
-  bankPill: { background: '#e8eef5', color: 'var(--qf-navy)', borderRadius: 4, padding: '2px 6px', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' },
-  actionButtons: { display: 'flex', gap: 3, justifyContent: 'center', flexWrap: 'nowrap' },
-  footerCount: { padding: '10px 16px', borderTop: '1px solid var(--qf-border)', fontSize: 11.5, color: 'var(--qf-text-light)', background: '#fff' },
+  th: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 10, padding: '6px 5px', lineHeight: 1.1, background: '#fff', borderBottom: '1px solid var(--qf-border)', cursor: 'pointer', userSelect: 'none' },
+  td: { padding: '4px 5px', verticalAlign: 'middle', lineHeight: 1.2, borderBottom: '1px solid #f0f2f5' },
+  compactRow: { height: 34 },
+  opCode: { background: '#e8eef5', padding: '1px 5px', borderRadius: 4, fontSize: 9.5, fontWeight: 800, color: 'var(--qf-navy)' },
+  bankPill: { background: '#e8eef5', color: 'var(--qf-navy)', borderRadius: 4, padding: '1px 5px', fontSize: 9.5, fontWeight: 700, whiteSpace: 'nowrap' },
+  actionButtons: { display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'nowrap' },
+  footerCount: { padding: '8px 16px', borderTop: '1px solid var(--qf-border)', fontSize: 11, color: 'var(--qf-text-light)', background: '#fff' },
   detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10 },
-  detailBox: { background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 9 },
-  detailLabel: { fontSize: 9.5, fontWeight: 700, color: 'var(--qf-text-light)', textTransform: 'uppercase' },
-  detailValue: { fontSize: 12.5, fontWeight: 600, color: 'var(--qf-navy)' },
+  detailBox: { background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 8 },
+  detailLabel: { fontSize: 9, fontWeight: 700, color: 'var(--qf-text-light)', textTransform: 'uppercase' },
+  detailValue: { fontSize: 12, fontWeight: 600, color: 'var(--qf-navy)' },
   modalGrid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' },
   modalGrid3: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' },
   modalGrid4: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0 16px' },
-  errorBox: { background: '#fce4e4', color: '#c62828', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginTop: 8 },
+  errorBox: { background: '#fce4e4', color: '#c62828', borderRadius: 8, padding: '8px 12px', fontSize: 12, marginTop: 6 },
 }
 
 // Agregar estilos para sortable
