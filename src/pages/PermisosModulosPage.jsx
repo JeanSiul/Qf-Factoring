@@ -241,7 +241,8 @@ const PermisosModulosPage = () => {
       method: 'POST',
       body: JSON.stringify({ ...form, usr_crea: user?.username || 'SISTEMA' })
     })
-    if (!res?.success) throw new Error(res?.message || 'Error al guardar')
+    // n8n puede devolver null, 1, o {success:true}
+    if (res !== null && res?.success === false) throw new Error(res?.message || 'Error al guardar')
     show(form.id ? 'Módulo actualizado' : 'Módulo creado')
     cargar()
   }
@@ -255,7 +256,7 @@ const PermisosModulosPage = () => {
     if (!confirm(`¿Eliminar el módulo "${modulo.nombre}" (${modulo.codigo})?`)) return
     try {
       const res = await apiCall('/qf/permisos/modulos/eliminar', { method: 'POST', body: JSON.stringify({ id: modulo.id }) })
-      if (!res?.success) throw new Error(res?.message || 'Error al eliminar')
+      if (res !== null && res?.success === false) throw new Error(res?.message || 'Error al eliminar')
       show('Módulo eliminado')
       cargar()
     } catch (e) { show(e.message, 'error') }
