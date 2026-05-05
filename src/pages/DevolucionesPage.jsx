@@ -323,12 +323,13 @@ const DevolucionesPage = () => {
   const [monedas, setMonedas] = useState([])
 
   // ── Permisos por bit ──────────────────────────────────
+  // OPEDEV bits: 0:Vista, 1:Lista, 2:Ver, 3:Modificar, 4:Total, 5:Crear, 6:Eliminar
   const claimValue = permisos?.[CLAIM] || '00000000000'
   const canList   = claimValue[1] === '1'  // bit 1: Lista
-  const canCreate = claimValue[2] === '1'  // bit 2: Crear
-  const canView   = claimValue[3] === '1'  // bit 3: Ver
-  const canEdit   = claimValue[4] === '1'  // bit 4: Modificar
-  const canDelete = claimValue[5] === '1'  // bit 5: Eliminar (o bit 6 según config)
+  const canView   = claimValue[2] === '1'  // bit 2: Ver
+  const canEdit   = claimValue[3] === '1'  // bit 3: Modificar
+  const canCreate = claimValue[5] === '1'  // bit 5: Crear
+  const canDelete = claimValue[6] === '1'  // bit 6: Eliminar
 
   // ── Cargar lookups al montar ──────────────────────────
   useEffect(() => {
