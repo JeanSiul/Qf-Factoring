@@ -4,12 +4,13 @@ import { apiCall } from '../utils/api'
 const AuthContext = createContext(null)
 export const useAuth = () => useContext(AuthContext)
 
-// Mapa de permisos: ClaimType → módulo del Sidebar
+// Mapa de permisos: ClaimType → ruta del Sidebar
 // El bit 0 (Vista) controla si se ve el menú
 const PERMISOS_MENU = {
   // Seguridad
   USRLIS: '/usuarios',
   ROLLIS: '/roles',
+  CFGPER: '/seguridad/modulos-permisos',
   // Parámetros
   TABLIS: '/parametros/tablas',
   ECOLIS: '/parametros/estructura',
@@ -21,6 +22,24 @@ const PERMISOS_MENU = {
   // Operaciones
   FACLIS: '/operaciones/facturas',
   OPELIS: '/operaciones/operaciones',
+  // Alertas
+  ALTDSH: '/alertas/dashboard',
+  ALTCAN: '/alertas/canales',
+  ALTDES: '/alertas/destinatarios',
+  ALTPRO: '/alertas/procesos',
+  ALTASI: '/alertas/asignaciones',
+  ALTCOL: '/alertas/cola',
+  // Inventario
+  IVNDSH: '/inventario/dashboard',
+  IVNGRP: '/inventario/grupos',
+  IVNITM: '/inventario/items',
+  IVNASI: '/inventario/asignaciones',
+  // Reportes
+  RPTINV: '/reportes/inventario',
+  RPTFAC: '/reportes/facturas',
+  RPTOPE: '/operaciones/reportes',
+  // Configuración
+  CFGGEN: '/configuracion/general',
 }
 
 // Verifica si un bit específico está activo en un ClaimValue
@@ -46,9 +65,8 @@ export const hasTotal = (permisos, claim) => hasBit(permisos, claim, 5)
 
 // Verifica si puede ver una ruta específica
 export const canAccessRoute = (permisos, path) => {
-  // Rutas libres (siempre accesibles)
-  const rutasLibres = ['/dashboard', '/alertas/', '/inventario/']
-  if (rutasLibres.some(r => path.startsWith(r) || path === r)) return true
+  // Solo el dashboard principal es libre (siempre accesible)
+  if (path === '/dashboard') return true
 
   // Buscar si algún claim permite esta ruta
   for (const [claim, ruta] of Object.entries(PERMISOS_MENU)) {
@@ -56,7 +74,9 @@ export const canAccessRoute = (permisos, path) => {
       return hasVista(permisos, claim)
     }
   }
-  return true // Si no hay regla, permitir
+
+  // Si no hay regla definida, denegar por defecto (más seguro)
+  return false
 }
 
 export const AuthProvider = ({ children }) => {
