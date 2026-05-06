@@ -12,12 +12,12 @@ const EMPTY_FORM = {
   numero_documento: '',
   naturaleza: 'PN',
   razon_social: '',
-  nombres: '',
-  apellidos: '',
-  correo: '',
+  nombre: '',
+  apellido: '',
+  email: '',
   banco: '',
   moneda: '',
-  cuenta_bancaria: '',
+  cuenta: '',
   cci: '',
   direccion: '',
   estado: 'Activo',
@@ -28,9 +28,9 @@ const SEARCH_FIELDS = [
   { value: 'codigo', label: 'Código' },
   { value: 'numero_documento', label: 'DNI/RUC' },
   { value: 'razon_social', label: 'Razón social' },
-  { value: 'nombres', label: 'Nombres' },
-  { value: 'apellidos', label: 'Apellidos' },
-  { value: 'correo', label: 'Correo' },
+  { value: 'nombre', label: 'Nombre' },
+  { value: 'apellido', label: 'Apellido' },
+  { value: 'email', label: 'Email' },
   { value: 'banco', label: 'Banco' },
   { value: 'moneda', label: 'Moneda' },
   { value: 'estado', label: 'Estado' },
@@ -151,9 +151,23 @@ const ControlInversionistas = () => {
       })
 
       const res = await apiCall(`${API_BASE}/listar?${params.toString()}`)
-      const rows = Array.isArray(res?.data) ? res.data : safeArray(res)
+
+      // Acepta cualquiera de estos formatos desde n8n:
+      // 1) { data: [...], total: 7 }  ← recomendado
+      // 2) [{...}, {...}]             ← MySQL directo como lista
+      // 3) { rows: [...], total: 7 }
+      // 4) { json: { data: [...], total: 7 } }
+      const payload = res?.json || res
+      const rows = Array.isArray(payload?.data)
+        ? payload.data
+        : Array.isArray(payload?.rows)
+          ? payload.rows
+          : Array.isArray(payload)
+            ? payload
+            : safeArray(payload)
+
       setData(rows)
-      setTotal(Number(res?.total ?? rows.length ?? 0))
+      setTotal(Number(payload?.total ?? payload?.count ?? rows.length ?? 0))
     } catch (err) {
       setError(err?.message || 'No se pudo cargar la lista de inversionistas.')
     } finally {
@@ -162,8 +176,8 @@ const ControlInversionistas = () => {
   }
 
   const metrics = useMemo(() => {
-    const activos = data.filter(r => normalize(r.estado) === 'activo').length
-    const inactivos = data.filter(r => normalize(r.estado) !== 'activo').length
+    const activos = data.filter(r => !r.estado || normalize(r.estado) === 'activo').length
+    const inactivos = data.filter(r => r.estado && normalize(r.estado) !== 'activo').length
     const naturales = data.filter(r => normalize(r.naturaleza) === 'pn' || normalize(r.naturaleza).includes('natural')).length
     const juridicos = data.filter(r => normalize(r.naturaleza) === 'pj' || normalize(r.naturaleza).includes('jur')).length
 
@@ -268,8 +282,8 @@ const ControlInversionistas = () => {
         form: {
           ...prev.form,
           razon_social: payload.razon_social || payload.nombre_o_razon_social || prev.form.razon_social,
-          nombres: payload.nombres || prev.form.nombres,
-          apellidos: payload.apellidos || `${payload.apellido_paterno || ''} ${payload.apellido_materno || ''}`.trim() || prev.form.apellidos,
+          nombre: payload.nombre || payload.nombres || prev.form.nombre,
+          apellido: payload.apellido || payload.apellidos || `${payload.apellido_paterno || ''} ${payload.apellido_materno || ''}`.trim() || prev.form.apellido,
           direccion: payload.direccion || prev.form.direccion,
           naturaleza: tipo_documento === 'RUC' ? 'PJ' : 'PN',
         }
@@ -322,7 +336,7 @@ const ControlInversionistas = () => {
     if (!form.numero_documento) return 'El número de documento es obligatorio.'
     if (form.tipo_documento === 'DNI' && String(form.numero_documento).length !== 8) return 'El DNI debe tener 8 dígitos.'
     if (form.tipo_documento === 'RUC' && String(form.numero_documento).length !== 11) return 'El RUC debe tener 11 dígitos.'
-    if (!form.razon_social && !form.nombres) return 'Ingrese razón social o nombres.'
+    if (!form.razon_social && !form.nombre) return 'Ingrese razón social o nombre.'
     if (!form.banco) return 'Seleccione un banco.'
     if (!form.moneda) return 'Seleccione una moneda.'
     return ''
@@ -490,11 +504,11 @@ const ControlInversionistas = () => {
                 <Th onClick={() => sortBy('numero_documento')}>Número {sortIcon('numero_documento')}</Th>
                 <Th onClick={() => sortBy('naturaleza')}>Nat. {sortIcon('naturaleza')}</Th>
                 <Th onClick={() => sortBy('razon_social')}>Razón Social {sortIcon('razon_social')}</Th>
-                <Th onClick={() => sortBy('nombres')}>Nombres {sortIcon('nombres')}</Th>
-                <Th onClick={() => sortBy('correo')}>Correo {sortIcon('correo')}</Th>
+                <Th onClick={() => sortBy('nombre')}>Nombre {sortIcon('nombre')}</Th>
+                <Th onClick={() => sortBy('email')}>Email {sortIcon('email')}</Th>
                 <Th onClick={() => sortBy('banco_nombre')}>Banco {sortIcon('banco_nombre')}</Th>
                 <Th onClick={() => sortBy('moneda_nombre')}>M {sortIcon('moneda_nombre')}</Th>
-                <Th onClick={() => sortBy('cuenta_bancaria')}>Cuenta {sortIcon('cuenta_bancaria')}</Th>
+                <Th onClick={() => sortBy('cuenta')}>Cuenta {sortIcon('cuenta')}</Th>
                 <Th onClick={() => sortBy('estado')}>Estado {sortIcon('estado')}</Th>
                 <th style={S.th}>Acciones</th>
               </tr>
@@ -516,14 +530,14 @@ const ControlInversionistas = () => {
                   <td style={S.td}>{row.numero_documento}</td>
                   <td style={S.td}>{row.naturaleza}</td>
                   <td style={S.td}>{row.razon_social}</td>
-                  <td style={S.td}>{[row.nombres, row.apellidos].filter(Boolean).join(' ')}</td>
-                  <td style={S.td}>{row.correo}</td>
+                  <td style={S.td}>{[row.nombre, row.apellido].filter(Boolean).join(' ')}</td>
+                  <td style={S.td}>{row.email}</td>
                   <td style={S.td}>
                     <span style={S.pill}>{row.banco_nombre || getBancoNombre(row.banco, bancos)}</span>
                   </td>
                   <td style={S.td}>{row.moneda_codigo || getMonedaNombre(row.moneda, monedas)}</td>
-                  <td style={{ ...S.td, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.cuenta_bancaria}</td>
-                  <td style={S.td}><EstadoBadge value={row.estado} /></td>
+                  <td style={{ ...S.td, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.cuenta}</td>
+                  <td style={S.td}><EstadoBadge value={row.estado || 'Activo'} /></td>
                   <td style={S.td}>
                     <div style={S.actions}>
                       {canView && <button className="btn" style={S.actionBtn} onClick={() => setDetail(row)}>Ver</button>}
@@ -597,15 +611,15 @@ const DetailModal = ({ row, bancos, monedas, onClose }) => {
     ['Documento', row.numero_documento],
     ['Naturaleza', row.naturaleza],
     ['Razón Social', row.razon_social],
-    ['Nombres', row.nombres],
-    ['Apellidos', row.apellidos],
-    ['Correo', row.correo],
+    ['Nombre', row.nombre],
+    ['Apellido', row.apellido],
+    ['Email', row.email],
     ['Banco', row.banco_nombre || getBancoNombre(row.banco, bancos)],
     ['Moneda', row.moneda_codigo || getMonedaNombre(row.moneda, monedas)],
-    ['Cuenta Bancaria', row.cuenta_bancaria],
+    ['Cuenta Bancaria', row.cuenta],
     ['CCI', row.cci],
     ['Dirección', row.direccion],
-    ['Estado', row.estado],
+    ['Estado', row.estado || 'Activo'],
     ['Creado', row.created_at],
     ['Actualizado', row.updated_at],
   ]
@@ -693,16 +707,16 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
         </div>
 
         <div style={S.formGrid3}>
-          <Field label="Nombres">
-            <input className="form-control" value={form.nombres || ''} onChange={e => onChange('nombres', e.target.value)} style={S.input} />
+          <Field label="Nombre">
+            <input className="form-control" value={form.nombre || ''} onChange={e => onChange('nombre', e.target.value)} style={S.input} />
           </Field>
 
-          <Field label="Apellidos">
-            <input className="form-control" value={form.apellidos || ''} onChange={e => onChange('apellidos', e.target.value)} style={S.input} />
+          <Field label="Apellido">
+            <input className="form-control" value={form.apellido || ''} onChange={e => onChange('apellido', e.target.value)} style={S.input} />
           </Field>
 
-          <Field label="Correo">
-            <input className="form-control" type="email" value={form.correo || ''} onChange={e => onChange('correo', e.target.value)} style={S.input} />
+          <Field label="Email">
+            <input className="form-control" type="email" value={form.email || ''} onChange={e => onChange('email', e.target.value)} style={S.input} />
           </Field>
         </div>
 
@@ -730,7 +744,7 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
           </Field>
 
           <Field label="Cuenta bancaria">
-            <input className="form-control" value={form.cuenta_bancaria || ''} onChange={e => onChange('cuenta_bancaria', e.target.value)} style={S.input} />
+            <input className="form-control" value={form.cuenta || ''} onChange={e => onChange('cuenta', e.target.value)} style={S.input} />
           </Field>
 
           <Field label="CCI">
