@@ -19,6 +19,7 @@ import Layout from './components/Layout'
 import OperacionesFacturasPage from './pages/OperacionesFacturasPage'
 import PermisosModulosPage from './pages/PermisosModulosPage'
 import DevolucionesPage from './pages/DevolucionesPage'
+import ControlInversionistas from './pages/ControlInversionistas'
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth()
@@ -64,6 +65,7 @@ const App = () => (
           <Route path="/operaciones/facturas" element={<OperacionesFacturasPage />} />
           <Route path="/seguridad/modulos-permisos" element={<PermisosModulosPage />} />
           <Route path="/operaciones/devoluciones" element={<DevolucionesPage />} />
+          <Route path="/operaciones/inversionistas" element={<ControlInversionistas />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
