@@ -36,6 +36,25 @@ const SEARCH_FIELDS = [
   { value: 'estado', label: 'Estado' },
 ]
 
+// Helper para mapear tipo_documento a texto completo
+const getTipoDocumentoLabel = (value) => {
+  const map = {
+    '1': 'DNI',
+    '2': 'RUC',
+    'DNI': 'DNI',
+    'RUC': 'RUC',
+  }
+  return map[value] || value || '-'
+}
+
+// Helper para obtener el valor correcto del tipo documento desde el backend
+const normalizeTipoDocumento = (value) => {
+  if (!value) return 'DNI'
+  if (value === '1' || value === 'DNI') return 'DNI'
+  if (value === '2' || value === 'RUC') return 'RUC'
+  return 'DNI'
+}
+
 const getBit = (value, index) => String(value || '00000000000')[index] === '1'
 
 const getField = (obj, ...keys) => {
@@ -53,15 +72,19 @@ const getField = (obj, ...keys) => {
 const safeArray = (res) => {
   if (Array.isArray(res)) return res
   if (Array.isArray(res?.data)) return res.data
+  if (Array.isArray(res?.rows)) return res.rows
+  if (Array.isArray(res?.items)) return res.items
   return toArray ? toArray(res) : []
 }
 
 const getBancoNombre = (bancoId, bancos) => {
+  if (!bancoId) return ''
   const item = bancos.find(b => String(getField(b, 'id', 'ID')) === String(bancoId))
   return item ? getField(item, 'name', 'nombre', 'Name') : ''
 }
 
 const getMonedaNombre = (monedaId, monedas) => {
+  if (!monedaId) return ''
   const item = monedas.find(m => String(getField(m, 'ID', 'id')) === String(monedaId))
   return item ? getField(item, 'CODIGO', 'codigo', 'VALORTEXTO') : ''
 }
@@ -94,8 +117,8 @@ const ControlInversionistas = () => {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
 
-  const [sortField, setSortField] = useState('id')
-  const [sortDir, setSortDir] = useState('desc')
+  const [sortField, setSortField] = useState('codigo')
+  const [sortDir, setSortDir] = useState('asc')
 
   const [detail, setDetail] = useState(null)
   const [modal, setModal] = useState({ open: false, mode: 'create', form: EMPTY_FORM })
@@ -152,11 +175,6 @@ const ControlInversionistas = () => {
 
       const res = await apiCall(`${API_BASE}/listar?${params.toString()}`)
 
-      // Acepta cualquiera de estos formatos desde n8n:
-      // 1) { data: [...], total: 7 }  ← recomendado
-      // 2) [{...}, {...}]             ← MySQL directo como lista
-      // 3) { rows: [...], total: 7 }
-      // 4) { json: { data: [...], total: 7 } }
       const payload = res?.json || res
       const rows = Array.isArray(payload?.data)
         ? payload.data
@@ -252,11 +270,21 @@ const ControlInversionistas = () => {
       open: true,
       mode: 'edit',
       form: {
-        ...EMPTY_FORM,
-        ...row,
+        id: row.id,
+        codigo: row.codigo || '',
+        tipo_documento: normalizeTipoDocumento(row.tipo_documento),
         numero_documento: row.numero_documento || '',
+        naturaleza: (row.naturaleza === 'PJ' || row.naturaleza === 'Persona Jurídica') ? 'PJ' : 'PN',
+        razon_social: row.razon_social || '',
+        nombre: row.nombre || '',
+        apellido: row.apellido || '',
+        email: row.email || '',
         banco: row.banco || '',
         moneda: row.moneda || '',
+        cuenta: row.cuenta || '',
+        cci: row.cci || '',
+        direccion: row.direccion || '',
+        estado: row.estado || 'Activo',
       }
     })
   }
@@ -273,25 +301,36 @@ const ControlInversionistas = () => {
       setSaving(true)
       setError('')
 
-      const params = new URLSearchParams({ tipo_documento, nro_documento: numero_documento })
-      const res = await apiCall(`${API_BASE}/validar-documento?${params.toString()}`)
+      const params = new URLSearchParams({
+        tipo_documento: tipo_documento === 'RUC' ? 'RUC' : 'DNI',
+        nro_documento: numero_documento
+      })
+      
+      const url = `${API_BASE}/validar-documento?${params.toString()}`
+      const res = await apiCall(url)
+
       const payload = res?.data || res || {}
 
       setModal(prev => ({
         ...prev,
         form: {
           ...prev.form,
-          razon_social: payload.razon_social || payload.nombre_o_razon_social || prev.form.razon_social,
+          razon_social: payload.razon_social || payload.nombre || payload.nombre_o_razon_social || prev.form.razon_social,
           nombre: payload.nombre || payload.nombres || prev.form.nombre,
-          apellido: payload.apellido || payload.apellidos || `${payload.apellido_paterno || ''} ${payload.apellido_materno || ''}`.trim() || prev.form.apellido,
-          direccion: payload.direccion || prev.form.direccion,
+          apellido: payload.apellido || payload.apellidos || 
+            `${payload.apellido_paterno || ''} ${payload.apellido_materno || ''}`.trim() || prev.form.apellido,
+          direccion: payload.direccion || payload.direccion_completa || prev.form.direccion,
           naturaleza: tipo_documento === 'RUC' ? 'PJ' : 'PN',
         }
       }))
 
       if (modal.mode === 'create' && !modal.form.codigo) {
-        const codeRes = await apiCall(`${API_BASE}/siguiente-codigo?naturaleza=${tipo_documento === 'RUC' ? 'PJ' : 'PN'}`)
-        setModal(prev => ({ ...prev, form: { ...prev.form, codigo: codeRes?.codigo || prev.form.codigo } }))
+        const nature = tipo_documento === 'RUC' ? 'PJ' : 'PN'
+        const codeRes = await apiCall(`${API_BASE}/siguiente-codigo?naturaleza=${nature}`)
+        setModal(prev => ({ 
+          ...prev, 
+          form: { ...prev.form, codigo: codeRes?.codigo || prev.form.codigo } 
+        }))
       }
     } catch (err) {
       setError(err?.message || 'No se pudo validar el documento.')
@@ -526,14 +565,16 @@ const ControlInversionistas = () => {
               {!loading && sortedData.map(row => (
                 <tr key={row.id || row.codigo} style={S.tr}>
                   <td style={S.td}><code style={S.code}>{row.codigo}</code></td>
-                  <td style={S.td}>{row.tipo_documento}</td>
+                  <td style={S.td}>{getTipoDocumentoLabel(row.tipo_documento)}</td>
                   <td style={S.td}>{row.numero_documento}</td>
-                  <td style={S.td}>{row.naturaleza}</td>
+                  <td style={S.td}>{row.naturaleza === 'PN' ? 'Persona Natural' : row.naturaleza === 'PJ' ? 'Persona Jurídica' : row.naturaleza}</td>
                   <td style={S.td}>{row.razon_social}</td>
                   <td style={S.td}>{[row.nombre, row.apellido].filter(Boolean).join(' ')}</td>
                   <td style={S.td}>{row.email}</td>
                   <td style={S.td}>
-                    <span style={S.pill}>{row.banco_nombre || getBancoNombre(row.banco, bancos)}</span>
+                    <span style={S.pill} title={row.banco_nombre || getBancoNombre(row.banco, bancos)}>
+                      {row.banco_nombre || getBancoNombre(row.banco, bancos)}
+                    </span>
                   </td>
                   <td style={S.td}>{row.moneda_codigo || getMonedaNombre(row.moneda, monedas)}</td>
                   <td style={{ ...S.td, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.cuenta}</td>
@@ -545,7 +586,7 @@ const ControlInversionistas = () => {
                       {canDelete && <button className="btn" style={S.dangerBtn} onClick={() => deleteRow(row)}>Del</button>}
                     </div>
                   </td>
-                </tr>
+                </table>
               ))}
             </tbody>
           </table>
@@ -607,9 +648,9 @@ const DetailModal = ({ row, bancos, monedas, onClose }) => {
   const fields = [
     ['ID', row.id],
     ['Código', row.codigo],
-    ['Tipo Documento', row.tipo_documento],
+    ['Tipo Documento', getTipoDocumentoLabel(row.tipo_documento)],
     ['Documento', row.numero_documento],
-    ['Naturaleza', row.naturaleza],
+    ['Naturaleza', row.naturaleza === 'PN' ? 'Persona Natural' : row.naturaleza === 'PJ' ? 'Persona Jurídica' : row.naturaleza],
     ['Razón Social', row.razon_social],
     ['Nombre', row.nombre],
     ['Apellido', row.apellido],
@@ -722,24 +763,42 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
 
         <div style={S.formGrid4}>
           <Field label="Banco">
-            <select className="form-control" value={form.banco || ''} onChange={e => onChange('banco', e.target.value)} style={S.input}>
+            <select 
+              className="form-control" 
+              value={form.banco || ''} 
+              onChange={e => onChange('banco', e.target.value)} 
+              style={{ ...S.input, minWidth: 220 }}
+            >
               <option value="">Seleccione...</option>
-              {activeBanks.map(b => (
-                <option key={getField(b, 'id', 'ID')} value={getField(b, 'id', 'ID')}>
-                  {getField(b, 'name', 'nombre', 'Name')}
-                </option>
-              ))}
+              {activeBanks.map(b => {
+                const bankId = getField(b, 'id', 'ID')
+                const bankName = getField(b, 'name', 'nombre', 'Name')
+                return (
+                  <option key={bankId} value={bankId} title={bankName}>
+                    {bankName}
+                  </option>
+                )
+              })}
             </select>
           </Field>
 
           <Field label="Moneda">
-            <select className="form-control" value={form.moneda || ''} onChange={e => onChange('moneda', e.target.value)} style={S.input}>
+            <select 
+              className="form-control" 
+              value={form.moneda || ''} 
+              onChange={e => onChange('moneda', e.target.value)} 
+              style={{ ...S.input, minWidth: 130 }}
+            >
               <option value="">Seleccione...</option>
-              {monedas.map(m => (
-                <option key={getField(m, 'ID', 'id')} value={getField(m, 'ID', 'id')}>
-                  {getField(m, 'CODIGO', 'codigo', 'VALORTEXTO')}
-                </option>
-              ))}
+              {monedas.map(m => {
+                const monId = getField(m, 'ID', 'id')
+                const monName = getField(m, 'CODIGO', 'codigo', 'VALORTEXTO')
+                return (
+                  <option key={monId} value={monId} title={monName}>
+                    {monName}
+                  </option>
+                )
+              })}
             </select>
           </Field>
 
@@ -804,7 +863,7 @@ const S = {
   tr: { height: 32 },
   td: { padding: '3px 4px', borderBottom: '1px solid #eef2f6', lineHeight: 1.15, verticalAlign: 'middle' },
   code: { background: '#e8eef5', borderRadius: 5, padding: '2px 5px', fontWeight: 900, color: 'var(--qf-navy)' },
-  pill: { display: 'inline-block', background: '#e8eef5', borderRadius: 999, padding: '2px 6px', fontWeight: 700 },
+  pill: { display: 'inline-block', background: '#e8eef5', borderRadius: 999, padding: '2px 6px', fontWeight: 700, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   badge: { borderRadius: 999, padding: '2px 6px', fontSize: 8, fontWeight: 900, textTransform: 'uppercase' },
   badgeActive: { background: '#e8f5e9', color: '#2e7d32' },
   badgeWarning: { background: '#fff8e1', color: '#e65100' },
@@ -820,7 +879,7 @@ const S = {
   error: { background: '#ffebee', color: '#c62828', border: '1px solid #ffcdd2', padding: '8px 10px', borderRadius: 8, fontSize: 12, marginBottom: 10 },
   noPerm: { background: 'white', border: '1px solid var(--qf-border)', borderRadius: 12, padding: 18, color: '#c62828', fontWeight: 800 },
   modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 500, padding: 16 },
-  modal: { background: 'white', borderRadius: 14, padding: 16, width: '100%', maxWidth: 860, maxHeight: '92vh', overflow: 'auto', boxShadow: '0 18px 50px rgba(0,0,0,0.25)' },
+  modal: { background: 'white', borderRadius: 14, padding: 16, width: '100%', maxWidth: 960, maxHeight: '92vh', overflow: 'auto', boxShadow: '0 18px 50px rgba(0,0,0,0.25)' },
   modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   modalTitle: { margin: 0, fontFamily: 'Montserrat', color: 'var(--qf-navy)', fontSize: 18 },
   detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 },
