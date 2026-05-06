@@ -518,11 +518,11 @@ const ControlInversionistas = () => {
             {[25, 50, 100, 200].map(n => <option key={n} value={n}>{n}</option>)}
           </select>
 
-          <button className="btn" disabled={page <= 1 || loading} onClick={() => setPage(1)}>«</button>
-          <button className="btn" disabled={page <= 1 || loading} onClick={() => setPage(p => Math.max(1, p - 1))}>‹</button>
+          <button className="btn btn-secondary btn-sm" disabled={page <= 1 || loading} onClick={() => setPage(1)}>«</button>
+          <button className="btn btn-secondary btn-sm" disabled={page <= 1 || loading} onClick={() => setPage(p => Math.max(1, p - 1))}>‹</button>
           <span style={S.pageIndicator}>{page}/{totalPages}</span>
-          <button className="btn" disabled={page >= totalPages || loading} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>›</button>
-          <button className="btn" disabled={page >= totalPages || loading} onClick={() => setPage(totalPages)}>»</button>
+          <button className="btn btn-secondary btn-sm" disabled={page >= totalPages || loading} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>›</button>
+          <button className="btn btn-secondary btn-sm" disabled={page >= totalPages || loading} onClick={() => setPage(totalPages)}>»</button>
         </div>
         </div>
 
@@ -615,12 +615,9 @@ const ControlInversionistas = () => {
 }
 
 const PageHeader = () => (
-  <div style={S.header}>
-    <div style={S.headerIcon}>👥</div>
-    <div>
-      <h1 style={S.title}>Control de Inversionistas</h1>
-      <p style={S.subtitle}>Registro, mantenimiento y consulta de inversionistas integrados con validación DNI/RUC.</p>
-    </div>
+  <div style={S.topHeader}>
+    <h1 style={S.title}>👥 Control de Inversionistas</h1>
+    <p style={S.subtitle}>Registro, mantenimiento y consulta de inversionistas integrados con validación DNI/RUC.</p>
   </div>
 )
 
@@ -829,11 +826,12 @@ const Field = ({ label, children }) => (
 
 const S = {
   page: { paddingBottom: 12, maxWidth: '100%', overflowX: 'hidden' },
+  topHeader: { marginBottom: 6 },
 
   header: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 },
   headerIcon: { width: 42, height: 42, borderRadius: 12, background: 'var(--qf-navy)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 },
-  title: { margin: 0, fontFamily: 'Montserrat', fontSize: 22, fontWeight: 800, color: 'var(--qf-navy)', marginBottom: 2 },
-  subtitle: { margin: '3px 0 0', color: 'var(--qf-text-light)', fontSize: 12 },
+  title: { fontFamily: 'Montserrat', fontSize: 22, fontWeight: 800, color: 'var(--qf-navy)', marginBottom: 2, marginTop: 0 },
+  subtitle: { color: 'var(--qf-text-light)', fontSize: 12, margin: 0 },
 
   actionBar: { display: 'flex', gap: 8, marginBottom: 8 },
   kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, marginBottom: 10 },
@@ -850,7 +848,7 @@ const S = {
   newBtn: { display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' },
 
   filters: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '0 14px 6px' },
-  select: { width: 'auto', minWidth: 170, height: 32, fontSize: 12, padding: '0 28px 0 10px' },
+  select: { width: 'auto', minWidth: 180, height: 32, fontSize: 12, padding: '0 28px 0 10px' },
   searchWrap: { position: 'relative', flex: 1, maxWidth: 360, minWidth: 220 },
   searchIcon: { position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5', pointerEvents: 'none' },
   searchInput: { minWidth: 180, maxWidth: 360, width: '100%', height: 32, fontSize: 12, paddingLeft: 32 },
