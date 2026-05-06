@@ -72,19 +72,15 @@ const getField = (obj, ...keys) => {
 const safeArray = (res) => {
   if (Array.isArray(res)) return res
   if (Array.isArray(res?.data)) return res.data
-  if (Array.isArray(res?.rows)) return res.rows
-  if (Array.isArray(res?.items)) return res.items
   return toArray ? toArray(res) : []
 }
 
 const getBancoNombre = (bancoId, bancos) => {
-  if (!bancoId) return ''
   const item = bancos.find(b => String(getField(b, 'id', 'ID')) === String(bancoId))
   return item ? getField(item, 'name', 'nombre', 'Name') : ''
 }
 
 const getMonedaNombre = (monedaId, monedas) => {
-  if (!monedaId) return ''
   const item = monedas.find(m => String(getField(m, 'ID', 'id')) === String(monedaId))
   return item ? getField(item, 'CODIGO', 'codigo', 'VALORTEXTO') : ''
 }
@@ -117,8 +113,8 @@ const ControlInversionistas = () => {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
 
-  const [sortField, setSortField] = useState('codigo')
-  const [sortDir, setSortDir] = useState('asc')
+  const [sortField, setSortField] = useState('id')
+  const [sortDir, setSortDir] = useState('desc')
 
   const [detail, setDetail] = useState(null)
   const [modal, setModal] = useState({ open: false, mode: 'create', form: EMPTY_FORM })
@@ -274,7 +270,7 @@ const ControlInversionistas = () => {
         codigo: row.codigo || '',
         tipo_documento: normalizeTipoDocumento(row.tipo_documento),
         numero_documento: row.numero_documento || '',
-        naturaleza: (row.naturaleza === 'PJ' || row.naturaleza === 'Persona Jurídica') ? 'PJ' : 'PN',
+        naturaleza: row.naturaleza === 'PN' || row.naturaleza === 'Persona Natural' ? 'PN' : (row.naturaleza === 'PJ' || row.naturaleza === 'Persona Jurídica' ? 'PJ' : row.naturaleza || 'PN'),
         razon_social: row.razon_social || '',
         nombre: row.nombre || '',
         apellido: row.apellido || '',
@@ -301,36 +297,29 @@ const ControlInversionistas = () => {
       setSaving(true)
       setError('')
 
-      const params = new URLSearchParams({
-        tipo_documento: tipo_documento === 'RUC' ? 'RUC' : 'DNI',
-        nro_documento: numero_documento
+      const params = new URLSearchParams({ 
+        tipo_documento: tipo_documento === 'RUC' ? 'RUC' : 'DNI', 
+        nro_documento: numero_documento 
       })
-      
-      const url = `${API_BASE}/validar-documento?${params.toString()}`
-      const res = await apiCall(url)
-
+      const res = await apiCall(`${API_BASE}/validar-documento?${params.toString()}`)
       const payload = res?.data || res || {}
 
       setModal(prev => ({
         ...prev,
         form: {
           ...prev.form,
-          razon_social: payload.razon_social || payload.nombre || payload.nombre_o_razon_social || prev.form.razon_social,
+          razon_social: payload.razon_social || payload.nombre_o_razon_social || payload.nombre || prev.form.razon_social,
           nombre: payload.nombre || payload.nombres || prev.form.nombre,
           apellido: payload.apellido || payload.apellidos || 
             `${payload.apellido_paterno || ''} ${payload.apellido_materno || ''}`.trim() || prev.form.apellido,
-          direccion: payload.direccion || payload.direccion_completa || prev.form.direccion,
+          direccion: payload.direccion || prev.form.direccion,
           naturaleza: tipo_documento === 'RUC' ? 'PJ' : 'PN',
         }
       }))
 
       if (modal.mode === 'create' && !modal.form.codigo) {
-        const nature = tipo_documento === 'RUC' ? 'PJ' : 'PN'
-        const codeRes = await apiCall(`${API_BASE}/siguiente-codigo?naturaleza=${nature}`)
-        setModal(prev => ({ 
-          ...prev, 
-          form: { ...prev.form, codigo: codeRes?.codigo || prev.form.codigo } 
-        }))
+        const codeRes = await apiCall(`${API_BASE}/siguiente-codigo?naturaleza=${tipo_documento === 'RUC' ? 'PJ' : 'PN'}`)
+        setModal(prev => ({ ...prev, form: { ...prev.form, codigo: codeRes?.codigo || prev.form.codigo } }))
       }
     } catch (err) {
       setError(err?.message || 'No se pudo validar el documento.')
@@ -398,7 +387,8 @@ const ControlInversionistas = () => {
 
       await apiCall(`${API_BASE}/${endpoint}`, {
         method: 'POST',
-        body: form,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
       })
 
       setModal({ open: false, mode: 'create', form: EMPTY_FORM })
@@ -417,9 +407,11 @@ const ControlInversionistas = () => {
       setLoading(true)
       setError('')
 
+      // ✅ Corrección: Enviar JSON válido
       await apiCall(`${API_BASE}/eliminar`, {
         method: 'POST',
-        body: { id: row.id },
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: row.id }),
       })
 
       await loadData()
@@ -572,9 +564,7 @@ const ControlInversionistas = () => {
                   <td style={S.td}>{[row.nombre, row.apellido].filter(Boolean).join(' ')}</td>
                   <td style={S.td}>{row.email}</td>
                   <td style={S.td}>
-                    <span style={S.pill} title={row.banco_nombre || getBancoNombre(row.banco, bancos)}>
-                      {row.banco_nombre || getBancoNombre(row.banco, bancos)}
-                    </span>
+                    <span style={S.pill}>{row.banco_nombre || getBancoNombre(row.banco, bancos)}</span>
                   </td>
                   <td style={S.td}>{row.moneda_codigo || getMonedaNombre(row.moneda, monedas)}</td>
                   <td style={{ ...S.td, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.cuenta}</td>
@@ -586,7 +576,7 @@ const ControlInversionistas = () => {
                       {canDelete && <button className="btn" style={S.dangerBtn} onClick={() => deleteRow(row)}>Del</button>}
                     </div>
                   </td>
-                </table>
+                </tr>
               ))}
             </tbody>
           </table>
@@ -767,7 +757,7 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
               className="form-control" 
               value={form.banco || ''} 
               onChange={e => onChange('banco', e.target.value)} 
-              style={{ ...S.input, minWidth: 220 }}
+              style={{ ...S.input, minWidth: 180 }}
             >
               <option value="">Seleccione...</option>
               {activeBanks.map(b => {
@@ -787,7 +777,7 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
               className="form-control" 
               value={form.moneda || ''} 
               onChange={e => onChange('moneda', e.target.value)} 
-              style={{ ...S.input, minWidth: 130 }}
+              style={{ ...S.input, minWidth: 120 }}
             >
               <option value="">Seleccione...</option>
               {monedas.map(m => {
@@ -863,7 +853,7 @@ const S = {
   tr: { height: 32 },
   td: { padding: '3px 4px', borderBottom: '1px solid #eef2f6', lineHeight: 1.15, verticalAlign: 'middle' },
   code: { background: '#e8eef5', borderRadius: 5, padding: '2px 5px', fontWeight: 900, color: 'var(--qf-navy)' },
-  pill: { display: 'inline-block', background: '#e8eef5', borderRadius: 999, padding: '2px 6px', fontWeight: 700, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  pill: { display: 'inline-block', background: '#e8eef5', borderRadius: 999, padding: '2px 6px', fontWeight: 700 },
   badge: { borderRadius: 999, padding: '2px 6px', fontSize: 8, fontWeight: 900, textTransform: 'uppercase' },
   badgeActive: { background: '#e8f5e9', color: '#2e7d32' },
   badgeWarning: { background: '#fff8e1', color: '#e65100' },
@@ -879,7 +869,7 @@ const S = {
   error: { background: '#ffebee', color: '#c62828', border: '1px solid #ffcdd2', padding: '8px 10px', borderRadius: 8, fontSize: 12, marginBottom: 10 },
   noPerm: { background: 'white', border: '1px solid var(--qf-border)', borderRadius: 12, padding: 18, color: '#c62828', fontWeight: 800 },
   modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 500, padding: 16 },
-  modal: { background: 'white', borderRadius: 14, padding: 16, width: '100%', maxWidth: 960, maxHeight: '92vh', overflow: 'auto', boxShadow: '0 18px 50px rgba(0,0,0,0.25)' },
+  modal: { background: 'white', borderRadius: 14, padding: 16, width: '100%', maxWidth: 860, maxHeight: '92vh', overflow: 'auto', boxShadow: '0 18px 50px rgba(0,0,0,0.25)' },
   modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   modalTitle: { margin: 0, fontFamily: 'Montserrat', color: 'var(--qf-navy)', fontSize: 18 },
   detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 },
