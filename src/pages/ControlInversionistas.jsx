@@ -47,6 +47,14 @@ const getTipoDocumentoLabel = (value) => {
   return map[value] || value || '-'
 }
 
+// Helper para obtener el valor correcto del tipo documento desde el backend
+const normalizeTipoDocumento = (value) => {
+  if (!value) return 'DNI'
+  if (value === '1' || value === 'DNI') return 'DNI'
+  if (value === '2' || value === 'RUC') return 'RUC'
+  return 'DNI'
+}
+
 const getBit = (value, index) => String(value || '00000000000')[index] === '1'
 
 const getField = (obj, ...keys) => {
@@ -258,12 +266,11 @@ const ControlInversionistas = () => {
       open: true,
       mode: 'edit',
       form: {
-        ...EMPTY_FORM,
         id: row.id,
         codigo: row.codigo || '',
-        tipo_documento: row.tipo_documento || 'DNI',
+        tipo_documento: normalizeTipoDocumento(row.tipo_documento),
         numero_documento: row.numero_documento || '',
-        naturaleza: row.naturaleza || 'PN',
+        naturaleza: row.naturaleza === 'PN' || row.naturaleza === 'Persona Natural' ? 'PN' : (row.naturaleza === 'PJ' || row.naturaleza === 'Persona Jurídica' ? 'PJ' : row.naturaleza || 'PN'),
         razon_social: row.razon_social || '',
         nombre: row.nombre || '',
         apellido: row.apellido || '',
@@ -290,7 +297,10 @@ const ControlInversionistas = () => {
       setSaving(true)
       setError('')
 
-      const params = new URLSearchParams({ tipo_documento, nro_documento: numero_documento })
+      const params = new URLSearchParams({ 
+        tipo_documento: tipo_documento === 'RUC' ? 'RUC' : 'DNI', 
+        nro_documento: numero_documento 
+      })
       const res = await apiCall(`${API_BASE}/validar-documento?${params.toString()}`)
       const payload = res?.data || res || {}
 
@@ -298,9 +308,10 @@ const ControlInversionistas = () => {
         ...prev,
         form: {
           ...prev.form,
-          razon_social: payload.razon_social || payload.nombre_o_razon_social || prev.form.razon_social,
+          razon_social: payload.razon_social || payload.nombre_o_razon_social || payload.nombre || prev.form.razon_social,
           nombre: payload.nombre || payload.nombres || prev.form.nombre,
-          apellido: payload.apellido || payload.apellidos || `${payload.apellido_paterno || ''} ${payload.apellido_materno || ''}`.trim() || prev.form.apellido,
+          apellido: payload.apellido || payload.apellidos || 
+            `${payload.apellido_paterno || ''} ${payload.apellido_materno || ''}`.trim() || prev.form.apellido,
           direccion: payload.direccion || prev.form.direccion,
           naturaleza: tipo_documento === 'RUC' ? 'PJ' : 'PN',
         }
@@ -376,7 +387,8 @@ const ControlInversionistas = () => {
 
       await apiCall(`${API_BASE}/${endpoint}`, {
         method: 'POST',
-        body: form,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
       })
 
       setModal({ open: false, mode: 'create', form: EMPTY_FORM })
@@ -395,9 +407,11 @@ const ControlInversionistas = () => {
       setLoading(true)
       setError('')
 
+      // ✅ Corrección: Enviar JSON válido
       await apiCall(`${API_BASE}/eliminar`, {
         method: 'POST',
-        body: { id: row.id },
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: row.id }),
       })
 
       await loadData()
@@ -543,7 +557,6 @@ const ControlInversionistas = () => {
               {!loading && sortedData.map(row => (
                 <tr key={row.id || row.codigo} style={S.tr}>
                   <td style={S.td}><code style={S.code}>{row.codigo}</code></td>
-                  {/* ✅ CORRECCIÓN: Muestra DNI o RUC en lugar de 1 o 2 */}
                   <td style={S.td}>{getTipoDocumentoLabel(row.tipo_documento)}</td>
                   <td style={S.td}>{row.numero_documento}</td>
                   <td style={S.td}>{row.naturaleza === 'PN' ? 'Persona Natural' : row.naturaleza === 'PJ' ? 'Persona Jurídica' : row.naturaleza}</td>
@@ -740,24 +753,42 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
 
         <div style={S.formGrid4}>
           <Field label="Banco">
-            <select className="form-control" value={form.banco || ''} onChange={e => onChange('banco', e.target.value)} style={S.input}>
+            <select 
+              className="form-control" 
+              value={form.banco || ''} 
+              onChange={e => onChange('banco', e.target.value)} 
+              style={{ ...S.input, minWidth: 180 }}
+            >
               <option value="">Seleccione...</option>
-              {activeBanks.map(b => (
-                <option key={getField(b, 'id', 'ID')} value={getField(b, 'id', 'ID')}>
-                  {getField(b, 'name', 'nombre', 'Name')}
-                </option>
-              ))}
+              {activeBanks.map(b => {
+                const bankId = getField(b, 'id', 'ID')
+                const bankName = getField(b, 'name', 'nombre', 'Name')
+                return (
+                  <option key={bankId} value={bankId} title={bankName}>
+                    {bankName}
+                  </option>
+                )
+              })}
             </select>
           </Field>
 
           <Field label="Moneda">
-            <select className="form-control" value={form.moneda || ''} onChange={e => onChange('moneda', e.target.value)} style={S.input}>
+            <select 
+              className="form-control" 
+              value={form.moneda || ''} 
+              onChange={e => onChange('moneda', e.target.value)} 
+              style={{ ...S.input, minWidth: 120 }}
+            >
               <option value="">Seleccione...</option>
-              {monedas.map(m => (
-                <option key={getField(m, 'ID', 'id')} value={getField(m, 'ID', 'id')}>
-                  {getField(m, 'CODIGO', 'codigo', 'VALORTEXTO')}
-                </option>
-              ))}
+              {monedas.map(m => {
+                const monId = getField(m, 'ID', 'id')
+                const monName = getField(m, 'CODIGO', 'codigo', 'VALORTEXTO')
+                return (
+                  <option key={monId} value={monId} title={monName}>
+                    {monName}
+                  </option>
+                )
+              })}
             </select>
           </Field>
 
