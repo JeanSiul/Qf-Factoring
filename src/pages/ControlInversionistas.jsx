@@ -36,6 +36,17 @@ const SEARCH_FIELDS = [
   { value: 'estado', label: 'Estado' },
 ]
 
+// Helper para mapear tipo_documento a texto completo
+const getTipoDocumentoLabel = (value) => {
+  const map = {
+    '1': 'DNI',
+    '2': 'RUC',
+    'DNI': 'DNI',
+    'RUC': 'RUC',
+  }
+  return map[value] || value || '-'
+}
+
 const getBit = (value, index) => String(value || '00000000000')[index] === '1'
 
 const getField = (obj, ...keys) => {
@@ -152,11 +163,6 @@ const ControlInversionistas = () => {
 
       const res = await apiCall(`${API_BASE}/listar?${params.toString()}`)
 
-      // Acepta cualquiera de estos formatos desde n8n:
-      // 1) { data: [...], total: 7 }  ← recomendado
-      // 2) [{...}, {...}]             ← MySQL directo como lista
-      // 3) { rows: [...], total: 7 }
-      // 4) { json: { data: [...], total: 7 } }
       const payload = res?.json || res
       const rows = Array.isArray(payload?.data)
         ? payload.data
@@ -253,10 +259,21 @@ const ControlInversionistas = () => {
       mode: 'edit',
       form: {
         ...EMPTY_FORM,
-        ...row,
+        id: row.id,
+        codigo: row.codigo || '',
+        tipo_documento: row.tipo_documento || 'DNI',
         numero_documento: row.numero_documento || '',
+        naturaleza: row.naturaleza || 'PN',
+        razon_social: row.razon_social || '',
+        nombre: row.nombre || '',
+        apellido: row.apellido || '',
+        email: row.email || '',
         banco: row.banco || '',
         moneda: row.moneda || '',
+        cuenta: row.cuenta || '',
+        cci: row.cci || '',
+        direccion: row.direccion || '',
+        estado: row.estado || 'Activo',
       }
     })
   }
@@ -526,9 +543,10 @@ const ControlInversionistas = () => {
               {!loading && sortedData.map(row => (
                 <tr key={row.id || row.codigo} style={S.tr}>
                   <td style={S.td}><code style={S.code}>{row.codigo}</code></td>
-                  <td style={S.td}>{row.tipo_documento}</td>
+                  {/* ✅ CORRECCIÓN: Muestra DNI o RUC en lugar de 1 o 2 */}
+                  <td style={S.td}>{getTipoDocumentoLabel(row.tipo_documento)}</td>
                   <td style={S.td}>{row.numero_documento}</td>
-                  <td style={S.td}>{row.naturaleza}</td>
+                  <td style={S.td}>{row.naturaleza === 'PN' ? 'Persona Natural' : row.naturaleza === 'PJ' ? 'Persona Jurídica' : row.naturaleza}</td>
                   <td style={S.td}>{row.razon_social}</td>
                   <td style={S.td}>{[row.nombre, row.apellido].filter(Boolean).join(' ')}</td>
                   <td style={S.td}>{row.email}</td>
@@ -607,9 +625,9 @@ const DetailModal = ({ row, bancos, monedas, onClose }) => {
   const fields = [
     ['ID', row.id],
     ['Código', row.codigo],
-    ['Tipo Documento', row.tipo_documento],
+    ['Tipo Documento', getTipoDocumentoLabel(row.tipo_documento)],
     ['Documento', row.numero_documento],
-    ['Naturaleza', row.naturaleza],
+    ['Naturaleza', row.naturaleza === 'PN' ? 'Persona Natural' : row.naturaleza === 'PJ' ? 'Persona Jurídica' : row.naturaleza],
     ['Razón Social', row.razon_social],
     ['Nombre', row.nombre],
     ['Apellido', row.apellido],
