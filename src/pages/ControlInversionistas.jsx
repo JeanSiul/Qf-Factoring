@@ -82,7 +82,7 @@ const getBancoNombre = (bancoId, bancos) => {
 
 const getMonedaNombre = (monedaId, monedas) => {
   const item = monedas.find(m => String(getField(m, 'ID', 'id')) === String(monedaId))
-  return item ? getField(item, 'CODIGO', 'codigo', 'DESCRIPCION', 'descripcion') : ''
+  return item ? getField(item, 'CODIGO', 'codigo', 'VALORTEXTO') : ''
 }
 
 const normalize = (v) => String(v ?? '').toLowerCase().trim()
@@ -436,15 +436,9 @@ const ControlInversionistas = () => {
       <PageHeader />
 
       <div style={S.actionBar}>
-        <button className="btn btn-secondary btn-sm" style={S.secondaryBtn} onClick={() => setComfortable(v => !v)}>
+        <button className="btn" style={S.secondaryBtn} onClick={() => setComfortable(v => !v)}>
           {comfortable ? 'Vista compacta' : 'Vista cómoda'}
         </button>
-
-        {canCreate && (
-          <button className="btn btn-primary btn-sm" style={S.primaryBtn} onClick={openCreate}>
-            + Nuevo Registro
-          </button>
-        )}
       </div>
 
       <div style={S.kpiGrid}>
@@ -457,14 +451,18 @@ const ControlInversionistas = () => {
       </div>
 
       <div className="page-card" style={S.card}>
-        <div style={S.stickyTools}>
-          <div style={S.cardTitleWrap}>
-            <div>
-              <h2 style={S.cardTitle}>Base de Datos Inversionistas</h2>
-              <p style={S.cardSub}>Listado paginado con búsqueda, ordenamiento y acciones según permisos.</p>
-            </div>
-            <span style={S.resultPill}>{from}-{to} de {total}</span>
+        <div style={S.cardHeader}>
+          <div>
+            <h2 style={S.cardTitle}>Base de Datos Inversionistas</h2>
+            <p style={S.cardSub}>Listado paginado con búsqueda, ordenamiento y acciones según permisos.</p>
           </div>
+
+          {canCreate && (
+            <button className="btn" style={S.primaryBtn} onClick={openCreate}>
+              <span style={{ color: '#4CAF50', fontWeight: 900 }}>+</span> Nuevo Registro
+            </button>
+          )}
+        </div>
 
         <div style={S.filters}>
           <select
@@ -525,7 +523,6 @@ const ControlInversionistas = () => {
           <button className="btn" disabled={page >= totalPages || loading} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>›</button>
           <button className="btn" disabled={page >= totalPages || loading} onClick={() => setPage(totalPages)}>»</button>
         </div>
-        </div>
 
         {error && <div style={S.error}>{error}</div>}
 
@@ -533,7 +530,8 @@ const ControlInversionistas = () => {
           <table className="qf-table" style={{ ...S.table, fontSize: comfortable ? 12 : 10.5 }}>
             <thead>
               <tr>
-                <Th onClick={() => sortBy('tipo_documento')}>Tipo Documento {sortIcon('tipo_documento')}</Th>
+                <Th onClick={() => sortBy('codigo')}>Código {sortIcon('codigo')}</Th>
+                <Th onClick={() => sortBy('tipo_documento')}>Doc. {sortIcon('tipo_documento')}</Th>
                 <Th onClick={() => sortBy('numero_documento')}>Número {sortIcon('numero_documento')}</Th>
                 <Th onClick={() => sortBy('naturaleza')}>Nat. {sortIcon('naturaleza')}</Th>
                 <Th onClick={() => sortBy('razon_social')}>Razón Social {sortIcon('razon_social')}</Th>
@@ -549,16 +547,17 @@ const ControlInversionistas = () => {
 
             <tbody>
               {loading && (
-                <tr><td colSpan={11} style={S.empty}>Cargando...</td></tr>
+                <tr><td colSpan={12} style={S.empty}>Cargando...</td></tr>
               )}
 
               {!loading && sortedData.length === 0 && (
-                <tr><td colSpan={11} style={S.empty}>No hay registros para mostrar.</td></tr>
+                <tr><td colSpan={12} style={S.empty}>No hay registros para mostrar.</td></tr>
               )}
 
               {!loading && sortedData.map(row => (
                 <tr key={row.id || row.codigo} style={S.tr}>
-                  <td style={S.td}><code style={S.code}>{getTipoDocumentoLabel(row.tipo_documento)}</code></td>
+                  <td style={S.td}><code style={S.code}>{row.codigo}</code></td>
+                  <td style={S.td}>{getTipoDocumentoLabel(row.tipo_documento)}</td>
                   <td style={S.td}>{row.numero_documento}</td>
                   <td style={S.td}>{row.naturaleza === 'PN' ? 'Persona Natural' : row.naturaleza === 'PJ' ? 'Persona Jurídica' : row.naturaleza}</td>
                   <td style={S.td}>{row.razon_social}</td>
@@ -783,7 +782,7 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
               <option value="">Seleccione...</option>
               {monedas.map(m => {
                 const monId = getField(m, 'ID', 'id')
-                const monName = getField(m, 'CODIGO', 'codigo', 'DESCRIPCION', 'descripcion')
+                const monName = getField(m, 'CODIGO', 'codigo', 'VALORTEXTO')
                 return (
                   <option key={monId} value={monId} title={monName}>
                     {monName}
@@ -825,73 +824,63 @@ const Field = ({ label, children }) => (
 )
 
 const S = {
-  page: { paddingBottom: 16, maxWidth: '100%', overflowX: 'hidden' },
-  header: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 },
-  headerIcon: { width: 42, height: 42, borderRadius: 12, background: 'var(--qf-navy)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 },
-  title: { margin: 0, fontFamily: 'Montserrat', fontSize: 22, fontWeight: 800, color: 'var(--qf-navy)', marginBottom: 3 },
-  subtitle: { margin: '3px 0 0', color: 'var(--qf-text-light)', fontSize: 12.5 },
-
-  actionBar: { display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: 8, marginBottom: 10 },
-  kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: 10, marginBottom: 14 },
-  kpiCard: { background: '#fff', borderRadius: 12, padding: '9px 13px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', minHeight: 62, borderTop: '3px solid var(--qf-navy)' },
-  kpiLabel: { fontSize: 9.2, textTransform: 'uppercase', letterSpacing: 0.4, color: 'var(--qf-text-light)', fontWeight: 700, marginBottom: 4 },
-  kpiValue: { marginTop: 4, fontFamily: 'Montserrat', fontSize: 21, fontWeight: 850, color: 'var(--qf-navy)', lineHeight: 1.1 },
-
-  card: { overflow: 'hidden', background: '#fff', borderRadius: 12, border: '1px solid var(--qf-border)', padding: 0 },
-  stickyTools: { background: '#fff', borderTopLeftRadius: 12, borderTopRightRadius: 12, borderBottom: '1px solid var(--qf-border)' },
+  page: { padding: 20 },
+  header: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 },
+  headerIcon: { width: 42, height: 42, borderRadius: 12, background: '#0A2B4E', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 },
+  title: { margin: 0, fontFamily: 'Montserrat', fontSize: 22, fontWeight: 800, color: '#0A2B4E' },
+  subtitle: { margin: '3px 0 0', color: '#6c86a3', fontSize: 12 },
+  actionBar: { display: 'flex', justifyContent: 'flex-end', marginBottom: 12 },
+  kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 14 },
+  kpiCard: { background: 'white', border: '1px solid #e2e8f0', borderRadius: 12, padding: '10px 12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
+  kpiLabel: { fontSize: 9, textTransform: 'uppercase', color: '#6c86a3', fontWeight: 800 },
+  kpiValue: { marginTop: 4, fontFamily: 'Montserrat', fontSize: 22, fontWeight: 900, color: '#0A2B4E' },
+  card: { background: 'white', border: '1px solid #e2e8f0', borderRadius: 14, padding: 14 },
   cardHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 12 },
-  cardTitleWrap: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 16px 8px' },
-  cardTitle: { margin: 0, fontSize: 18, fontFamily: 'Montserrat', fontWeight: 800, color: 'var(--qf-navy)' },
-  cardSub: { margin: '3px 0 0', color: 'var(--qf-text-light)', fontSize: 12 },
-
-  filters: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 0, flexWrap: 'wrap', padding: '0 16px 8px' },
-  select: { width: 'auto', minWidth: 205, height: 36, fontSize: 12, paddingRight: 28 },
-  searchWrap: { position: 'relative', flex: '1 1 320px', minWidth: 260, maxWidth: 520 },
+  cardTitle: { margin: 0, color: '#0A2B4E', fontFamily: 'Montserrat', fontSize: 17 },
+  cardSub: { margin: '3px 0 0', color: '#6c86a3', fontSize: 12 },
+  filters: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' },
+  select: { width: 160, height: 34, fontSize: 12 },
+  searchWrap: { position: 'relative', flex: 1, minWidth: 220 },
   searchIcon: { position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 12, opacity: 0.65 },
-  searchInput: { width: '100%', height: 36, paddingLeft: 32, fontSize: 12 },
-  pagination: { display: 'flex', alignItems: 'center', gap: 7, marginBottom: 0, flexWrap: 'wrap', padding: '8px 16px 10px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
-  resultPill: { fontSize: 11, fontWeight: 700, color: 'var(--qf-navy)', background: '#e8eef5', borderRadius: 999, padding: '4px 10px', whiteSpace: 'nowrap' },
-  pageSize: { width: 'auto', minWidth: 62, height: 30, fontSize: 11 },
-  pageIndicator: { fontSize: 12, color: 'var(--qf-text-light)', padding: '0 6px' },
-
-  tableWrap: { maxHeight: 'calc(100vh - 350px)', minHeight: 260, overflow: 'auto', width: '100%' },
-  table: { minWidth: 1280, width: '100%', tableLayout: 'auto', borderCollapse: 'collapse' },
-  th: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 10.3, padding: '8px 8px', lineHeight: 1.05, background: '#f0f7ff', borderBottom: '1px solid #d4e0e9', cursor: 'pointer', userSelect: 'none', color: 'var(--qf-navy)', fontWeight: 800, textTransform: 'uppercase', textAlign: 'left' },
-  tr: { height: 38 },
-  td: { padding: '6px 8px', borderBottom: '1px solid #eef2f6', lineHeight: 1.15, verticalAlign: 'middle', fontSize: 11 },
-  code: { background: '#e8eef5', borderRadius: 4, padding: '2px 7px', fontWeight: 800, color: 'var(--qf-navy)', fontSize: 10.5 },
-  pill: { display: 'inline-block', background: '#e8eef5', color: 'var(--qf-navy)', borderRadius: 4, padding: '2px 7px', fontWeight: 700, fontSize: 10.5, whiteSpace: 'nowrap' },
-
+  searchInput: { width: '100%', height: 34, paddingLeft: 32, fontSize: 12 },
+  pagination: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, flexWrap: 'wrap' },
+  resultPill: { border: '1px solid #e2e8f0', background: '#f8fafc', borderRadius: 999, padding: '6px 10px', fontSize: 11, fontWeight: 700, color: '#0A2B4E' },
+  pageSize: { width: 74, height: 30, fontSize: 11 },
+  pageIndicator: { fontSize: 11, color: '#6c86a3', padding: '0 4px' },
+  tableWrap: { maxHeight: 'calc(100vh - 340px)', minHeight: 260, overflow: 'auto', border: '1px solid #e2e8f0', borderRadius: 10 },
+  table: { width: '100%', borderCollapse: 'collapse', tableLayout: 'auto' },
+  th: { position: 'sticky', top: 0, background: '#f0f7ff', zIndex: 1, color: '#0A2B4E', fontSize: 9, fontWeight: 900, textTransform: 'uppercase', padding: '5px 4px', borderBottom: '1px solid #d4e0e9', cursor: 'pointer', textAlign: 'left', whiteSpace: 'nowrap' },
+  tr: { height: 32 },
+  td: { padding: '3px 4px', borderBottom: '1px solid #eef2f6', lineHeight: 1.15, verticalAlign: 'middle' },
+  code: { background: '#e8eef5', borderRadius: 5, padding: '2px 5px', fontWeight: 900, color: '#0A2B4E', fontSize: 9.5 },
+  pill: { display: 'inline-block', background: '#e8eef5', borderRadius: 999, padding: '2px 6px', fontWeight: 700, fontSize: 9.5 },
   badge: { borderRadius: 999, padding: '2px 6px', fontSize: 8, fontWeight: 900, textTransform: 'uppercase' },
   badgeActive: { background: '#e8f5e9', color: '#2e7d32' },
   badgeWarning: { background: '#fff8e1', color: '#e65100' },
   badgeInactive: { background: '#ffebee', color: '#c62828' },
-
-  actions: { display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'nowrap' },
-  actionBtn: { fontSize: 9.5, padding: '2px 6px', borderRadius: 4 },
-  dangerBtn: { fontSize: 9.5, padding: '2px 6px', borderRadius: 4, color: '#c62828' },
-  footer: { padding: '10px 16px', borderTop: '1px solid var(--qf-border)', color: 'var(--qf-text-light)', fontSize: 11.5, background: '#fff', marginTop: 0 },
-  empty: { textAlign: 'center', padding: 40, color: 'var(--qf-text-light)' },
-
-  primaryBtn: { background: 'var(--qf-navy)', color: 'white', border: 'none', borderRadius: 8, padding: '7px 12px', fontWeight: 800 },
-  secondaryBtn: { background: '#f8fafc', color: 'var(--qf-navy)', border: '1px solid var(--qf-border)', borderRadius: 8, padding: '7px 12px', fontWeight: 800 },
-  clearBtn: { background: 'white', color: 'var(--qf-navy)', border: '1px solid var(--qf-border)', borderRadius: 8, padding: '8px 12px' },
-  error: { background: '#ffebee', color: '#c62828', border: '1px solid #ffcdd2', padding: '8px 10px', borderRadius: 8, fontSize: 12, margin: '10px 16px' },
-  noPerm: { background: 'white', border: '1px solid var(--qf-border)', borderRadius: 12, padding: 18, color: '#c62828', fontWeight: 800 },
-
+  actions: { display: 'flex', gap: 3, flexWrap: 'nowrap' },
+  actionBtn: { fontSize: 9, padding: '1px 4px' },
+  dangerBtn: { fontSize: 9, padding: '1px 4px', color: '#c62828' },
+  footer: { marginTop: 8, color: '#6c86a3', fontSize: 11 },
+  empty: { textAlign: 'center', padding: 24, color: '#6c86a3' },
+  primaryBtn: { background: '#0A2B4E', color: 'white', border: 'none', borderRadius: 8, padding: '8px 12px', fontWeight: 800 },
+  secondaryBtn: { background: '#f8fafc', color: '#0A2B4E', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontWeight: 800 },
+  clearBtn: { background: 'white', color: '#0A2B4E', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px' },
+  error: { background: '#ffebee', color: '#c62828', border: '1px solid #ffcdd2', padding: '8px 10px', borderRadius: 8, fontSize: 12, marginBottom: 10 },
+  noPerm: { background: 'white', border: '1px solid #e2e8f0', borderRadius: 12, padding: 18, color: '#c62828', fontWeight: 800 },
   modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 500, padding: 16 },
   modal: { background: 'white', borderRadius: 14, padding: 16, width: '100%', maxWidth: 860, maxHeight: '92vh', overflow: 'auto', boxShadow: '0 18px 50px rgba(0,0,0,0.25)' },
   modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  modalTitle: { margin: 0, fontFamily: 'Montserrat', color: 'var(--qf-navy)', fontSize: 18 },
-  detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10 },
-  detailBox: { background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 9 },
-  detailLabel: { fontSize: 9.5, textTransform: 'uppercase', color: 'var(--qf-text-light)', fontWeight: 700, marginBottom: 4 },
-  detailValue: { fontSize: 12.5, fontWeight: 600, color: 'var(--qf-navy)', wordBreak: 'break-word' },
-  formGrid4: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0 16px', marginBottom: 10 },
-  formGrid3: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0 16px', marginBottom: 10 },
-  field: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 },
-  fieldLabel: { fontSize: 9.5, textTransform: 'uppercase', color: 'var(--qf-text-light)', fontWeight: 700 },
-  input: { height: 36, fontSize: 12, borderRadius: 6, border: '1px solid var(--qf-border)', padding: '0 8px', width: '100%' },
+  modalTitle: { margin: 0, fontFamily: 'Montserrat', color: '#0A2B4E', fontSize: 18 },
+  detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 },
+  detailBox: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 8 },
+  detailLabel: { fontSize: 9, textTransform: 'uppercase', color: '#6c86a3', fontWeight: 900, marginBottom: 4 },
+  detailValue: { fontSize: 12, fontWeight: 800, color: '#0A2B4E', wordBreak: 'break-word' },
+  formGrid4: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginBottom: 10 },
+  formGrid3: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginBottom: 10 },
+  field: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 },
+  fieldLabel: { fontSize: 9, textTransform: 'uppercase', color: '#6c86a3', fontWeight: 900 },
+  input: { height: 34, fontSize: 12, borderRadius: 6, border: '1px solid #e2e8f0', padding: '0 8px' },
   modalActions: { display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 },
 }
 
