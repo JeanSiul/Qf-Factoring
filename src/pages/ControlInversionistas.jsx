@@ -82,7 +82,7 @@ const getBancoNombre = (bancoId, bancos) => {
 
 const getMonedaNombre = (monedaId, monedas) => {
   const item = monedas.find(m => String(getField(m, 'ID', 'id')) === String(monedaId))
-  return item ? getField(item, 'CODIGO', 'codigo', 'VALORTEXTO') : ''
+  return item ? getField(item, 'CODIGO', 'codigo', 'DESCRIPCION', 'descripcion', 'VALORTEXTO', 'valortexto') : ''
 }
 
 const normalize = (v) => String(v ?? '').toLowerCase().trim()
@@ -424,7 +424,7 @@ const ControlInversionistas = () => {
 
   if (!canList) {
     return (
-      <div style={S.page}>
+      <div className="fade-in" style={S.page}>
         <PageHeader />
         <div style={S.noPerm}>No tienes permisos para listar este módulo.</div>
       </div>
@@ -436,7 +436,7 @@ const ControlInversionistas = () => {
       <PageHeader />
 
       <div style={S.actionBar}>
-        <button className="btn" style={S.secondaryBtn} onClick={() => setComfortable(v => !v)}>
+        <button className="btn btn-secondary btn-sm" onClick={() => setComfortable(v => !v)}>
           {comfortable ? 'Vista compacta' : 'Vista cómoda'}
         </button>
       </div>
@@ -451,22 +451,23 @@ const ControlInversionistas = () => {
       </div>
 
       <div className="page-card" style={S.card}>
-        <div style={S.cardHeader}>
-          <div>
-            <h2 style={S.cardTitle}>Base de Datos Inversionistas</h2>
-            <p style={S.cardSub}>Listado paginado con búsqueda, ordenamiento y acciones según permisos.</p>
-          </div>
+        <div style={S.stickyTools}>
+          <div style={S.cardTitleWrap}>
+            <div>
+              <h2 style={S.cardTitle}>Base de Datos Inversionistas</h2>
+              <p style={S.cardSub}>Listado paginado con búsqueda, ordenamiento y acciones según permisos.</p>
+            </div>
 
-          {canCreate && (
-            <button className="btn" style={S.primaryBtn} onClick={openCreate}>
-              <span style={{ color: '#4CAF50', fontWeight: 900 }}>+</span> Nuevo Registro
-            </button>
-          )}
-        </div>
+            {canCreate && (
+              <button className="btn btn-primary btn-sm" onClick={openCreate} style={S.newBtn}>
+                <span style={{ color: '#4CAF50', fontWeight: 800, fontSize: 16 }}>+</span> Nuevo Registro
+              </button>
+            )}
+          </div>
 
         <div style={S.filters}>
           <select
-            className="form-control"
+            className="filter-input"
             value={field}
             onChange={e => {
               setField(e.target.value)
@@ -489,7 +490,7 @@ const ControlInversionistas = () => {
           </div>
 
           <button
-            className="btn"
+            className="btn btn-secondary btn-sm"
             style={S.clearBtn}
             onClick={() => {
               setField('all')
@@ -506,7 +507,7 @@ const ControlInversionistas = () => {
           <span style={S.resultPill}>{from}-{to} de {total}</span>
 
           <select
-            className="form-control"
+            className="filter-input"
             value={pageSize}
             onChange={e => {
               setPageSize(Number(e.target.value))
@@ -522,6 +523,7 @@ const ControlInversionistas = () => {
           <span style={S.pageIndicator}>{page}/{totalPages}</span>
           <button className="btn" disabled={page >= totalPages || loading} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>›</button>
           <button className="btn" disabled={page >= totalPages || loading} onClick={() => setPage(totalPages)}>»</button>
+        </div>
         </div>
 
         {error && <div style={S.error}>{error}</div>}
@@ -571,9 +573,9 @@ const ControlInversionistas = () => {
                   <td style={S.td}><EstadoBadge value={row.estado || 'Activo'} /></td>
                   <td style={S.td}>
                     <div style={S.actions}>
-                      {canView && <button className="btn" style={S.actionBtn} onClick={() => setDetail(row)}>Ver</button>}
-                      {canEdit && <button className="btn" style={S.actionBtn} onClick={() => openEdit(row)}>Edit</button>}
-                      {canDelete && <button className="btn" style={S.dangerBtn} onClick={() => deleteRow(row)}>Del</button>}
+                      {canView && <button className="btn btn-secondary btn-sm" style={S.actionBtn} onClick={() => setDetail(row)}>Ver</button>}
+                      {canEdit && <button className="btn btn-primary btn-sm" style={S.actionBtn} onClick={() => openEdit(row)}>Edit</button>}
+                      {canDelete && <button className="btn btn-danger btn-sm" style={S.dangerBtn} onClick={() => deleteRow(row)}>Del</button>}
                     </div>
                   </td>
                 </tr>
@@ -660,7 +662,7 @@ const DetailModal = ({ row, bancos, monedas, onClose }) => {
       <div className="modal" style={S.modal}>
         <div style={S.modalHeader}>
           <h2 style={S.modalTitle}>Detalle de Inversionista</h2>
-          <button className="btn" onClick={onClose}>×</button>
+          <button className="modal-close" onClick={onClose}>x</button>
         </div>
 
         <div style={S.detailGrid}>
@@ -685,7 +687,7 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
       <div className="modal" style={{ ...S.modal, maxWidth: 980 }}>
         <div style={S.modalHeader}>
           <h2 style={S.modalTitle}>{isEdit ? 'Modificar Inversionista' : 'Crear Inversionista'}</h2>
-          <button className="btn" onClick={onClose}>×</button>
+          <button className="modal-close" onClick={onClose}>x</button>
         </div>
 
         {error && <div style={S.error}>{error}</div>}
@@ -712,7 +714,7 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
           </Field>
 
           <Field label="Validación">
-            <button className="btn" style={S.secondaryBtn} disabled={saving} onClick={onValidate}>Validar DNI/RUC</button>
+            <button className="btn btn-secondary btn-sm" disabled={saving} onClick={onValidate}>Validar DNI/RUC</button>
           </Field>
         </div>
 
@@ -782,7 +784,7 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
               <option value="">Seleccione...</option>
               {monedas.map(m => {
                 const monId = getField(m, 'ID', 'id')
-                const monName = getField(m, 'CODIGO', 'codigo', 'VALORTEXTO')
+                const monName = getField(m, 'CODIGO', 'codigo', 'DESCRIPCION', 'descripcion', 'VALORTEXTO', 'valortexto')
                 return (
                   <option key={monId} value={monId} title={monName}>
                     {monName}
@@ -801,13 +803,15 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
           </Field>
         </div>
 
-        <Field label="Dirección">
-          <input className="form-control" value={form.direccion || ''} onChange={e => onChange('direccion', e.target.value)} style={S.input} />
-        </Field>
+        <div style={S.singleFieldWrap}>
+          <Field label="Dirección">
+            <input className="form-control" value={form.direccion || ''} onChange={e => onChange('direccion', e.target.value)} style={S.input} />
+          </Field>
+        </div>
 
         <div style={S.modalActions}>
-          <button className="btn" style={S.clearBtn} onClick={onClose}>Cancelar</button>
-          <button className="btn" style={S.primaryBtn} disabled={saving} onClick={onSave}>
+          <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-primary" disabled={saving} onClick={onSave}>
             {saving ? 'Guardando...' : 'Guardar'}
           </button>
         </div>
@@ -824,64 +828,80 @@ const Field = ({ label, children }) => (
 )
 
 const S = {
-  page: { padding: 20 },
-  header: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 },
-  headerIcon: { width: 42, height: 42, borderRadius: 12, background: '#0A2B4E', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 },
-  title: { margin: 0, fontFamily: 'Montserrat', fontSize: 22, fontWeight: 800, color: '#0A2B4E' },
-  subtitle: { margin: '3px 0 0', color: '#6c86a3', fontSize: 12 },
-  actionBar: { display: 'flex', justifyContent: 'flex-end', marginBottom: 12 },
-  kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 14 },
-  kpiCard: { background: 'white', border: '1px solid #e2e8f0', borderRadius: 12, padding: '10px 12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
-  kpiLabel: { fontSize: 9, textTransform: 'uppercase', color: '#6c86a3', fontWeight: 800 },
-  kpiValue: { marginTop: 4, fontFamily: 'Montserrat', fontSize: 22, fontWeight: 900, color: '#0A2B4E' },
-  card: { background: 'white', border: '1px solid #e2e8f0', borderRadius: 14, padding: 14 },
-  cardHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 12 },
-  cardTitle: { margin: 0, color: '#0A2B4E', fontFamily: 'Montserrat', fontSize: 17 },
-  cardSub: { margin: '3px 0 0', color: '#6c86a3', fontSize: 12 },
-  filters: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' },
-  select: { width: 160, height: 34, fontSize: 12 },
-  searchWrap: { position: 'relative', flex: 1, minWidth: 220 },
-  searchIcon: { position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 12, opacity: 0.65 },
-  searchInput: { width: '100%', height: 34, paddingLeft: 32, fontSize: 12 },
-  pagination: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, flexWrap: 'wrap' },
-  resultPill: { border: '1px solid #e2e8f0', background: '#f8fafc', borderRadius: 999, padding: '6px 10px', fontSize: 11, fontWeight: 700, color: '#0A2B4E' },
-  pageSize: { width: 74, height: 30, fontSize: 11 },
-  pageIndicator: { fontSize: 11, color: '#6c86a3', padding: '0 4px' },
-  tableWrap: { maxHeight: 'calc(100vh - 340px)', minHeight: 260, overflow: 'auto', border: '1px solid #e2e8f0', borderRadius: 10 },
-  table: { width: '100%', borderCollapse: 'collapse', tableLayout: 'auto' },
-  th: { position: 'sticky', top: 0, background: '#f0f7ff', zIndex: 1, color: '#0A2B4E', fontSize: 9, fontWeight: 900, textTransform: 'uppercase', padding: '5px 4px', borderBottom: '1px solid #d4e0e9', cursor: 'pointer', textAlign: 'left', whiteSpace: 'nowrap' },
+  page: { paddingBottom: 12, maxWidth: '100%', overflowX: 'hidden' },
+
+  header: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 },
+  headerIcon: { width: 42, height: 42, borderRadius: 12, background: 'var(--qf-navy)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 },
+  title: { margin: 0, fontFamily: 'Montserrat', fontSize: 22, fontWeight: 800, color: 'var(--qf-navy)', marginBottom: 2 },
+  subtitle: { margin: '3px 0 0', color: 'var(--qf-text-light)', fontSize: 12 },
+
+  actionBar: { display: 'flex', gap: 8, marginBottom: 8 },
+  kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, marginBottom: 10 },
+  kpiCard: { background: '#fff', borderRadius: 10, padding: '8px 12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', minHeight: 56, borderTop: '3px solid var(--qf-navy)' },
+  kpiLabel: { fontSize: 8.5, color: 'var(--qf-text-light)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 3 },
+  kpiValue: { marginTop: 0, fontWeight: 850, fontFamily: 'Montserrat', lineHeight: 1.1, fontSize: 19 },
+
+  card: { overflow: 'hidden', padding: 0 },
+  stickyTools: { background: '#fff', borderTopLeftRadius: 12, borderTopRightRadius: 12, borderBottom: '1px solid var(--qf-border)' },
+  cardHeader: { display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', padding: '10px 14px 6px' },
+  cardTitleWrap: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 14px 6px' },
+  cardTitle: { margin: 0, fontSize: 16, fontFamily: 'Montserrat', color: 'var(--qf-navy)' },
+  cardSub: { margin: '2px 0 0', color: 'var(--qf-text-light)', fontSize: 11.5 },
+  newBtn: { display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' },
+
+  filters: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '0 14px 6px' },
+  select: { width: 'auto', minWidth: 170, height: 32, fontSize: 12, padding: '0 28px 0 10px' },
+  searchWrap: { position: 'relative', flex: 1, maxWidth: 360, minWidth: 220 },
+  searchIcon: { position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5', pointerEvents: 'none' },
+  searchInput: { minWidth: 180, maxWidth: 360, width: '100%', height: 32, fontSize: 12, paddingLeft: 32 },
+  clearBtn: { fontSize: 11 },
+
+  pagination: { display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', padding: '5px 14px 7px', marginBottom: 0, background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
+  resultPill: { fontSize: 10, fontWeight: 700, color: 'var(--qf-navy)', background: '#e8eef5', borderRadius: 999, padding: '3px 8px', whiteSpace: 'nowrap' },
+  pageSize: { width: 'auto', minWidth: 52, height: 28, fontSize: 11, padding: '0 4px' },
+  pageIndicator: { fontSize: 11, color: 'var(--qf-text-light)', fontWeight: 600 },
+
+  tableWrap: { maxHeight: 'calc(100vh - 340px)', minHeight: 260, overflow: 'auto', width: '100%' },
+  table: { width: '100%', tableLayout: 'auto', borderCollapse: 'collapse' },
+  th: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 9, padding: '5px 4px', cursor: 'pointer', userSelect: 'none', background: '#f8fafc', color: 'var(--qf-navy)', borderBottom: '1px solid var(--qf-border)', textTransform: 'uppercase', fontWeight: 800, textAlign: 'left', lineHeight: 1.1 },
   tr: { height: 32 },
-  td: { padding: '3px 4px', borderBottom: '1px solid #eef2f6', lineHeight: 1.15, verticalAlign: 'middle' },
-  code: { background: '#e8eef5', borderRadius: 5, padding: '2px 5px', fontWeight: 900, color: '#0A2B4E', fontSize: 9.5 },
-  pill: { display: 'inline-block', background: '#e8eef5', borderRadius: 999, padding: '2px 6px', fontWeight: 700, fontSize: 9.5 },
+  td: { padding: '3px 4px', verticalAlign: 'middle', lineHeight: 1.15, borderBottom: '1px solid #eef2f6', fontSize: 10.5 },
+  code: { background: '#e8eef5', padding: '1px 4px', borderRadius: 3, fontSize: 9.5, fontWeight: 800, color: 'var(--qf-navy)' },
+  pill: { display: 'inline-block', background: '#e8eef5', color: 'var(--qf-navy)', borderRadius: 3, padding: '1px 4px', fontSize: 9.5, fontWeight: 700, whiteSpace: 'nowrap' },
+
   badge: { borderRadius: 999, padding: '2px 6px', fontSize: 8, fontWeight: 900, textTransform: 'uppercase' },
   badgeActive: { background: '#e8f5e9', color: '#2e7d32' },
   badgeWarning: { background: '#fff8e1', color: '#e65100' },
   badgeInactive: { background: '#ffebee', color: '#c62828' },
-  actions: { display: 'flex', gap: 3, flexWrap: 'nowrap' },
+
+  actions: { display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'nowrap' },
   actionBtn: { fontSize: 9, padding: '1px 4px' },
-  dangerBtn: { fontSize: 9, padding: '1px 4px', color: '#c62828' },
-  footer: { marginTop: 8, color: '#6c86a3', fontSize: 11 },
-  empty: { textAlign: 'center', padding: 24, color: '#6c86a3' },
-  primaryBtn: { background: '#0A2B4E', color: 'white', border: 'none', borderRadius: 8, padding: '8px 12px', fontWeight: 800 },
-  secondaryBtn: { background: '#f8fafc', color: '#0A2B4E', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontWeight: 800 },
-  clearBtn: { background: 'white', color: '#0A2B4E', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px' },
-  error: { background: '#ffebee', color: '#c62828', border: '1px solid #ffcdd2', padding: '8px 10px', borderRadius: 8, fontSize: 12, marginBottom: 10 },
-  noPerm: { background: 'white', border: '1px solid #e2e8f0', borderRadius: 12, padding: 18, color: '#c62828', fontWeight: 800 },
+  dangerBtn: { fontSize: 9, padding: '1px 4px' },
+
+  footer: { padding: '6px 14px', borderTop: '1px solid var(--qf-border)', fontSize: 10.5, color: 'var(--qf-text-light)', background: '#fff', marginTop: 0 },
+  empty: { textAlign: 'center', padding: 40, color: 'var(--qf-text-light)' },
+
+  primaryBtn: { background: 'var(--qf-navy)', color: 'white', border: 'none', borderRadius: 8, padding: '7px 12px', fontWeight: 800 },
+  secondaryBtn: { background: '#f8fafc', color: 'var(--qf-navy)', border: '1px solid var(--qf-border)', borderRadius: 8, padding: '7px 12px', fontWeight: 800 },
+  error: { background: '#fce4e4', color: '#c62828', borderRadius: 8, padding: '10px 14px', fontSize: 13, margin: '8px 14px' },
+  noPerm: { background: 'white', border: '1px solid var(--qf-border)', borderRadius: 12, padding: 18, color: '#c62828', fontWeight: 800 },
+
   modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 500, padding: 16 },
-  modal: { background: 'white', borderRadius: 14, padding: 16, width: '100%', maxWidth: 860, maxHeight: '92vh', overflow: 'auto', boxShadow: '0 18px 50px rgba(0,0,0,0.25)' },
-  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  modalTitle: { margin: 0, fontFamily: 'Montserrat', color: '#0A2B4E', fontSize: 18 },
-  detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 },
-  detailBox: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 8 },
-  detailLabel: { fontSize: 9, textTransform: 'uppercase', color: '#6c86a3', fontWeight: 900, marginBottom: 4 },
-  detailValue: { fontSize: 12, fontWeight: 800, color: '#0A2B4E', wordBreak: 'break-word' },
-  formGrid4: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginBottom: 10 },
-  formGrid3: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginBottom: 10 },
-  field: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 },
-  fieldLabel: { fontSize: 9, textTransform: 'uppercase', color: '#6c86a3', fontWeight: 900 },
-  input: { height: 34, fontSize: 12, borderRadius: 6, border: '1px solid #e2e8f0', padding: '0 8px' },
-  modalActions: { display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 },
+  modal: { background: 'white', borderRadius: 14, padding: 0, width: '94vw', maxWidth: 980, maxHeight: '92vh', overflow: 'hidden', boxShadow: '0 18px 50px rgba(0,0,0,0.25)' },
+  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderBottom: '1px solid var(--qf-border)' },
+  modalTitle: { margin: 0, fontFamily: 'Montserrat', color: 'var(--qf-navy)', fontSize: 18 },
+  detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8, padding: 16 },
+  detailBox: { background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 8 },
+  detailLabel: { fontSize: 9, textTransform: 'uppercase', color: 'var(--qf-text-light)', fontWeight: 700 },
+  detailValue: { fontSize: 12, fontWeight: 600, color: 'var(--qf-navy)', wordBreak: 'break-word' },
+
+  formGrid4: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0 16px', padding: '0 18px' },
+  formGrid3: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px', padding: '0 18px' },
+  field: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 },
+  singleFieldWrap: { padding: '0 18px' },
+  fieldLabel: { fontSize: 9, textTransform: 'uppercase', color: 'var(--qf-text-light)', fontWeight: 700 },
+  input: { height: 34, fontSize: 12, borderRadius: 6, border: '1px solid var(--qf-border)', padding: '0 8px', width: '100%' },
+  modalActions: { display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12, padding: '12px 18px', borderTop: '1px solid var(--qf-border)' },
 }
 
 export default ControlInversionistas
