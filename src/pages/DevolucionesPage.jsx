@@ -330,36 +330,36 @@ const ControlInversionistas = () => {
 
   if (!canList) {
     return (
-      <div style={S.page}>
+      <div style={styles.page}>
         <PageHeader />
-        <div style={S.noPerm}>No tienes permisos para listar este módulo.</div>
+        <div style={styles.noPerm}>No tienes permisos para listar este módulo.</div>
       </div>
     )
   }
 
   return (
-    <div style={S.page}>
+    <div style={styles.page}>
       <PageHeader />
 
-      <div style={S.actionBar}>
+      <div style={styles.actionBar}>
         <button className="btn btn-secondary btn-sm" onClick={() => setComfortable(v => !v)}>
           {comfortable ? 'Vista compacta' : 'Vista cómoda'}
         </button>
       </div>
 
-      <div style={S.kpiGrid}>
+      <div style={styles.kpiGrid}>
         {metrics.map(k => (
-          <div key={k.label} style={{ ...S.kpiCard, borderTop: `3px solid ${k.border}` }}>
-            <div style={S.kpiLabel}>{k.label}</div>
-            <div style={{ ...S.kpiValue, color: k.color }}>{k.value}</div>
+          <div key={k.label} style={{ ...styles.kpiCard, borderTop: `3px solid ${k.border}` }}>
+            <div style={styles.kpiLabel}>{k.label}</div>
+            <div style={{ ...styles.kpiValue, color: k.color }}>{k.value}</div>
           </div>
         ))}
       </div>
 
-      <div className="page-card" style={S.card}>
-        <div style={S.stickyTools}>
-          <div style={S.cardTitleWrap}>
-            <h2 style={S.cardTitle}>Base de Datos Inversionistas</h2>
+      <div className="page-card" style={styles.card}>
+        <div style={styles.stickyTools}>
+          <div style={styles.cardTitleWrap}>
+            <h2 style={styles.cardTitle}>Base de Datos Inversionistas</h2>
             {canCreate && (
               <button className="btn btn-primary btn-sm" onClick={openCreate} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span style={{ color: '#4CAF50', fontWeight: 800, fontSize: 16 }}>+</span> Nuevo Registro
@@ -367,28 +367,28 @@ const ControlInversionistas = () => {
             )}
           </div>
 
-          <div style={S.filtersRow}>
-            <select className="filter-input" value={field} onChange={e => { setField(e.target.value); setPage(1) }} style={S.fieldSelect}>
+          <div style={styles.filtersRow}>
+            <select className="filter-input" value={field} onChange={e => { setField(e.target.value); setPage(1) }} style={styles.fieldSelect}>
               {SEARCH_FIELDS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
             </select>
             <div style={{ position: 'relative', flex: 1, maxWidth: 360 }}>
               <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5' }}>🔍</span>
-              <input className="filter-input" placeholder="Buscar inversionista..." value={q} onChange={e => setQ(e.target.value)} style={{ ...S.searchInput, paddingLeft: 32, width: '100%' }} />
+              <input className="filter-input" placeholder="Buscar inversionista..." value={q} onChange={e => setQ(e.target.value)} style={{ ...styles.searchInput, paddingLeft: 32, width: '100%' }} />
             </div>
             <button className="btn btn-secondary btn-sm" onClick={() => { setField('all'); setQ(''); setDebouncedQ(''); setPage(1) }}>Limpiar</button>
           </div>
 
-          <div style={S.pagRow}>
-            <span style={S.pill}>{from}-{to} de {total}</span>
+          <div style={styles.pagRow}>
+            <span style={styles.pill}>{from}-{to} de {total}</span>
             <select className="filter-input" value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }} style={{ width: 'auto', minWidth: 52, height: 28, fontSize: 11 }}>
               <option value={25}>25</option><option value={50}>50</option><option value={100}>100</option><option value={200}>200</option>
             </select>
             <button className="btn btn-secondary btn-sm" disabled={page <= 1 || loading} onClick={() => setPage(1)}>«</button>
             <button className="btn btn-secondary btn-sm" disabled={page <= 1 || loading} onClick={() => setPage(p => Math.max(1, p - 1))}>‹</button>
-            <span style={S.pageInfo}>{page}/{totalPages}</span>
+            <span style={styles.pageInfo}>{page}/{totalPages}</span>
             <button className="btn btn-secondary btn-sm" disabled={page >= totalPages || loading} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>›</button>
             <button className="btn btn-secondary btn-sm" disabled={page >= totalPages || loading} onClick={() => setPage(totalPages)}>»</button>
-            {loading && <span style={S.loadMini}>...</span>}
+            {loading && <span style={styles.loadMini}>...</span>}
           </div>
         </div>
 
@@ -401,39 +401,39 @@ const ControlInversionistas = () => {
             <table className="qf-table" style={{ width: '100%', fontSize: comfortable ? 11 : 9.5 }}>
               <thead>
                 <tr style={{ background: '#f0f7ff' }}>
-                  <th style={S.ths} onClick={() => sortBy('codigo')}>Código<span style={S.si}>{sortIcon('codigo')}</span></th>
-                  <th style={S.ths} onClick={() => sortBy('tipo_documento')}>Doc.<span style={S.si}>{sortIcon('tipo_documento')}</span></th>
-                  <th style={S.ths} onClick={() => sortBy('numero_documento')}>Número<span style={S.si}>{sortIcon('numero_documento')}</span></th>
-                  <th style={S.ths} onClick={() => sortBy('naturaleza')}>Nat.<span style={S.si}>{sortIcon('naturaleza')}</span></th>
-                  <th style={S.ths} onClick={() => sortBy('razon_social')}>Razón Social<span style={S.si}>{sortIcon('razon_social')}</span></th>
-                  <th style={S.ths} onClick={() => sortBy('nombre')}>Nombre<span style={S.si}>{sortIcon('nombre')}</span></th>
-                  <th style={S.ths} onClick={() => sortBy('email')}>Email<span style={S.si}>{sortIcon('email')}</span></th>
-                  <th style={S.ths} onClick={() => sortBy('banco_nombre')}>Banco<span style={S.si}>{sortIcon('banco_nombre')}</span></th>
-                  <th style={S.ths} onClick={() => sortBy('moneda_nombre')}>M<span style={S.si}>{sortIcon('moneda_nombre')}</span></th>
-                  <th style={S.ths} onClick={() => sortBy('cuenta')}>Cuenta<span style={S.si}>{sortIcon('cuenta')}</span></th>
-                  <th style={S.ths} onClick={() => sortBy('estado')}>Estado<span style={S.si}>{sortIcon('estado')}</span></th>
-                  <th style={{ ...S.th0, textAlign: 'center' }}>Acciones</th>
+                  <th style={styles.ths} onClick={() => sortBy('codigo')}>Código<span style={styles.si}>{sortIcon('codigo')}</span></th>
+                  <th style={styles.ths} onClick={() => sortBy('tipo_documento')}>Doc.<span style={styles.si}>{sortIcon('tipo_documento')}</span></th>
+                  <th style={styles.ths} onClick={() => sortBy('numero_documento')}>Número<span style={styles.si}>{sortIcon('numero_documento')}</span></th>
+                  <th style={styles.ths} onClick={() => sortBy('naturaleza')}>Nat.<span style={styles.si}>{sortIcon('naturaleza')}</span></th>
+                  <th style={styles.ths} onClick={() => sortBy('razon_social')}>Razón Social<span style={styles.si}>{sortIcon('razon_social')}</span></th>
+                  <th style={styles.ths} onClick={() => sortBy('nombre')}>Nombre<span style={styles.si}>{sortIcon('nombre')}</span></th>
+                  <th style={styles.ths} onClick={() => sortBy('email')}>Email<span style={styles.si}>{sortIcon('email')}</span></th>
+                  <th style={styles.ths} onClick={() => sortBy('banco_nombre')}>Banco<span style={styles.si}>{sortIcon('banco_nombre')}</span></th>
+                  <th style={styles.ths} onClick={() => sortBy('moneda_nombre')}>M<span style={styles.si}>{sortIcon('moneda_nombre')}</span></th>
+                  <th style={styles.ths} onClick={() => sortBy('cuenta')}>Cuenta<span style={styles.si}>{sortIcon('cuenta')}</span></th>
+                  <th style={styles.ths} onClick={() => sortBy('estado')}>Estado<span style={styles.si}>{sortIcon('estado')}</span></th>
+                  <th style={{ ...styles.th0, textAlign: 'center' }}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {sortedData.map(row => (
                   <tr key={row.id || row.codigo} style={comfortable ? { height: 32 } : { height: 28 }}>
-                    <td style={S.td}><code style={S.opCode}>{row.codigo}</code></td>
-                    <td style={S.td}>{getTipoDocumentoLabel(row.tipo_documento)}</td>
-                    <td style={S.td}>{row.numero_documento}</td>
-                    <td style={S.td}>{row.naturaleza === 'PN' ? 'Persona Natural' : row.naturaleza === 'PJ' ? 'Persona Jurídica' : row.naturaleza}</td>
-                    <td style={{ ...S.td, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.razon_social}>{row.razon_social}</td>
-                    <td style={S.td}>{[row.nombre, row.apellido].filter(Boolean).join(' ')}</td>
-                    <td style={{ ...S.td, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.email}>{row.email}</td>
-                    <td style={S.td}><span style={S.bankPill} title={row.banco_nombre || getBancoNombre(row.banco, bancos)}>{row.banco_nombre || getBancoNombre(row.banco, bancos)}</span></td>
-                    <td style={S.td}>{row.moneda_codigo || getMonedaNombre(row.moneda, monedas)}</td>
-                    <td style={{ ...S.td, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.cuenta}>{row.cuenta}</td>
-                    <td style={S.td}><EstadoBadge value={row.estado || 'Activo'} /></td>
-                    <td style={{ ...S.td, textAlign: 'center' }}>
+                    <td style={styles.td}><code style={styles.opCode}>{row.codigo}</code></td>
+                    <td style={styles.td}>{getTipoDocumentoLabel(row.tipo_documento)}</td>
+                    <td style={styles.td}>{row.numero_documento}</td>
+                    <td style={styles.td}>{row.naturaleza === 'PN' ? 'Persona Natural' : row.naturaleza === 'PJ' ? 'Persona Jurídica' : row.naturaleza}</td>
+                    <td style={{ ...styles.td, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.razon_social}>{row.razon_social}</td>
+                    <td style={styles.td}>{[row.nombre, row.apellido].filter(Boolean).join(' ')}</td>
+                    <td style={{ ...styles.td, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.email}>{row.email}</td>
+                    <td style={styles.td}><span style={styles.bankPill} title={row.banco_nombre || getBancoNombre(row.banco, bancos)}>{row.banco_nombre || getBancoNombre(row.banco, bancos)}</span></td>
+                    <td style={styles.td}>{row.moneda_codigo || getMonedaNombre(row.moneda, monedas)}</td>
+                    <td style={{ ...styles.td, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.cuenta}>{row.cuenta}</td>
+                    <td style={styles.td}><EstadoBadge value={row.estado || 'Activo'} /></td>
+                    <td style={{ ...styles.td, textAlign: 'center' }}>
                       <div style={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
-                        {canView && <button className="btn btn-secondary btn-sm" onClick={() => setDetail(row)} style={S.aBtn}>Ver</button>}
-                        {canEdit && <button className="btn btn-primary btn-sm" onClick={() => openEdit(row)} style={S.aBtn}>Edit</button>}
-                        {canDelete && <button className="btn btn-danger btn-sm" onClick={() => deleteRow(row)} style={S.aBtn}>Del</button>}
+                        {canView && <button className="btn btn-secondary btn-sm" onClick={() => setDetail(row)} style={styles.aBtn}>Ver</button>}
+                        {canEdit && <button className="btn btn-primary btn-sm" onClick={() => openEdit(row)} style={styles.aBtn}>Edit</button>}
+                        {canDelete && <button className="btn btn-danger btn-sm" onClick={() => deleteRow(row)} style={styles.aBtn}>Del</button>}
                       </div>
                     </td>
                   </tr>
@@ -442,7 +442,7 @@ const ControlInversionistas = () => {
             </table>
           )}
         </div>
-        {!loading && <div style={S.footerCount}>{data.length} de {total} inversionistas</div>}
+        {!loading && <div style={styles.footerCount}>{data.length} de {total} inversionistas</div>}
       </div>
 
       {detail && <DetailModal row={detail} bancos={bancos} monedas={monedas} onClose={() => setDetail(null)} />}
@@ -452,11 +452,11 @@ const ControlInversionistas = () => {
 }
 
 const PageHeader = () => (
-  <div style={S.header}>
-    <div style={S.headerIcon}>👥</div>
+  <div style={styles.header}>
+    <div style={styles.headerIcon}>👥</div>
     <div>
-      <h1 style={S.title}>Control de Inversionistas</h1>
-      <p style={S.subtitle}>Registro, mantenimiento y consulta de inversionistas integrados con validación DNI/RUC.</p>
+      <h1 style={styles.title}>Control de Inversionistas</h1>
+      <p style={styles.subtitle}>Registro, mantenimiento y consulta de inversionistas integrados con validación DNI/RUC.</p>
     </div>
   </div>
 )
@@ -464,8 +464,11 @@ const PageHeader = () => (
 const EstadoBadge = ({ value }) => {
   const v = normalize(value)
   const type = v.includes('activo') ? 'active' : v.includes('pend') ? 'warning' : 'inactive'
-  const styleType = type === 'active' ? S.badgeActive : type === 'warning' ? S.badgeWarning : S.badgeInactive
-  return <span style={{ ...S.badge, ...styleType }}>{value || 'N/D'}</span>
+  let badgeStyle = {}
+  if (type === 'active') badgeStyle = styles.badgeActive
+  else if (type === 'warning') badgeStyle = styles.badgeWarning
+  else badgeStyle = styles.badgeInactive
+  return <span style={{ ...styles.badge, ...badgeStyle }}>{value || 'N/D'}</span>
 }
 
 const DetailModal = ({ row, bancos, monedas, onClose }) => {
@@ -479,10 +482,10 @@ const DetailModal = ({ row, bancos, monedas, onClose }) => {
     ['Creado', row.created_at], ['Actualizado', row.updated_at]
   ]
   return (
-    <div className="modal-overlay" style={S.modalOverlay}>
-      <div className="modal" style={S.modal}>
-        <div style={S.modalHeader}><h2 style={S.modalTitle}>Detalle de Inversionista</h2><button className="btn" onClick={onClose}>×</button></div>
-        <div style={S.detailGrid}>{fields.map(([label, value]) => (<div key={label} style={S.detailBox}><div style={S.detailLabel}>{label}</div><div style={S.detailValue}>{value || '—'}</div></div>))}</div>
+    <div className="modal-overlay" style={styles.modalOverlay}>
+      <div className="modal" style={styles.modal}>
+        <div style={styles.modalHeader}><h2 style={styles.modalTitle}>Detalle de Inversionista</h2><button className="btn" onClick={onClose}>×</button></div>
+        <div style={styles.detailGrid}>{fields.map(([label, value]) => (<div key={label} style={styles.detailBox}><div style={styles.detailLabel}>{label}</div><div style={styles.detailValue}>{value || '—'}</div></div>))}</div>
       </div>
     </div>
   )
@@ -493,31 +496,31 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
   const activeBanks = bancos.filter(b => normalize(getField(b, 'status', 'estado')) !== 'inactive')
 
   return (
-    <div className="modal-overlay" style={S.modalOverlay}>
-      <div className="modal" style={{ ...S.modal, maxWidth: 980 }}>
-        <div style={S.modalHeader}><h2 style={S.modalTitle}>{isEdit ? 'Modificar Inversionista' : 'Crear Inversionista'}</h2><button className="btn" onClick={onClose}>×</button></div>
-        {error && <div style={S.error}>{error}</div>}
+    <div className="modal-overlay" style={styles.modalOverlay}>
+      <div className="modal" style={{ ...styles.modal, maxWidth: 980 }}>
+        <div style={styles.modalHeader}><h2 style={styles.modalTitle}>{isEdit ? 'Modificar Inversionista' : 'Crear Inversionista'}</h2><button className="btn" onClick={onClose}>×</button></div>
+        {error && <div style={styles.error}>{error}</div>}
 
-        <div style={S.formGrid4}>
-          <Field label="Código"><input className="form-control" value={form.codigo || ''} readOnly style={S.input} /></Field>
-          <Field label="Tipo documento"><select className="form-control" value={form.tipo_documento || 'DNI'} onChange={e => onChange('tipo_documento', e.target.value)} style={S.input}><option value="DNI">DNI</option><option value="RUC">RUC</option></select></Field>
-          <Field label="Número"><input className="form-control" value={form.numero_documento || ''} onChange={e => onChange('numero_documento', e.target.value.replace(/\D/g, ''))} style={S.input} /></Field>
+        <div style={styles.formGrid4}>
+          <Field label="Código"><input className="form-control" value={form.codigo || ''} readOnly style={styles.input} /></Field>
+          <Field label="Tipo documento"><select className="form-control" value={form.tipo_documento || 'DNI'} onChange={e => onChange('tipo_documento', e.target.value)} style={styles.input}><option value="DNI">DNI</option><option value="RUC">RUC</option></select></Field>
+          <Field label="Número"><input className="form-control" value={form.numero_documento || ''} onChange={e => onChange('numero_documento', e.target.value.replace(/\D/g, ''))} style={styles.input} /></Field>
           <Field label="Validación"><button className="btn btn-secondary btn-sm" disabled={saving} onClick={onValidate}>Validar DNI/RUC</button></Field>
         </div>
 
-        <div style={S.formGrid3}>
-          <Field label="Naturaleza"><select className="form-control" value={form.naturaleza || 'PN'} onChange={e => onChange('naturaleza', e.target.value)} style={S.input}><option value="PN">Persona Natural</option><option value="PJ">Persona Jurídica</option></select></Field>
-          <Field label="Razón social"><input className="form-control" value={form.razon_social || ''} onChange={e => onChange('razon_social', e.target.value)} style={S.input} /></Field>
-          <Field label="Estado"><select className="form-control" value={form.estado || 'Activo'} onChange={e => onChange('estado', e.target.value)} style={S.input}><option value="Activo">Activo</option><option value="Inactivo">Inactivo</option><option value="Pendiente">Pendiente</option></select></Field>
+        <div style={styles.formGrid3}>
+          <Field label="Naturaleza"><select className="form-control" value={form.naturaleza || 'PN'} onChange={e => onChange('naturaleza', e.target.value)} style={styles.input}><option value="PN">Persona Natural</option><option value="PJ">Persona Jurídica</option></select></Field>
+          <Field label="Razón social"><input className="form-control" value={form.razon_social || ''} onChange={e => onChange('razon_social', e.target.value)} style={styles.input} /></Field>
+          <Field label="Estado"><select className="form-control" value={form.estado || 'Activo'} onChange={e => onChange('estado', e.target.value)} style={styles.input}><option value="Activo">Activo</option><option value="Inactivo">Inactivo</option><option value="Pendiente">Pendiente</option></select></Field>
         </div>
 
-        <div style={S.formGrid3}>
-          <Field label="Nombre"><input className="form-control" value={form.nombre || ''} onChange={e => onChange('nombre', e.target.value)} style={S.input} /></Field>
-          <Field label="Apellido"><input className="form-control" value={form.apellido || ''} onChange={e => onChange('apellido', e.target.value)} style={S.input} /></Field>
-          <Field label="Email"><input className="form-control" type="email" value={form.email || ''} onChange={e => onChange('email', e.target.value)} style={S.input} /></Field>
+        <div style={styles.formGrid3}>
+          <Field label="Nombre"><input className="form-control" value={form.nombre || ''} onChange={e => onChange('nombre', e.target.value)} style={styles.input} /></Field>
+          <Field label="Apellido"><input className="form-control" value={form.apellido || ''} onChange={e => onChange('apellido', e.target.value)} style={styles.input} /></Field>
+          <Field label="Email"><input className="form-control" type="email" value={form.email || ''} onChange={e => onChange('email', e.target.value)} style={styles.input} /></Field>
         </div>
 
-        <div style={S.formGrid4}>
+        <div style={styles.formGrid4}>
           <Field label="Banco">
             <select className="form-control" value={form.banco || ''} onChange={e => onChange('banco', e.target.value)} style={{ width: '100%', minWidth: '180px' }}>
               <option value="">Seleccione...</option>
@@ -530,13 +533,13 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
               {monedas.map(m => { const monId = getField(m, 'ID', 'id'); const monName = getField(m, 'CODIGO', 'codigo', 'VALORTEXTO'); return <option key={monId} value={monId} title={monName}>{monName}</option> })}
             </select>
           </Field>
-          <Field label="Cuenta bancaria"><input className="form-control" value={form.cuenta || ''} onChange={e => onChange('cuenta', e.target.value)} style={S.input} /></Field>
-          <Field label="CCI"><input className="form-control" value={form.cci || ''} onChange={e => onChange('cci', e.target.value)} style={S.input} /></Field>
+          <Field label="Cuenta bancaria"><input className="form-control" value={form.cuenta || ''} onChange={e => onChange('cuenta', e.target.value)} style={styles.input} /></Field>
+          <Field label="CCI"><input className="form-control" value={form.cci || ''} onChange={e => onChange('cci', e.target.value)} style={styles.input} /></Field>
         </div>
 
-        <Field label="Dirección"><input className="form-control" value={form.direccion || ''} onChange={e => onChange('direccion', e.target.value)} style={S.input} /></Field>
+        <Field label="Dirección"><input className="form-control" value={form.direccion || ''} onChange={e => onChange('direccion', e.target.value)} style={styles.input} /></Field>
 
-        <div style={S.modalActions}>
+        <div style={styles.modalActions}>
           <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
           <button className="btn btn-primary" disabled={saving} onClick={onSave}>{saving ? 'Guardando...' : 'Guardar'}</button>
         </div>
@@ -546,10 +549,10 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
 }
 
 const Field = ({ label, children }) => (
-  <label style={S.field}><span style={S.fieldLabel}>{label}</span>{children}</label>
+  <label style={styles.field}><span style={styles.fieldLabel}>{label}</span>{children}</label>
 )
 
-const S = {
+const styles = {
   page: { paddingBottom: 12, maxWidth: '100%', overflowX: 'hidden' },
   header: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 },
   headerIcon: { width: 42, height: 42, borderRadius: 12, background: 'var(--qf-navy)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 },
