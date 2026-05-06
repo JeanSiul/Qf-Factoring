@@ -9,14 +9,14 @@ const EMPTY_FORM = {
   id: null,
   codigo: '',
   tipo_documento: 'DNI',
-  nro_documento: '',
+  numero_documento: '',
   naturaleza: 'PN',
   razon_social: '',
   nombres: '',
   apellidos: '',
   correo: '',
-  banco_id: '',
-  moneda_id: '',
+  banco: '',
+  moneda: '',
   cuenta_bancaria: '',
   cci: '',
   direccion: '',
@@ -26,7 +26,7 @@ const EMPTY_FORM = {
 const SEARCH_FIELDS = [
   { value: 'all', label: 'Todos' },
   { value: 'codigo', label: 'Código' },
-  { value: 'nro_documento', label: 'DNI/RUC' },
+  { value: 'numero_documento', label: 'DNI/RUC' },
   { value: 'razon_social', label: 'Razón social' },
   { value: 'nombres', label: 'Nombres' },
   { value: 'apellidos', label: 'Apellidos' },
@@ -56,13 +56,13 @@ const safeArray = (res) => {
   return toArray ? toArray(res) : []
 }
 
-const getBancoNombre = (id, bancos) => {
-  const item = bancos.find(b => String(getField(b, 'id', 'ID')) === String(id))
+const getBancoNombre = (bancoId, bancos) => {
+  const item = bancos.find(b => String(getField(b, 'id', 'ID')) === String(bancoId))
   return item ? getField(item, 'name', 'nombre', 'Name') : ''
 }
 
-const getMonedaNombre = (id, monedas) => {
-  const item = monedas.find(m => String(getField(m, 'ID', 'id')) === String(id))
+const getMonedaNombre = (monedaId, monedas) => {
+  const item = monedas.find(m => String(getField(m, 'ID', 'id')) === String(monedaId))
   return item ? getField(item, 'CODIGO', 'codigo', 'VALORTEXTO') : ''
 }
 
@@ -149,6 +149,7 @@ const ControlInversionistas = () => {
         field,
         q: debouncedQ,
       })
+
       const res = await apiCall(`${API_BASE}/listar?${params.toString()}`)
       const rows = Array.isArray(res?.data) ? res.data : safeArray(res)
       setData(rows)
@@ -178,23 +179,25 @@ const ControlInversionistas = () => {
 
   const sortedData = useMemo(() => {
     const rows = [...data]
+
     rows.sort((a, b) => {
       let av = a?.[sortField]
       let bv = b?.[sortField]
 
       if (sortField === 'banco_nombre') {
-        av = getBancoNombre(a.banco_id, bancos)
-        bv = getBancoNombre(b.banco_id, bancos)
+        av = a.banco_nombre || getBancoNombre(a.banco, bancos)
+        bv = b.banco_nombre || getBancoNombre(b.banco, bancos)
       }
 
       if (sortField === 'moneda_nombre') {
-        av = getMonedaNombre(a.moneda_id, monedas)
-        bv = getMonedaNombre(b.moneda_id, monedas)
+        av = a.moneda_codigo || getMonedaNombre(a.moneda, monedas)
+        bv = b.moneda_codigo || getMonedaNombre(b.moneda, monedas)
       }
 
       const an = Number(av)
       const bn = Number(bv)
       let cmp = 0
+
       if (!Number.isNaN(an) && !Number.isNaN(bn) && String(av).trim() !== '' && String(bv).trim() !== '') {
         cmp = an - bn
       } else {
@@ -203,6 +206,7 @@ const ControlInversionistas = () => {
 
       return sortDir === 'asc' ? cmp : -cmp
     })
+
     return rows
   }, [data, sortField, sortDir, bancos, monedas])
 
@@ -219,21 +223,34 @@ const ControlInversionistas = () => {
   const openCreate = async () => {
     setError('')
     let nextCode = ''
+
     try {
       const res = await apiCall(`${API_BASE}/siguiente-codigo?naturaleza=PN`)
       nextCode = res?.codigo || ''
     } catch (_) {}
+
     setModal({ open: true, mode: 'create', form: { ...EMPTY_FORM, codigo: nextCode } })
   }
 
   const openEdit = (row) => {
     setError('')
-    setModal({ open: true, mode: 'edit', form: { ...EMPTY_FORM, ...row } })
+    setModal({
+      open: true,
+      mode: 'edit',
+      form: {
+        ...EMPTY_FORM,
+        ...row,
+        numero_documento: row.numero_documento || '',
+        banco: row.banco || '',
+        moneda: row.moneda || '',
+      }
+    })
   }
 
   const validateDocument = async () => {
-    const { tipo_documento, nro_documento } = modal.form
-    if (!nro_documento) {
+    const { tipo_documento, numero_documento } = modal.form
+
+    if (!numero_documento) {
       setError('Ingrese un DNI/RUC para validar.')
       return
     }
@@ -241,7 +258,8 @@ const ControlInversionistas = () => {
     try {
       setSaving(true)
       setError('')
-      const params = new URLSearchParams({ tipo_documento, nro_documento })
+
+      const params = new URLSearchParams({ tipo_documento, nro_documento: numero_documento })
       const res = await apiCall(`${API_BASE}/validar-documento?${params.toString()}`)
       const payload = res?.data || res || {}
 
@@ -273,11 +291,27 @@ const ControlInversionistas = () => {
 
     if (name === 'tipo_documento' && modal.mode === 'create') {
       const naturaleza = value === 'RUC' ? 'PJ' : 'PN'
+
       try {
         const res = await apiCall(`${API_BASE}/siguiente-codigo?naturaleza=${naturaleza}`)
-        setModal(prev => ({ ...prev, form: { ...prev.form, tipo_documento: value, naturaleza, codigo: res?.codigo || prev.form.codigo } }))
+        setModal(prev => ({
+          ...prev,
+          form: {
+            ...prev.form,
+            tipo_documento: value,
+            naturaleza,
+            codigo: res?.codigo || prev.form.codigo,
+          }
+        }))
       } catch (_) {
-        setModal(prev => ({ ...prev, form: { ...prev.form, tipo_documento: value, naturaleza } }))
+        setModal(prev => ({
+          ...prev,
+          form: {
+            ...prev.form,
+            tipo_documento: value,
+            naturaleza,
+          }
+        }))
       }
     }
   }
@@ -285,18 +319,19 @@ const ControlInversionistas = () => {
   const validateForm = (form) => {
     if (!form.codigo) return 'El código es obligatorio.'
     if (!form.tipo_documento) return 'El tipo de documento es obligatorio.'
-    if (!form.nro_documento) return 'El número de documento es obligatorio.'
-    if (form.tipo_documento === 'DNI' && String(form.nro_documento).length !== 8) return 'El DNI debe tener 8 dígitos.'
-    if (form.tipo_documento === 'RUC' && String(form.nro_documento).length !== 11) return 'El RUC debe tener 11 dígitos.'
+    if (!form.numero_documento) return 'El número de documento es obligatorio.'
+    if (form.tipo_documento === 'DNI' && String(form.numero_documento).length !== 8) return 'El DNI debe tener 8 dígitos.'
+    if (form.tipo_documento === 'RUC' && String(form.numero_documento).length !== 11) return 'El RUC debe tener 11 dígitos.'
     if (!form.razon_social && !form.nombres) return 'Ingrese razón social o nombres.'
-    if (!form.banco_id) return 'Seleccione un banco.'
-    if (!form.moneda_id) return 'Seleccione una moneda.'
+    if (!form.banco) return 'Seleccione un banco.'
+    if (!form.moneda) return 'Seleccione una moneda.'
     return ''
   }
 
   const saveForm = async () => {
     const form = modal.form
     const validation = validateForm(form)
+
     if (validation) {
       setError(validation)
       return
@@ -305,11 +340,14 @@ const ControlInversionistas = () => {
     try {
       setSaving(true)
       setError('')
+
       const endpoint = modal.mode === 'edit' ? 'actualizar' : 'crear'
+
       await apiCall(`${API_BASE}/${endpoint}`, {
         method: 'POST',
         body: form,
       })
+
       setModal({ open: false, mode: 'create', form: EMPTY_FORM })
       await loadData()
     } catch (err) {
@@ -321,13 +359,16 @@ const ControlInversionistas = () => {
 
   const deleteRow = async (row) => {
     if (!window.confirm(`¿Eliminar inversionista ${row.codigo || row.id}?`)) return
+
     try {
       setLoading(true)
       setError('')
+
       await apiCall(`${API_BASE}/eliminar`, {
         method: 'POST',
         body: { id: row.id },
       })
+
       await loadData()
     } catch (err) {
       setError(err?.message || 'No se pudo eliminar el registro.')
@@ -370,6 +411,7 @@ const ControlInversionistas = () => {
             <h2 style={S.cardTitle}>Base de Datos Inversionistas</h2>
             <p style={S.cardSub}>Listado paginado con búsqueda, ordenamiento y acciones según permisos.</p>
           </div>
+
           {canCreate && (
             <button className="btn" style={S.primaryBtn} onClick={openCreate}>
               <span style={{ color: '#4CAF50', fontWeight: 900 }}>+</span> Nuevo Registro
@@ -378,9 +420,18 @@ const ControlInversionistas = () => {
         </div>
 
         <div style={S.filters}>
-          <select className="form-control" value={field} onChange={e => { setField(e.target.value); setPage(1) }} style={S.select}>
+          <select
+            className="form-control"
+            value={field}
+            onChange={e => {
+              setField(e.target.value)
+              setPage(1)
+            }}
+            style={S.select}
+          >
             {SEARCH_FIELDS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
           </select>
+
           <div style={S.searchWrap}>
             <span style={S.searchIcon}>🔍</span>
             <input
@@ -391,16 +442,36 @@ const ControlInversionistas = () => {
               style={S.searchInput}
             />
           </div>
-          <button className="btn" style={S.clearBtn} onClick={() => { setField('all'); setQ(''); setDebouncedQ(''); setPage(1) }}>
+
+          <button
+            className="btn"
+            style={S.clearBtn}
+            onClick={() => {
+              setField('all')
+              setQ('')
+              setDebouncedQ('')
+              setPage(1)
+            }}
+          >
             Limpiar
           </button>
         </div>
 
         <div style={S.pagination}>
           <span style={S.resultPill}>{from}-{to} de {total}</span>
-          <select className="form-control" value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }} style={S.pageSize}>
+
+          <select
+            className="form-control"
+            value={pageSize}
+            onChange={e => {
+              setPageSize(Number(e.target.value))
+              setPage(1)
+            }}
+            style={S.pageSize}
+          >
             {[25, 50, 100, 200].map(n => <option key={n} value={n}>{n}</option>)}
           </select>
+
           <button className="btn" disabled={page <= 1 || loading} onClick={() => setPage(1)}>«</button>
           <button className="btn" disabled={page <= 1 || loading} onClick={() => setPage(p => Math.max(1, p - 1))}>‹</button>
           <span style={S.pageIndicator}>{page}/{totalPages}</span>
@@ -416,7 +487,7 @@ const ControlInversionistas = () => {
               <tr>
                 <Th onClick={() => sortBy('codigo')}>Código {sortIcon('codigo')}</Th>
                 <Th onClick={() => sortBy('tipo_documento')}>Doc. {sortIcon('tipo_documento')}</Th>
-                <Th onClick={() => sortBy('nro_documento')}>Número {sortIcon('nro_documento')}</Th>
+                <Th onClick={() => sortBy('numero_documento')}>Número {sortIcon('numero_documento')}</Th>
                 <Th onClick={() => sortBy('naturaleza')}>Nat. {sortIcon('naturaleza')}</Th>
                 <Th onClick={() => sortBy('razon_social')}>Razón Social {sortIcon('razon_social')}</Th>
                 <Th onClick={() => sortBy('nombres')}>Nombres {sortIcon('nombres')}</Th>
@@ -428,13 +499,16 @@ const ControlInversionistas = () => {
                 <th style={S.th}>Acciones</th>
               </tr>
             </thead>
+
             <tbody>
               {loading && (
                 <tr><td colSpan={12} style={S.empty}>Cargando...</td></tr>
               )}
+
               {!loading && sortedData.length === 0 && (
                 <tr><td colSpan={12} style={S.empty}>No hay registros para mostrar.</td></tr>
               )}
+
               {!loading && sortedData.map(row => (
                 <tr key={row.id || row.codigo} style={S.tr}>
                   <td style={S.td}><code style={S.code}>{row.codigo}</code></td>
@@ -444,7 +518,9 @@ const ControlInversionistas = () => {
                   <td style={S.td}>{row.razon_social}</td>
                   <td style={S.td}>{[row.nombres, row.apellidos].filter(Boolean).join(' ')}</td>
                   <td style={S.td}>{row.correo}</td>
-                  <td style={S.td}><span style={S.pill}>{row.banco_nombre || getBancoNombre(row.banco, bancos)}</span></td>
+                  <td style={S.td}>
+                    <span style={S.pill}>{row.banco_nombre || getBancoNombre(row.banco, bancos)}</span>
+                  </td>
                   <td style={S.td}>{row.moneda_codigo || getMonedaNombre(row.moneda, monedas)}</td>
                   <td style={{ ...S.td, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.cuenta_bancaria}</td>
                   <td style={S.td}><EstadoBadge value={row.estado} /></td>
@@ -509,6 +585,7 @@ const EstadoBadge = ({ value }) => {
   const v = normalize(value)
   const type = v.includes('activo') || v.includes('validado') ? 'active' : v.includes('pend') ? 'warning' : 'inactive'
   const style = type === 'active' ? S.badgeActive : type === 'warning' ? S.badgeWarning : S.badgeInactive
+
   return <span className={`badge ${type}`} style={{ ...S.badge, ...style }}>{value || 'N/D'}</span>
 }
 
@@ -517,14 +594,14 @@ const DetailModal = ({ row, bancos, monedas, onClose }) => {
     ['ID', row.id],
     ['Código', row.codigo],
     ['Tipo Documento', row.tipo_documento],
-    ['Documento', row.nro_documento],
+    ['Documento', row.numero_documento],
     ['Naturaleza', row.naturaleza],
     ['Razón Social', row.razon_social],
     ['Nombres', row.nombres],
     ['Apellidos', row.apellidos],
     ['Correo', row.correo],
-    ['Banco', row.banco_nombre || getBancoNombre(row.banco_id, bancos)],
-    ['Moneda', row.moneda_codigo || getMonedaNombre(row.moneda_id, monedas)],
+    ['Banco', row.banco_nombre || getBancoNombre(row.banco, bancos)],
+    ['Moneda', row.moneda_codigo || getMonedaNombre(row.moneda, monedas)],
     ['Cuenta Bancaria', row.cuenta_bancaria],
     ['CCI', row.cci],
     ['Dirección', row.direccion],
@@ -540,6 +617,7 @@ const DetailModal = ({ row, bancos, monedas, onClose }) => {
           <h2 style={S.modalTitle}>Detalle de Inversionista</h2>
           <button className="btn" onClick={onClose}>×</button>
         </div>
+
         <div style={S.detailGrid}>
           {fields.map(([label, value]) => (
             <div key={label} style={S.detailBox}>
@@ -571,15 +649,23 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
           <Field label="Código">
             <input className="form-control" value={form.codigo || ''} readOnly style={S.input} />
           </Field>
+
           <Field label="Tipo documento">
             <select className="form-control" value={form.tipo_documento || 'DNI'} onChange={e => onChange('tipo_documento', e.target.value)} style={S.input}>
               <option value="DNI">DNI</option>
               <option value="RUC">RUC</option>
             </select>
           </Field>
+
           <Field label="Número">
-            <input className="form-control" value={form.nro_documento || ''} onChange={e => onChange('nro_documento', e.target.value.replace(/\D/g, ''))} style={S.input} />
+            <input
+              className="form-control"
+              value={form.numero_documento || ''}
+              onChange={e => onChange('numero_documento', e.target.value.replace(/\D/g, ''))}
+              style={S.input}
+            />
           </Field>
+
           <Field label="Validación">
             <button className="btn" style={S.secondaryBtn} disabled={saving} onClick={onValidate}>Validar DNI/RUC</button>
           </Field>
@@ -592,9 +678,11 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
               <option value="PJ">Persona Jurídica</option>
             </select>
           </Field>
+
           <Field label="Razón social">
             <input className="form-control" value={form.razon_social || ''} onChange={e => onChange('razon_social', e.target.value)} style={S.input} />
           </Field>
+
           <Field label="Estado">
             <select className="form-control" value={form.estado || 'Activo'} onChange={e => onChange('estado', e.target.value)} style={S.input}>
               <option value="Activo">Activo</option>
@@ -608,9 +696,11 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
           <Field label="Nombres">
             <input className="form-control" value={form.nombres || ''} onChange={e => onChange('nombres', e.target.value)} style={S.input} />
           </Field>
+
           <Field label="Apellidos">
             <input className="form-control" value={form.apellidos || ''} onChange={e => onChange('apellidos', e.target.value)} style={S.input} />
           </Field>
+
           <Field label="Correo">
             <input className="form-control" type="email" value={form.correo || ''} onChange={e => onChange('correo', e.target.value)} style={S.input} />
           </Field>
@@ -618,20 +708,31 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
 
         <div style={S.formGrid4}>
           <Field label="Banco">
-            <select className="form-control" value={form.banco_id || ''} onChange={e => onChange('banco_id', e.target.value)} style={S.input}>
+            <select className="form-control" value={form.banco || ''} onChange={e => onChange('banco', e.target.value)} style={S.input}>
               <option value="">Seleccione...</option>
-              {activeBanks.map(b => <option key={getField(b, 'id', 'ID')} value={getField(b, 'id', 'ID')}>{getField(b, 'name', 'nombre', 'Name')}</option>)}
+              {activeBanks.map(b => (
+                <option key={getField(b, 'id', 'ID')} value={getField(b, 'id', 'ID')}>
+                  {getField(b, 'name', 'nombre', 'Name')}
+                </option>
+              ))}
             </select>
           </Field>
+
           <Field label="Moneda">
-            <select className="form-control" value={form.moneda_id || ''} onChange={e => onChange('moneda_id', e.target.value)} style={S.input}>
+            <select className="form-control" value={form.moneda || ''} onChange={e => onChange('moneda', e.target.value)} style={S.input}>
               <option value="">Seleccione...</option>
-              {monedas.map(m => <option key={getField(m, 'ID', 'id')} value={getField(m, 'ID', 'id')}>{getField(m, 'CODIGO', 'codigo', 'VALORTEXTO')}</option>)}
+              {monedas.map(m => (
+                <option key={getField(m, 'ID', 'id')} value={getField(m, 'ID', 'id')}>
+                  {getField(m, 'CODIGO', 'codigo', 'VALORTEXTO')}
+                </option>
+              ))}
             </select>
           </Field>
+
           <Field label="Cuenta bancaria">
             <input className="form-control" value={form.cuenta_bancaria || ''} onChange={e => onChange('cuenta_bancaria', e.target.value)} style={S.input} />
           </Field>
+
           <Field label="CCI">
             <input className="form-control" value={form.cci || ''} onChange={e => onChange('cci', e.target.value)} style={S.input} />
           </Field>
