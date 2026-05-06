@@ -439,13 +439,13 @@ const ControlInversionistas = () => {
                 <tr key={row.id || row.codigo} style={S.tr}>
                   <td style={S.td}><code style={S.code}>{row.codigo}</code></td>
                   <td style={S.td}>{row.tipo_documento}</td>
-                  <td style={S.td}>{row.nro_documento}</td>
+                  <td style={S.td}>{row.numero_documento}</td>
                   <td style={S.td}>{row.naturaleza}</td>
                   <td style={S.td}>{row.razon_social}</td>
                   <td style={S.td}>{[row.nombres, row.apellidos].filter(Boolean).join(' ')}</td>
                   <td style={S.td}>{row.correo}</td>
-                  <td style={S.td}><span style={S.pill}>{row.banco_nombre || getBancoNombre(row.banco_id, bancos)}</span></td>
-                  <td style={S.td}>{row.moneda_codigo || getMonedaNombre(row.moneda_id, monedas)}</td>
+                  <td style={S.td}><span style={S.pill}>{row.banco_nombre || getBancoNombre(row.banco, bancos)}</span></td>
+                  <td style={S.td}>{row.moneda_codigo || getMonedaNombre(row.moneda, monedas)}</td>
                   <td style={{ ...S.td, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.cuenta_bancaria}</td>
                   <td style={S.td}><EstadoBadge value={row.estado} /></td>
                   <td style={S.td}>
