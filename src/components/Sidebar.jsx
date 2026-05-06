@@ -41,6 +41,7 @@ const menuItems = [
       { icon: '🧾', label: 'Facturas', path: '/operaciones/facturas', claim: 'FACLIS' },
       { icon: '🧾', label: 'Devoluciones', path: '/operaciones/devoluciones', claim: 'OPEDEV' },
       { icon: '💰', label: 'Finanzas', path: '/operaciones/finanzas', claim: 'OPELIS' },
+      { icon: '👥', label: 'Inversionistas', path: '/operaciones/inversionistas', claim: 'INVCTL' },
       { icon: '📈', label: 'Reportes', path: '/operaciones/reportes', claim: 'RPTOPE' },
     ]
   },
