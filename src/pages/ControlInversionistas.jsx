@@ -36,6 +36,25 @@ const SEARCH_FIELDS = [
   { value: 'estado', label: 'Estado' },
 ]
 
+// Helper para mapear tipo_documento a texto completo
+const getTipoDocumentoLabel = (value) => {
+  const map = {
+    '1': 'DNI',
+    '2': 'RUC',
+    'DNI': 'DNI',
+    'RUC': 'RUC',
+  }
+  return map[value] || value || '-'
+}
+
+// Helper para obtener el valor correcto del tipo documento desde el backend
+const normalizeTipoDocumento = (value) => {
+  if (!value) return 'DNI'
+  if (value === '1' || value === 'DNI') return 'DNI'
+  if (value === '2' || value === 'RUC') return 'RUC'
+  return 'DNI'
+}
+
 const getBit = (value, index) => String(value || '00000000000')[index] === '1'
 
 const getField = (obj, ...keys) => {
@@ -152,11 +171,6 @@ const ControlInversionistas = () => {
 
       const res = await apiCall(`${API_BASE}/listar?${params.toString()}`)
 
-      // Acepta cualquiera de estos formatos desde n8n:
-      // 1) { data: [...], total: 7 }  ← recomendado
-      // 2) [{...}, {...}]             ← MySQL directo como lista
-      // 3) { rows: [...], total: 7 }
-      // 4) { json: { data: [...], total: 7 } }
       const payload = res?.json || res
       const rows = Array.isArray(payload?.data)
         ? payload.data
@@ -252,11 +266,21 @@ const ControlInversionistas = () => {
       open: true,
       mode: 'edit',
       form: {
-        ...EMPTY_FORM,
-        ...row,
+        id: row.id,
+        codigo: row.codigo || '',
+        tipo_documento: normalizeTipoDocumento(row.tipo_documento),
         numero_documento: row.numero_documento || '',
+        naturaleza: row.naturaleza === 'PN' || row.naturaleza === 'Persona Natural' ? 'PN' : (row.naturaleza === 'PJ' || row.naturaleza === 'Persona Jurídica' ? 'PJ' : row.naturaleza || 'PN'),
+        razon_social: row.razon_social || '',
+        nombre: row.nombre || '',
+        apellido: row.apellido || '',
+        email: row.email || '',
         banco: row.banco || '',
         moneda: row.moneda || '',
+        cuenta: row.cuenta || '',
+        cci: row.cci || '',
+        direccion: row.direccion || '',
+        estado: row.estado || 'Activo',
       }
     })
   }
@@ -273,7 +297,10 @@ const ControlInversionistas = () => {
       setSaving(true)
       setError('')
 
-      const params = new URLSearchParams({ tipo_documento, nro_documento: numero_documento })
+      const params = new URLSearchParams({ 
+        tipo_documento: tipo_documento === 'RUC' ? 'RUC' : 'DNI', 
+        nro_documento: numero_documento 
+      })
       const res = await apiCall(`${API_BASE}/validar-documento?${params.toString()}`)
       const payload = res?.data || res || {}
 
@@ -281,9 +308,10 @@ const ControlInversionistas = () => {
         ...prev,
         form: {
           ...prev.form,
-          razon_social: payload.razon_social || payload.nombre_o_razon_social || prev.form.razon_social,
+          razon_social: payload.razon_social || payload.nombre_o_razon_social || payload.nombre || prev.form.razon_social,
           nombre: payload.nombre || payload.nombres || prev.form.nombre,
-          apellido: payload.apellido || payload.apellidos || `${payload.apellido_paterno || ''} ${payload.apellido_materno || ''}`.trim() || prev.form.apellido,
+          apellido: payload.apellido || payload.apellidos || 
+            `${payload.apellido_paterno || ''} ${payload.apellido_materno || ''}`.trim() || prev.form.apellido,
           direccion: payload.direccion || prev.form.direccion,
           naturaleza: tipo_documento === 'RUC' ? 'PJ' : 'PN',
         }
@@ -359,7 +387,8 @@ const ControlInversionistas = () => {
 
       await apiCall(`${API_BASE}/${endpoint}`, {
         method: 'POST',
-        body: form,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
       })
 
       setModal({ open: false, mode: 'create', form: EMPTY_FORM })
@@ -378,9 +407,11 @@ const ControlInversionistas = () => {
       setLoading(true)
       setError('')
 
+      // ✅ Corrección: Enviar JSON válido
       await apiCall(`${API_BASE}/eliminar`, {
         method: 'POST',
-        body: { id: row.id },
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: row.id }),
       })
 
       await loadData()
@@ -405,9 +436,15 @@ const ControlInversionistas = () => {
       <PageHeader />
 
       <div style={S.actionBar}>
-        <button className="btn" style={S.secondaryBtn} onClick={() => setComfortable(v => !v)}>
+        <button className="btn btn-secondary btn-sm" style={S.secondaryBtn} onClick={() => setComfortable(v => !v)}>
           {comfortable ? 'Vista compacta' : 'Vista cómoda'}
         </button>
+
+        {canCreate && (
+          <button className="btn btn-primary btn-sm" style={S.primaryBtn} onClick={openCreate}>
+            + Nuevo Registro
+          </button>
+        )}
       </div>
 
       <div style={S.kpiGrid}>
@@ -420,18 +457,14 @@ const ControlInversionistas = () => {
       </div>
 
       <div className="page-card" style={S.card}>
-        <div style={S.cardHeader}>
-          <div>
-            <h2 style={S.cardTitle}>Base de Datos Inversionistas</h2>
-            <p style={S.cardSub}>Listado paginado con búsqueda, ordenamiento y acciones según permisos.</p>
+        <div style={S.stickyTools}>
+          <div style={S.cardTitleWrap}>
+            <div>
+              <h2 style={S.cardTitle}>Base de Datos Inversionistas</h2>
+              <p style={S.cardSub}>Listado paginado con búsqueda, ordenamiento y acciones según permisos.</p>
+            </div>
+            <span style={S.resultPill}>{from}-{to} de {total}</span>
           </div>
-
-          {canCreate && (
-            <button className="btn" style={S.primaryBtn} onClick={openCreate}>
-              <span style={{ color: '#4CAF50', fontWeight: 900 }}>+</span> Nuevo Registro
-            </button>
-          )}
-        </div>
 
         <div style={S.filters}>
           <select
@@ -492,6 +525,7 @@ const ControlInversionistas = () => {
           <button className="btn" disabled={page >= totalPages || loading} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>›</button>
           <button className="btn" disabled={page >= totalPages || loading} onClick={() => setPage(totalPages)}>»</button>
         </div>
+        </div>
 
         {error && <div style={S.error}>{error}</div>}
 
@@ -499,8 +533,7 @@ const ControlInversionistas = () => {
           <table className="qf-table" style={{ ...S.table, fontSize: comfortable ? 12 : 10.5 }}>
             <thead>
               <tr>
-                <Th onClick={() => sortBy('codigo')}>Código {sortIcon('codigo')}</Th>
-                <Th onClick={() => sortBy('tipo_documento')}>Doc. {sortIcon('tipo_documento')}</Th>
+                <Th onClick={() => sortBy('tipo_documento')}>Tipo Documento {sortIcon('tipo_documento')}</Th>
                 <Th onClick={() => sortBy('numero_documento')}>Número {sortIcon('numero_documento')}</Th>
                 <Th onClick={() => sortBy('naturaleza')}>Nat. {sortIcon('naturaleza')}</Th>
                 <Th onClick={() => sortBy('razon_social')}>Razón Social {sortIcon('razon_social')}</Th>
@@ -516,19 +549,18 @@ const ControlInversionistas = () => {
 
             <tbody>
               {loading && (
-                <tr><td colSpan={12} style={S.empty}>Cargando...</td></tr>
+                <tr><td colSpan={11} style={S.empty}>Cargando...</td></tr>
               )}
 
               {!loading && sortedData.length === 0 && (
-                <tr><td colSpan={12} style={S.empty}>No hay registros para mostrar.</td></tr>
+                <tr><td colSpan={11} style={S.empty}>No hay registros para mostrar.</td></tr>
               )}
 
               {!loading && sortedData.map(row => (
                 <tr key={row.id || row.codigo} style={S.tr}>
-                  <td style={S.td}><code style={S.code}>{row.codigo}</code></td>
-                  <td style={S.td}>{row.tipo_documento}</td>
+                  <td style={S.td}><code style={S.code}>{getTipoDocumentoLabel(row.tipo_documento)}</code></td>
                   <td style={S.td}>{row.numero_documento}</td>
-                  <td style={S.td}>{row.naturaleza}</td>
+                  <td style={S.td}>{row.naturaleza === 'PN' ? 'Persona Natural' : row.naturaleza === 'PJ' ? 'Persona Jurídica' : row.naturaleza}</td>
                   <td style={S.td}>{row.razon_social}</td>
                   <td style={S.td}>{[row.nombre, row.apellido].filter(Boolean).join(' ')}</td>
                   <td style={S.td}>{row.email}</td>
@@ -607,9 +639,9 @@ const DetailModal = ({ row, bancos, monedas, onClose }) => {
   const fields = [
     ['ID', row.id],
     ['Código', row.codigo],
-    ['Tipo Documento', row.tipo_documento],
+    ['Tipo Documento', getTipoDocumentoLabel(row.tipo_documento)],
     ['Documento', row.numero_documento],
-    ['Naturaleza', row.naturaleza],
+    ['Naturaleza', row.naturaleza === 'PN' ? 'Persona Natural' : row.naturaleza === 'PJ' ? 'Persona Jurídica' : row.naturaleza],
     ['Razón Social', row.razon_social],
     ['Nombre', row.nombre],
     ['Apellido', row.apellido],
@@ -722,24 +754,42 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
 
         <div style={S.formGrid4}>
           <Field label="Banco">
-            <select className="form-control" value={form.banco || ''} onChange={e => onChange('banco', e.target.value)} style={S.input}>
+            <select 
+              className="form-control" 
+              value={form.banco || ''} 
+              onChange={e => onChange('banco', e.target.value)} 
+              style={{ ...S.input, minWidth: 180 }}
+            >
               <option value="">Seleccione...</option>
-              {activeBanks.map(b => (
-                <option key={getField(b, 'id', 'ID')} value={getField(b, 'id', 'ID')}>
-                  {getField(b, 'name', 'nombre', 'Name')}
-                </option>
-              ))}
+              {activeBanks.map(b => {
+                const bankId = getField(b, 'id', 'ID')
+                const bankName = getField(b, 'name', 'nombre', 'Name')
+                return (
+                  <option key={bankId} value={bankId} title={bankName}>
+                    {bankName}
+                  </option>
+                )
+              })}
             </select>
           </Field>
 
           <Field label="Moneda">
-            <select className="form-control" value={form.moneda || ''} onChange={e => onChange('moneda', e.target.value)} style={S.input}>
+            <select 
+              className="form-control" 
+              value={form.moneda || ''} 
+              onChange={e => onChange('moneda', e.target.value)} 
+              style={{ ...S.input, minWidth: 120 }}
+            >
               <option value="">Seleccione...</option>
-              {monedas.map(m => (
-                <option key={getField(m, 'ID', 'id')} value={getField(m, 'ID', 'id')}>
-                  {getField(m, 'CODIGO', 'codigo', 'DESCRIPCION', 'descripcion')}
-                </option>
-              ))}
+              {monedas.map(m => {
+                const monId = getField(m, 'ID', 'id')
+                const monName = getField(m, 'CODIGO', 'codigo', 'DESCRIPCION', 'descripcion')
+                return (
+                  <option key={monId} value={monId} title={monName}>
+                    {monName}
+                  </option>
+                )
+              })}
             </select>
           </Field>
 
@@ -775,63 +825,73 @@ const Field = ({ label, children }) => (
 )
 
 const S = {
-  page: { animation: 'fadeIn 0.25s ease', padding: 20 },
-  header: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 },
+  page: { paddingBottom: 16, maxWidth: '100%', overflowX: 'hidden' },
+  header: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 },
   headerIcon: { width: 42, height: 42, borderRadius: 12, background: 'var(--qf-navy)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 },
-  title: { margin: 0, fontFamily: 'Montserrat', fontSize: 24, fontWeight: 800, color: 'var(--qf-navy)' },
-  subtitle: { margin: '3px 0 0', color: 'var(--qf-text-light)', fontSize: 13 },
-  actionBar: { display: 'flex', justifyContent: 'flex-end', marginBottom: 12 },
-  kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 14 },
-  kpiCard: { background: 'white', border: '1px solid var(--qf-border)', borderTop: '3px solid var(--qf-navy)', borderRadius: 12, padding: '10px 12px', boxShadow: '0 4px 12px rgba(0,0,0,0.04)' },
-  kpiLabel: { fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--qf-text-light)', fontWeight: 800 },
-  kpiValue: { marginTop: 4, fontFamily: 'Montserrat', fontSize: 22, fontWeight: 900, color: 'var(--qf-navy)' },
-  card: { background: 'white', border: '1px solid var(--qf-border)', borderRadius: 14, padding: 14 },
+  title: { margin: 0, fontFamily: 'Montserrat', fontSize: 22, fontWeight: 800, color: 'var(--qf-navy)', marginBottom: 3 },
+  subtitle: { margin: '3px 0 0', color: 'var(--qf-text-light)', fontSize: 12.5 },
+
+  actionBar: { display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: 8, marginBottom: 10 },
+  kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: 10, marginBottom: 14 },
+  kpiCard: { background: '#fff', borderRadius: 12, padding: '9px 13px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', minHeight: 62, borderTop: '3px solid var(--qf-navy)' },
+  kpiLabel: { fontSize: 9.2, textTransform: 'uppercase', letterSpacing: 0.4, color: 'var(--qf-text-light)', fontWeight: 700, marginBottom: 4 },
+  kpiValue: { marginTop: 4, fontFamily: 'Montserrat', fontSize: 21, fontWeight: 850, color: 'var(--qf-navy)', lineHeight: 1.1 },
+
+  card: { overflow: 'hidden', background: '#fff', borderRadius: 12, border: '1px solid var(--qf-border)', padding: 0 },
+  stickyTools: { background: '#fff', borderTopLeftRadius: 12, borderTopRightRadius: 12, borderBottom: '1px solid var(--qf-border)' },
   cardHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 12 },
-  cardTitle: { margin: 0, color: 'var(--qf-navy)', fontFamily: 'Montserrat', fontSize: 17 },
+  cardTitleWrap: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 16px 8px' },
+  cardTitle: { margin: 0, fontSize: 18, fontFamily: 'Montserrat', fontWeight: 800, color: 'var(--qf-navy)' },
   cardSub: { margin: '3px 0 0', color: 'var(--qf-text-light)', fontSize: 12 },
-  filters: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' },
-  select: { width: 160, height: 34, fontSize: 12 },
-  searchWrap: { position: 'relative', flex: 1, minWidth: 220 },
+
+  filters: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 0, flexWrap: 'wrap', padding: '0 16px 8px' },
+  select: { width: 'auto', minWidth: 205, height: 36, fontSize: 12, paddingRight: 28 },
+  searchWrap: { position: 'relative', flex: '1 1 320px', minWidth: 260, maxWidth: 520 },
   searchIcon: { position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 12, opacity: 0.65 },
-  searchInput: { width: '100%', height: 34, paddingLeft: 32, fontSize: 12 },
-  pagination: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, flexWrap: 'wrap' },
-  resultPill: { border: '1px solid var(--qf-border)', background: '#f8fafc', borderRadius: 999, padding: '6px 10px', fontSize: 11, fontWeight: 700, color: 'var(--qf-navy)' },
-  pageSize: { width: 74, height: 30, fontSize: 11 },
-  pageIndicator: { fontSize: 11, color: 'var(--qf-text-light)', padding: '0 4px' },
-  tableWrap: { maxHeight: 'calc(100vh - 340px)', minHeight: 260, overflow: 'auto', border: '1px solid var(--qf-border)', borderRadius: 10 },
-  table: { width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'auto' },
-  th: { position: 'sticky', top: 0, background: '#f3f6fa', zIndex: 1, color: 'var(--qf-navy)', fontSize: 9, fontWeight: 900, textTransform: 'uppercase', padding: '5px 4px', borderBottom: '1px solid var(--qf-border)', cursor: 'pointer', textAlign: 'left', whiteSpace: 'nowrap' },
-  tr: { height: 32 },
-  td: { padding: '3px 4px', borderBottom: '1px solid #eef2f6', lineHeight: 1.15, verticalAlign: 'middle' },
-  code: { background: '#e8eef5', borderRadius: 5, padding: '2px 5px', fontWeight: 900, color: 'var(--qf-navy)' },
-  pill: { display: 'inline-block', background: '#e8eef5', borderRadius: 999, padding: '2px 6px', fontWeight: 700 },
+  searchInput: { width: '100%', height: 36, paddingLeft: 32, fontSize: 12 },
+  pagination: { display: 'flex', alignItems: 'center', gap: 7, marginBottom: 0, flexWrap: 'wrap', padding: '8px 16px 10px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
+  resultPill: { fontSize: 11, fontWeight: 700, color: 'var(--qf-navy)', background: '#e8eef5', borderRadius: 999, padding: '4px 10px', whiteSpace: 'nowrap' },
+  pageSize: { width: 'auto', minWidth: 62, height: 30, fontSize: 11 },
+  pageIndicator: { fontSize: 12, color: 'var(--qf-text-light)', padding: '0 6px' },
+
+  tableWrap: { maxHeight: 'calc(100vh - 350px)', minHeight: 260, overflow: 'auto', width: '100%' },
+  table: { minWidth: 1280, width: '100%', tableLayout: 'auto', borderCollapse: 'collapse' },
+  th: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 10.3, padding: '8px 8px', lineHeight: 1.05, background: '#f0f7ff', borderBottom: '1px solid #d4e0e9', cursor: 'pointer', userSelect: 'none', color: 'var(--qf-navy)', fontWeight: 800, textTransform: 'uppercase', textAlign: 'left' },
+  tr: { height: 38 },
+  td: { padding: '6px 8px', borderBottom: '1px solid #eef2f6', lineHeight: 1.15, verticalAlign: 'middle', fontSize: 11 },
+  code: { background: '#e8eef5', borderRadius: 4, padding: '2px 7px', fontWeight: 800, color: 'var(--qf-navy)', fontSize: 10.5 },
+  pill: { display: 'inline-block', background: '#e8eef5', color: 'var(--qf-navy)', borderRadius: 4, padding: '2px 7px', fontWeight: 700, fontSize: 10.5, whiteSpace: 'nowrap' },
+
   badge: { borderRadius: 999, padding: '2px 6px', fontSize: 8, fontWeight: 900, textTransform: 'uppercase' },
   badgeActive: { background: '#e8f5e9', color: '#2e7d32' },
   badgeWarning: { background: '#fff8e1', color: '#e65100' },
   badgeInactive: { background: '#ffebee', color: '#c62828' },
-  actions: { display: 'flex', gap: 3, flexWrap: 'nowrap' },
-  actionBtn: { fontSize: 9, padding: '1px 4px' },
-  dangerBtn: { fontSize: 9, padding: '1px 4px', color: '#c62828' },
-  footer: { marginTop: 8, color: 'var(--qf-text-light)', fontSize: 11 },
-  empty: { textAlign: 'center', padding: 24, color: 'var(--qf-text-light)' },
-  primaryBtn: { background: 'var(--qf-navy)', color: 'white', border: 'none', borderRadius: 8, padding: '8px 12px', fontWeight: 800 },
-  secondaryBtn: { background: '#f8fafc', color: 'var(--qf-navy)', border: '1px solid var(--qf-border)', borderRadius: 8, padding: '8px 12px', fontWeight: 800 },
+
+  actions: { display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'nowrap' },
+  actionBtn: { fontSize: 9.5, padding: '2px 6px', borderRadius: 4 },
+  dangerBtn: { fontSize: 9.5, padding: '2px 6px', borderRadius: 4, color: '#c62828' },
+  footer: { padding: '10px 16px', borderTop: '1px solid var(--qf-border)', color: 'var(--qf-text-light)', fontSize: 11.5, background: '#fff', marginTop: 0 },
+  empty: { textAlign: 'center', padding: 40, color: 'var(--qf-text-light)' },
+
+  primaryBtn: { background: 'var(--qf-navy)', color: 'white', border: 'none', borderRadius: 8, padding: '7px 12px', fontWeight: 800 },
+  secondaryBtn: { background: '#f8fafc', color: 'var(--qf-navy)', border: '1px solid var(--qf-border)', borderRadius: 8, padding: '7px 12px', fontWeight: 800 },
   clearBtn: { background: 'white', color: 'var(--qf-navy)', border: '1px solid var(--qf-border)', borderRadius: 8, padding: '8px 12px' },
-  error: { background: '#ffebee', color: '#c62828', border: '1px solid #ffcdd2', padding: '8px 10px', borderRadius: 8, fontSize: 12, marginBottom: 10 },
+  error: { background: '#ffebee', color: '#c62828', border: '1px solid #ffcdd2', padding: '8px 10px', borderRadius: 8, fontSize: 12, margin: '10px 16px' },
   noPerm: { background: 'white', border: '1px solid var(--qf-border)', borderRadius: 12, padding: 18, color: '#c62828', fontWeight: 800 },
+
   modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 500, padding: 16 },
   modal: { background: 'white', borderRadius: 14, padding: 16, width: '100%', maxWidth: 860, maxHeight: '92vh', overflow: 'auto', boxShadow: '0 18px 50px rgba(0,0,0,0.25)' },
   modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   modalTitle: { margin: 0, fontFamily: 'Montserrat', color: 'var(--qf-navy)', fontSize: 18 },
-  detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 },
-  detailBox: { background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 10, padding: 10 },
-  detailLabel: { fontSize: 9, textTransform: 'uppercase', color: 'var(--qf-text-light)', fontWeight: 900, marginBottom: 4 },
-  detailValue: { fontSize: 12, fontWeight: 800, color: 'var(--qf-navy)', wordBreak: 'break-word' },
-  formGrid4: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginBottom: 10 },
-  formGrid3: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, marginBottom: 10 },
+  detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10 },
+  detailBox: { background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 9 },
+  detailLabel: { fontSize: 9.5, textTransform: 'uppercase', color: 'var(--qf-text-light)', fontWeight: 700, marginBottom: 4 },
+  detailValue: { fontSize: 12.5, fontWeight: 600, color: 'var(--qf-navy)', wordBreak: 'break-word' },
+  formGrid4: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0 16px', marginBottom: 10 },
+  formGrid3: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0 16px', marginBottom: 10 },
   field: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 },
-  fieldLabel: { fontSize: 9, textTransform: 'uppercase', color: 'var(--qf-text-light)', fontWeight: 900 },
-  input: { height: 34, fontSize: 12 },
+  fieldLabel: { fontSize: 9.5, textTransform: 'uppercase', color: 'var(--qf-text-light)', fontWeight: 700 },
+  input: { height: 36, fontSize: 12, borderRadius: 6, border: '1px solid var(--qf-border)', padding: '0 8px', width: '100%' },
   modalActions: { display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 },
 }
 
