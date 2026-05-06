@@ -1,3 +1,4 @@
+// src/utils/api.js
 export const getBaseUrl = () => {
   return '/api'
 }
@@ -32,28 +33,45 @@ export const toArray = (res) => {
 export const apiCall = async (endpoint, options = {}) => {
   const url = `/api/webhook${endpoint}`
 
-  const response = await fetch(url, {
+  const fetchOptions = {
+    method: options.method || 'GET',
     headers: {
       'Content-Type': 'application/json',
       'ngrok-skip-browser-warning': '1',
       ...options.headers
     },
     ...options
-  })
-
-  if (!response.ok) {
-    const err = await response.text()
-    throw new Error(err || `Error ${response.status}`)
   }
 
-  const text = await response.text()
-  const clean = text.trim().startsWith('=') ? text.trim().slice(1) : text.trim()
-
-  if (!clean || clean === '1' || clean === '0') return null
+  // ✅ Corregido: stringificar body si es objeto
+  if (fetchOptions.body && typeof fetchOptions.body !== 'string') {
+    fetchOptions.body = JSON.stringify(fetchOptions.body)
+  }
 
   try {
-    return JSON.parse(clean)
-  } catch {
-    return null
+    const response = await fetch(url, fetchOptions)
+
+    if (!response.ok) {
+      let errorMsg = `Error ${response.status}`
+      try {
+        const errText = await response.text()
+        if (errText) errorMsg = errText
+      } catch (_) {}
+      throw new Error(errorMsg)
+    }
+
+    const text = await response.text()
+    const clean = text.trim().startsWith('=') ? text.trim().slice(1) : text.trim()
+
+    if (!clean || clean === '1' || clean === '0') return null
+
+    try {
+      return JSON.parse(clean)
+    } catch {
+      return null
+    }
+  } catch (error) {
+    console.error('API Call Error:', error)
+    throw error
   }
 }
