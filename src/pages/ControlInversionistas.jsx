@@ -246,6 +246,30 @@ const ControlInversionistas = () => {
         bv = b.moneda_codigo || getMonedaNombre(b.moneda, monedas)
       }
 
+      if (sortField === 'naturaleza') {
+        const getTipoPersona = (r) => {
+          const nat = normalize(r.naturaleza)
+          const tipoDoc = normalize(r.tipo_documento)
+          const tipoRuc = normalize(r.tipo_ruc)
+
+          if (
+            nat === 'pj' ||
+            nat.includes('jur') ||
+            tipoDoc === 'ruc' ||
+            tipoDoc === '2' ||
+            tipoRuc === 'pj' ||
+            tipoRuc.includes('jur')
+          ) {
+            return 'persona juridica'
+          }
+
+          return 'persona natural'
+        }
+
+        av = getTipoPersona(a)
+        bv = getTipoPersona(b)
+      }
+
       const an = Number(av)
       const bn = Number(bv)
       let cmp = 0
