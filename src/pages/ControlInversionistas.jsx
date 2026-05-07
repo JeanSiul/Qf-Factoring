@@ -453,11 +453,7 @@ const ControlInversionistas = () => {
       <div className="page-card" style={S.card}>
         <div style={S.stickyTools}>
           <div style={S.cardTitleWrap}>
-            <div>
-              <h2 style={S.cardTitle}>Base de Datos Inversionistas</h2>
-              <p style={S.cardSub}>Listado paginado con búsqueda, ordenamiento y acciones según permisos.</p>
-            </div>
-
+            <h2 style={S.cardTitle}>Base de Datos Inversionistas</h2>
             {canCreate && (
               <button className="btn btn-primary btn-sm" onClick={openCreate} style={S.newBtn}>
                 <span style={{ color: '#4CAF50', fontWeight: 800, fontSize: 16 }}>+</span> Nuevo Registro
@@ -465,7 +461,7 @@ const ControlInversionistas = () => {
             )}
           </div>
 
-        <div style={S.filters}>
+          <div style={S.filters}>
           <select
             className="filter-input"
             value={field}
@@ -827,41 +823,40 @@ const Field = ({ label, children }) => (
 const S = {
   page: { paddingBottom: 12, maxWidth: '100%', overflowX: 'hidden' },
   topHeader: { marginBottom: 6 },
-
   header: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 },
-  headerIcon: { width: 42, height: 42, borderRadius: 12, background: 'var(--qf-navy)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 },
-  title: { fontFamily: 'Montserrat', fontSize: 22, fontWeight: 800, color: 'var(--qf-navy)', marginBottom: 2, marginTop: 0 },
+  headerIcon: { display: 'none' },
+  title: { fontFamily: 'Montserrat', fontSize: 22, fontWeight: 800, color: 'var(--qf-navy)', margin: 0, marginBottom: 2 },
   subtitle: { color: 'var(--qf-text-light)', fontSize: 12, margin: 0 },
-
   actionBar: { display: 'flex', gap: 8, marginBottom: 8 },
+
   kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, marginBottom: 10 },
   kpiCard: { background: '#fff', borderRadius: 10, padding: '8px 12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', minHeight: 56, borderTop: '3px solid var(--qf-navy)' },
   kpiLabel: { fontSize: 8.5, color: 'var(--qf-text-light)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 3 },
-  kpiValue: { marginTop: 0, fontWeight: 850, fontFamily: 'Montserrat', lineHeight: 1.1, fontSize: 19 },
+  kpiValue: { fontWeight: 850, fontFamily: 'Montserrat', lineHeight: 1.1, fontSize: 19, marginTop: 0 },
 
   card: { overflow: 'hidden', padding: 0 },
   stickyTools: { background: '#fff', borderTopLeftRadius: 12, borderTopRightRadius: 12, borderBottom: '1px solid var(--qf-border)' },
-  cardHeader: { display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', padding: '10px 14px 6px' },
+  cardHeader: { display: 'none' },
   cardTitleWrap: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 14px 6px' },
   cardTitle: { margin: 0, fontSize: 16, fontFamily: 'Montserrat', color: 'var(--qf-navy)' },
-  cardSub: { margin: '2px 0 0', color: 'var(--qf-text-light)', fontSize: 11.5 },
+  cardSub: { display: 'none' },
   newBtn: { display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' },
 
-  filters: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '0 14px 6px' },
-  select: { width: 'auto', minWidth: 180, height: 32, fontSize: 12, padding: '0 28px 0 10px' },
+  filters: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '0 14px 6px', margin: 0 },
+  select: { width: 'auto', minWidth: 170, height: 32, fontSize: 12, padding: '0 28px 0 10px' },
   searchWrap: { position: 'relative', flex: 1, maxWidth: 360, minWidth: 220 },
-  searchIcon: { position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5', pointerEvents: 'none' },
-  searchInput: { minWidth: 180, maxWidth: 360, width: '100%', height: 32, fontSize: 12, paddingLeft: 32 },
+  searchIcon: { position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5', pointerEvents: 'none', opacity: 1 },
+  searchInput: { minWidth: 180, maxWidth: 360, height: 32, fontSize: 12, paddingLeft: 32, width: '100%' },
   clearBtn: { fontSize: 11 },
 
-  pagination: { display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', padding: '5px 14px 7px', marginBottom: 0, background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
-  resultPill: { fontSize: 10, fontWeight: 700, color: 'var(--qf-navy)', background: '#e8eef5', borderRadius: 999, padding: '3px 8px', whiteSpace: 'nowrap' },
+  pagination: { display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', padding: '5px 14px 7px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)', margin: 0 },
+  resultPill: { fontSize: 10, fontWeight: 700, color: 'var(--qf-navy)', background: '#e8eef5', borderRadius: 999, padding: '3px 8px', whiteSpace: 'nowrap', border: 'none' },
   pageSize: { width: 'auto', minWidth: 52, height: 28, fontSize: 11, padding: '0 4px' },
   pageIndicator: { fontSize: 11, color: 'var(--qf-text-light)', fontWeight: 600 },
 
   tableWrap: { maxHeight: 'calc(100vh - 340px)', minHeight: 260, overflow: 'auto', width: '100%' },
   table: { width: '100%', tableLayout: 'auto', borderCollapse: 'collapse' },
-  th: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 9, padding: '5px 4px', cursor: 'pointer', userSelect: 'none', background: '#f8fafc', color: 'var(--qf-navy)', borderBottom: '1px solid var(--qf-border)', textTransform: 'uppercase', fontWeight: 800, textAlign: 'left', lineHeight: 1.1 },
+  th: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 9, padding: '5px 4px', cursor: 'pointer', userSelect: 'none', background: 'var(--qf-navy)', color: '#fff', borderBottom: '1px solid var(--qf-navy)', textTransform: 'uppercase', fontWeight: 800, textAlign: 'left', lineHeight: 1.1 },
   tr: { height: 32 },
   td: { padding: '3px 4px', verticalAlign: 'middle', lineHeight: 1.15, borderBottom: '1px solid #eef2f6', fontSize: 10.5 },
   code: { background: '#e8eef5', padding: '1px 4px', borderRadius: 3, fontSize: 9.5, fontWeight: 800, color: 'var(--qf-navy)' },
@@ -876,7 +871,7 @@ const S = {
   actionBtn: { fontSize: 9, padding: '1px 4px' },
   dangerBtn: { fontSize: 9, padding: '1px 4px' },
 
-  footer: { padding: '6px 14px', borderTop: '1px solid var(--qf-border)', fontSize: 10.5, color: 'var(--qf-text-light)', background: '#fff', marginTop: 0 },
+  footer: { padding: '6px 14px', borderTop: '1px solid var(--qf-border)', fontSize: 10.5, color: 'var(--qf-text-light)', background: '#fff', margin: 0 },
   empty: { textAlign: 'center', padding: 40, color: 'var(--qf-text-light)' },
 
   primaryBtn: { background: 'var(--qf-navy)', color: 'white', border: 'none', borderRadius: 8, padding: '7px 12px', fontWeight: 800 },
