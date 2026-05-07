@@ -190,18 +190,42 @@ const ControlInversionistas = () => {
   }
 
   const metrics = useMemo(() => {
+    const esJuridico = (r) => {
+      const nat = normalize(r.naturaleza)
+      const tipoDoc = normalize(r.tipo_documento)
+      const tipoRuc = normalize(r.tipo_ruc)
+      return nat === 'pj'
+        || nat.includes('jur')
+        || tipoDoc === 'ruc'
+        || tipoDoc === '2'
+        || tipoRuc === 'pj'
+        || tipoRuc.includes('jur')
+    }
+
+    const esNatural = (r) => {
+      const nat = normalize(r.naturaleza)
+      const tipoDoc = normalize(r.tipo_documento)
+      const tipoRuc = normalize(r.tipo_ruc)
+      return nat === 'pn'
+        || nat.includes('natural')
+        || tipoDoc === 'dni'
+        || tipoDoc === '1'
+        || tipoRuc === 'pn'
+        || tipoRuc.includes('natural')
+    }
+
+    const naturales = data.filter(esNatural).length
+    const juridicos = data.filter(esJuridico).length
     const activos = data.filter(r => !r.estado || normalize(r.estado) === 'activo').length
     const inactivos = data.filter(r => r.estado && normalize(r.estado) !== 'activo').length
-    const naturales = data.filter(r => normalize(r.naturaleza) === 'pn' || normalize(r.naturaleza).includes('natural')).length
-    const juridicos = data.filter(r => normalize(r.naturaleza) === 'pj' || normalize(r.naturaleza).includes('jur')).length
 
     return [
-      { label: 'Total registros', value: total, color: 'var(--qf-navy)' },
-      { label: 'Mostradas', value: data.length, color: '#185FA5' },
-      { label: 'Naturales', value: naturales, color: '#2e7d32' },
-      { label: 'Jurídicos', value: juridicos, color: '#5e35b1' },
-      { label: 'Activos', value: activos, color: '#4CAF50' },
-      { label: 'Inactivos', value: inactivos, color: '#c62828' },
+      { label: 'Total registros', value: total, color: 'var(--qf-navy)', border: '#2196f3' },
+      { label: 'Mostradas', value: data.length, color: '#185FA5', border: '#03a9f4' },
+      { label: 'Persona natural', value: naturales, color: '#2e7d32', border: '#4caf50' },
+      { label: 'Persona jurídica', value: juridicos, color: '#5e35b1', border: '#7e57c2' },
+      { label: 'Activos', value: activos, color: '#2e7d32', border: '#4caf50' },
+      { label: 'Inactivos', value: inactivos, color: '#c62828', border: '#f44336' },
     ]
   }, [data, total])
 
@@ -443,9 +467,9 @@ const ControlInversionistas = () => {
 
       <div style={S.kpiGrid}>
         {metrics.map(k => (
-          <div key={k.label} style={{ ...S.kpiCard, borderTopColor: k.color }}>
+          <div key={k.label} style={{ ...S.kpiCard, borderTop: `3px solid ${k.border}` }}>
             <div style={S.kpiLabel}>{k.label}</div>
-            <div style={S.kpiValue}>{k.value}</div>
+            <div style={{ ...S.kpiValue, color: k.color }}>{k.value}</div>
           </div>
         ))}
       </div>
@@ -531,7 +555,7 @@ const ControlInversionistas = () => {
                 <Th onClick={() => sortBy('codigo')}>Código {sortIcon('codigo')}</Th>
                 <Th onClick={() => sortBy('tipo_documento')}>Doc. {sortIcon('tipo_documento')}</Th>
                 <Th onClick={() => sortBy('numero_documento')}>Número {sortIcon('numero_documento')}</Th>
-                <Th onClick={() => sortBy('naturaleza')}>Nat. {sortIcon('naturaleza')}</Th>
+                <Th onClick={() => sortBy('naturaleza')}>Tipo Persona {sortIcon('naturaleza')}</Th>
                 <Th onClick={() => sortBy('razon_social')}>Razón Social {sortIcon('razon_social')}</Th>
                 <Th onClick={() => sortBy('nombre')}>Nombre {sortIcon('nombre')}</Th>
                 <Th onClick={() => sortBy('email')}>Email {sortIcon('email')}</Th>
@@ -557,7 +581,7 @@ const ControlInversionistas = () => {
                   <td style={S.td}><code style={S.code}>{row.codigo}</code></td>
                   <td style={S.td}>{getTipoDocumentoLabel(row.tipo_documento)}</td>
                   <td style={S.td}>{row.numero_documento}</td>
-                  <td style={S.td}>{row.naturaleza === 'PN' ? 'Persona Natural' : row.naturaleza === 'PJ' ? 'Persona Jurídica' : row.naturaleza}</td>
+                  <td style={S.td}>{row.naturaleza === 'PN' ? 'Persona Natural' : row.naturaleza === 'PJ' ? 'Persona Jurídica' : (getTipoDocumentoLabel(row.tipo_documento) === 'RUC' ? 'Persona Jurídica' : getTipoDocumentoLabel(row.tipo_documento) === 'DNI' ? 'Persona Natural' : row.naturaleza)}</td>
                   <td style={S.td}>{row.razon_social}</td>
                   <td style={S.td}>{[row.nombre, row.apellido].filter(Boolean).join(' ')}</td>
                   <td style={S.td}>{row.email}</td>
@@ -830,7 +854,7 @@ const S = {
   actionBar: { display: 'flex', gap: 8, marginBottom: 8 },
 
   kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, marginBottom: 10 },
-  kpiCard: { background: '#fff', borderRadius: 10, padding: '8px 12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', minHeight: 56, borderTop: '3px solid var(--qf-navy)' },
+  kpiCard: { background: '#fff', borderRadius: 10, padding: '8px 12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', minHeight: 56 },
   kpiLabel: { fontSize: 8.5, color: 'var(--qf-text-light)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 3 },
   kpiValue: { fontWeight: 850, fontFamily: 'Montserrat', lineHeight: 1.1, fontSize: 19, marginTop: 0 },
 
