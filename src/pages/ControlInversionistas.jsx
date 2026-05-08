@@ -21,6 +21,24 @@ const EMPTY_FORM = {
   cci: '',
   direccion: '',
   estado: 'Activo',
+  condicion: '',
+  ubigeo: '',
+  via_tipo: '',
+  via_nombre: '',
+  zona_codigo: '',
+  zona_tipo: '',
+  numero_direccion: '',
+  interior: '',
+  lote: '',
+  dpto: '',
+  manzana: '',
+  kilometro: '',
+  distrito: '',
+  provincia: '',
+  departamento: '',
+  es_agente_retencion: false,
+  es_buen_contribuyente: false,
+  locales_anexos: '',
 }
 
 const SEARCH_FIELDS = [
@@ -74,10 +92,15 @@ const unwrapPayload = (res) => res?.json ?? res?.data ?? res ?? {}
 const unwrapDocumentPayload = (res) => {
   let payload = unwrapPayload(res)
 
-  // La validacion puede venir directa desde dniruc.apisperu.com/api/v1
+  // La validacion puede venir directa desde proveedores externos
   // o envuelta por el webhook/n8n/backend en { json }, { data }, { result }, etc.
   for (let i = 0; i < 4; i += 1) {
-    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) break
+    if (Array.isArray(payload)) {
+      payload = payload[0] || {}
+      continue
+    }
+
+    if (!payload || typeof payload !== 'object') break
 
     const next = payload.data ?? payload.result ?? payload.results ?? payload.body ?? payload.response
     if (!next || next === payload) break
@@ -85,6 +108,7 @@ const unwrapDocumentPayload = (res) => {
     payload = next
   }
 
+  if (Array.isArray(payload)) return payload[0] || {}
   return payload || {}
 }
 
@@ -94,6 +118,35 @@ const joinNames = (...values) => values
   .map(v => String(v ?? '').trim())
   .filter(Boolean)
   .join(' ')
+
+const normalizeBoolean = (value) => {
+  if (value === true || value === 1) return true
+  const v = normalize(value)
+  return ['true', '1', 'si', 'sí', 'yes'].includes(v)
+}
+
+const formatBoolean = (value) => normalizeBoolean(value) ? 'Sí' : 'No'
+
+const safeDisplay = (value) => {
+  if (value === true || value === false) return formatBoolean(value)
+  if (value === null || value === undefined || value === '') return '—'
+  return String(value)
+}
+
+const safeJsonText = (value) => {
+  if (!value) return ''
+  if (typeof value === 'string') return value
+  try {
+    return JSON.stringify(value)
+  } catch (_) {
+    return String(value)
+  }
+}
+
+const safeApiValue = (value) => {
+  const v = String(value ?? '').trim()
+  return v === '-' ? '' : v
+}
 
 const safeArray = (res) => {
   const payload = unwrapPayload(res)
@@ -378,6 +431,24 @@ const ControlInversionistas = () => {
         cci: row.cci || '',
         direccion: row.direccion || '',
         estado: row.estado || 'Activo',
+        condicion: row.condicion || '',
+        ubigeo: row.ubigeo || '',
+        via_tipo: row.via_tipo || '',
+        via_nombre: row.via_nombre || '',
+        zona_codigo: row.zona_codigo || '',
+        zona_tipo: row.zona_tipo || '',
+        numero_direccion: row.numero_direccion || row.numero || '',
+        interior: row.interior || '',
+        lote: row.lote || '',
+        dpto: row.dpto || '',
+        manzana: row.manzana || '',
+        kilometro: row.kilometro || '',
+        distrito: row.distrito || '',
+        provincia: row.provincia || '',
+        departamento: row.departamento || '',
+        es_agente_retencion: normalizeBoolean(row.es_agente_retencion),
+        es_buen_contribuyente: normalizeBoolean(row.es_buen_contribuyente),
+        locales_anexos: safeJsonText(row.locales_anexos),
       }
     })
   }
@@ -453,6 +524,27 @@ const ControlInversionistas = () => {
       const condicionApi = firstNonEmpty(getField(payload, 'condicion', 'condicion_contribuyente'))
       const estado = estadoApi || condicionApi || 'Activo'
 
+      const sunatFields = {
+        condicion: condicionApi,
+        ubigeo: safeApiValue(getField(payload, 'ubigeo')),
+        via_tipo: safeApiValue(getField(payload, 'via_tipo', 'tipoVia')),
+        via_nombre: safeApiValue(getField(payload, 'via_nombre', 'nombreVia')),
+        zona_codigo: safeApiValue(getField(payload, 'zona_codigo')),
+        zona_tipo: safeApiValue(getField(payload, 'zona_tipo')),
+        numero_direccion: safeApiValue(getField(payload, 'numero')),
+        interior: safeApiValue(getField(payload, 'interior')),
+        lote: safeApiValue(getField(payload, 'lote')),
+        dpto: safeApiValue(getField(payload, 'dpto')),
+        manzana: safeApiValue(getField(payload, 'manzana')),
+        kilometro: safeApiValue(getField(payload, 'kilometro')),
+        distrito: safeApiValue(getField(payload, 'distrito')),
+        provincia: safeApiValue(getField(payload, 'provincia')),
+        departamento: safeApiValue(getField(payload, 'departamento')),
+        es_agente_retencion: normalizeBoolean(getField(payload, 'es_agente_retencion')),
+        es_buen_contribuyente: normalizeBoolean(getField(payload, 'es_buen_contribuyente')),
+        locales_anexos: safeJsonText(getField(payload, 'locales_anexos')),
+      }
+
       setModal(prev => ({
         ...prev,
         form: {
@@ -471,6 +563,24 @@ const ControlInversionistas = () => {
             : '',
           direccion: direccion || prev.form.direccion,
           estado,
+          condicion: sunatFields.condicion || prev.form.condicion,
+          ubigeo: sunatFields.ubigeo || prev.form.ubigeo,
+          via_tipo: sunatFields.via_tipo || prev.form.via_tipo,
+          via_nombre: sunatFields.via_nombre || prev.form.via_nombre,
+          zona_codigo: sunatFields.zona_codigo || prev.form.zona_codigo,
+          zona_tipo: sunatFields.zona_tipo || prev.form.zona_tipo,
+          numero_direccion: sunatFields.numero_direccion || prev.form.numero_direccion,
+          interior: sunatFields.interior || prev.form.interior,
+          lote: sunatFields.lote || prev.form.lote,
+          dpto: sunatFields.dpto || prev.form.dpto,
+          manzana: sunatFields.manzana || prev.form.manzana,
+          kilometro: sunatFields.kilometro || prev.form.kilometro,
+          distrito: sunatFields.distrito || prev.form.distrito,
+          provincia: sunatFields.provincia || prev.form.provincia,
+          departamento: sunatFields.departamento || prev.form.departamento,
+          es_agente_retencion: sunatFields.es_agente_retencion,
+          es_buen_contribuyente: sunatFields.es_buen_contribuyente,
+          locales_anexos: sunatFields.locales_anexos || prev.form.locales_anexos,
         }
       }))
 
@@ -804,13 +914,31 @@ const DetailModal = ({ row, bancos, monedas, onClose }) => {
     ['CCI', row.cci],
     ['Dirección', row.direccion],
     ['Estado', row.estado || 'Activo'],
+    ['Condición SUNAT', row.condicion],
+    ['Ubigeo', row.ubigeo],
+    ['Departamento', row.departamento],
+    ['Provincia', row.provincia],
+    ['Distrito', row.distrito],
+    ['Tipo vía', row.via_tipo],
+    ['Nombre vía', row.via_nombre],
+    ['Número dirección', row.numero_direccion || row.numero],
+    ['Zona código', row.zona_codigo],
+    ['Zona tipo', row.zona_tipo],
+    ['Interior', row.interior],
+    ['Lote', row.lote],
+    ['Dpto.', row.dpto],
+    ['Manzana', row.manzana],
+    ['Kilómetro', row.kilometro],
+    ['Agente retención', formatBoolean(row.es_agente_retencion)],
+    ['Buen contribuyente', formatBoolean(row.es_buen_contribuyente)],
+    ['Locales anexos', safeJsonText(row.locales_anexos)],
     ['Creado', row.created_at],
     ['Actualizado', row.updated_at],
   ]
 
   return (
     <div className="modal-overlay" style={S.modalOverlay}>
-      <div className="modal" style={S.modal}>
+      <div className="modal" style={{ ...S.modal, overflowY: 'auto' }}>
         <div style={S.modalHeader}>
           <h2 style={S.modalTitle}>Detalle de Inversionista</h2>
           <button className="modal-close" onClick={onClose}>x</button>
@@ -820,7 +948,7 @@ const DetailModal = ({ row, bancos, monedas, onClose }) => {
           {fields.map(([label, value]) => (
             <div key={label} style={S.detailBox}>
               <div style={S.detailLabel}>{label}</div>
-              <div style={S.detailValue}>{value || '—'}</div>
+              <div style={S.detailValue}>{safeDisplay(value)}</div>
             </div>
           ))}
         </div>
@@ -835,7 +963,7 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
 
   return (
     <div className="modal-overlay" style={S.modalOverlay}>
-      <div className="modal" style={{ ...S.modal, maxWidth: 980 }}>
+      <div className="modal" style={{ ...S.modal, maxWidth: 980, overflowY: 'auto' }}>
         <div style={S.modalHeader}>
           <h2 style={S.modalTitle}>{isEdit ? 'Modificar Inversionista' : 'Crear Inversionista'}</h2>
           <button className="modal-close" onClick={onClose}>x</button>
@@ -966,6 +1094,98 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
           </Field>
         </div>
 
+        <SectionTitle>Datos SUNAT / ubicación fiscal</SectionTitle>
+
+        <div style={S.formGrid4}>
+          <Field label="Condición SUNAT">
+            <input className="form-control" value={form.condicion || ''} onChange={e => onChange('condicion', e.target.value)} style={S.input} />
+          </Field>
+
+          <Field label="Ubigeo">
+            <input className="form-control" value={form.ubigeo || ''} onChange={e => onChange('ubigeo', e.target.value)} style={S.input} />
+          </Field>
+
+          <Field label="Departamento">
+            <input className="form-control" value={form.departamento || ''} onChange={e => onChange('departamento', e.target.value)} style={S.input} />
+          </Field>
+
+          <Field label="Provincia">
+            <input className="form-control" value={form.provincia || ''} onChange={e => onChange('provincia', e.target.value)} style={S.input} />
+          </Field>
+        </div>
+
+        <div style={S.formGrid4}>
+          <Field label="Distrito">
+            <input className="form-control" value={form.distrito || ''} onChange={e => onChange('distrito', e.target.value)} style={S.input} />
+          </Field>
+
+          <Field label="Tipo vía">
+            <input className="form-control" value={form.via_tipo || ''} onChange={e => onChange('via_tipo', e.target.value)} style={S.input} />
+          </Field>
+
+          <Field label="Nombre vía">
+            <input className="form-control" value={form.via_nombre || ''} onChange={e => onChange('via_nombre', e.target.value)} style={S.input} />
+          </Field>
+
+          <Field label="Número dirección">
+            <input className="form-control" value={form.numero_direccion || ''} onChange={e => onChange('numero_direccion', e.target.value)} style={S.input} />
+          </Field>
+        </div>
+
+        <div style={S.formGrid4}>
+          <Field label="Zona código">
+            <input className="form-control" value={form.zona_codigo || ''} onChange={e => onChange('zona_codigo', e.target.value)} style={S.input} />
+          </Field>
+
+          <Field label="Zona tipo">
+            <input className="form-control" value={form.zona_tipo || ''} onChange={e => onChange('zona_tipo', e.target.value)} style={S.input} />
+          </Field>
+
+          <Field label="Interior">
+            <input className="form-control" value={form.interior || ''} onChange={e => onChange('interior', e.target.value)} style={S.input} />
+          </Field>
+
+          <Field label="Lote">
+            <input className="form-control" value={form.lote || ''} onChange={e => onChange('lote', e.target.value)} style={S.input} />
+          </Field>
+        </div>
+
+        <div style={S.formGrid4}>
+          <Field label="Dpto.">
+            <input className="form-control" value={form.dpto || ''} onChange={e => onChange('dpto', e.target.value)} style={S.input} />
+          </Field>
+
+          <Field label="Manzana">
+            <input className="form-control" value={form.manzana || ''} onChange={e => onChange('manzana', e.target.value)} style={S.input} />
+          </Field>
+
+          <Field label="Kilómetro">
+            <input className="form-control" value={form.kilometro || ''} onChange={e => onChange('kilometro', e.target.value)} style={S.input} />
+          </Field>
+
+          <Field label="Agente retención">
+            <select className="form-control" value={form.es_agente_retencion ? '1' : '0'} onChange={e => onChange('es_agente_retencion', e.target.value === '1')} style={S.input}>
+              <option value="0">No</option>
+              <option value="1">Sí</option>
+            </select>
+          </Field>
+        </div>
+
+        <div style={S.formGrid4}>
+          <Field label="Buen contribuyente">
+            <select className="form-control" value={form.es_buen_contribuyente ? '1' : '0'} onChange={e => onChange('es_buen_contribuyente', e.target.value === '1')} style={S.input}>
+              <option value="0">No</option>
+              <option value="1">Sí</option>
+            </select>
+          </Field>
+        </div>
+
+        <div style={S.singleFieldWrap}>
+          <Field label="Locales anexos">
+            <textarea className="form-control" value={form.locales_anexos || ''} onChange={e => onChange('locales_anexos', e.target.value)} style={S.textarea} />
+          </Field>
+        </div>
+
         <div style={S.modalActions}>
           <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
           <button className="btn btn-primary" disabled={saving} onClick={onSave}>
@@ -976,6 +1196,10 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
     </div>
   )
 }
+
+const SectionTitle = ({ children }) => (
+  <div style={S.sectionTitle}>{children}</div>
+)
 
 const Field = ({ label, children }) => (
   <label style={S.field}>
@@ -1057,7 +1281,9 @@ const S = {
   field: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 },
   singleFieldWrap: { padding: '0 18px' },
   fieldLabel: { fontSize: 9, textTransform: 'uppercase', color: 'var(--qf-text-light)', fontWeight: 700 },
+  sectionTitle: { margin: '8px 18px 10px', paddingTop: 10, borderTop: '1px solid var(--qf-border)', fontFamily: 'Montserrat', fontSize: 13, fontWeight: 800, color: 'var(--qf-navy)' },
   input: { height: 34, fontSize: 12, borderRadius: 6, border: '1px solid var(--qf-border)', padding: '0 8px', width: '100%' },
+  textarea: { minHeight: 58, fontSize: 12, borderRadius: 6, border: '1px solid var(--qf-border)', padding: '8px', width: '100%', resize: 'vertical' },
   modalActions: { display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12, padding: '12px 18px', borderTop: '1px solid var(--qf-border)' },
 }
 
