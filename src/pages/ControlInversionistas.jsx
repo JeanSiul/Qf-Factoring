@@ -71,6 +71,30 @@ const getField = (obj, ...keys) => {
 
 const unwrapPayload = (res) => res?.json ?? res?.data ?? res ?? {}
 
+const unwrapDocumentPayload = (res) => {
+  let payload = unwrapPayload(res)
+
+  // La validacion puede venir directa desde dniruc.apisperu.com/api/v1
+  // o envuelta por el webhook/n8n/backend en { json }, { data }, { result }, etc.
+  for (let i = 0; i < 4; i += 1) {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) break
+
+    const next = payload.data ?? payload.result ?? payload.results ?? payload.body ?? payload.response
+    if (!next || next === payload) break
+
+    payload = next
+  }
+
+  return payload || {}
+}
+
+const firstNonEmpty = (...values) => values.find(v => String(v ?? '').trim() !== '') || ''
+
+const joinNames = (...values) => values
+  .map(v => String(v ?? '').trim())
+  .filter(Boolean)
+  .join(' ')
+
 const safeArray = (res) => {
   const payload = unwrapPayload(res)
 
@@ -387,14 +411,47 @@ const ControlInversionistas = () => {
       })
 
       const res = await apiCall(`${API_BASE}/validar-documento?${params.toString()}`)
-      const payload = unwrapPayload(res)
+      const payload = unwrapDocumentPayload(res)
 
-      const razonSocial = getField(payload, 'razon_social', 'razonSocial', 'nombre_o_razon_social', 'nombreORazonSocial', 'nombre_razon_social', 'nombre')
-      const nombres = getField(payload, 'nombres', 'nombre', 'preNombres')
-      const apellidos = getField(payload, 'apellidos', 'apellido', 'apellido_paterno', 'apellidoPaterno')
-      const apellidoMaterno = getField(payload, 'apellido_materno', 'apellidoMaterno')
-      const direccion = getField(payload, 'direccion', 'domicilio', 'direccion_completa')
-      const estado = getField(payload, 'estado', 'estado_contribuyente', 'condicion', 'status') || 'Activo'
+      const apiMessage = getField(payload, 'message', 'mensaje', 'error', 'errors')
+      const success = getField(payload, 'success', 'ok')
+
+      if (success === false || success === 'false') {
+        throw new Error(apiMessage || 'El API no encontró información para el documento.')
+      }
+
+      const razonSocial = firstNonEmpty(
+        getField(payload, 'razon_social', 'razonSocial', 'nombre_o_razon_social', 'nombreORazonSocial', 'nombre_razon_social'),
+        tipo_documento === 'RUC' ? getField(payload, 'nombre') : ''
+      )
+
+      const nombres = firstNonEmpty(
+        getField(payload, 'nombres', 'preNombres'),
+        tipo_documento === 'DNI' ? getField(payload, 'nombre') : ''
+      )
+
+      const apellidoPaterno = getField(payload, 'apellido_paterno', 'apellidoPaterno', 'apePaterno')
+      const apellidoMaterno = getField(payload, 'apellido_materno', 'apellidoMaterno', 'apeMaterno')
+      const apellidos = firstNonEmpty(
+        joinNames(apellidoPaterno, apellidoMaterno),
+        getField(payload, 'apellidos', 'apellido')
+      )
+
+      const direccion = firstNonEmpty(
+        getField(payload, 'direccion', 'domicilio', 'direccion_completa', 'direccionCompleta'),
+        joinNames(
+          getField(payload, 'tipoVia'),
+          getField(payload, 'nombreVia'),
+          getField(payload, 'numero'),
+          getField(payload, 'distrito'),
+          getField(payload, 'provincia'),
+          getField(payload, 'departamento')
+        )
+      )
+
+      const estadoApi = firstNonEmpty(getField(payload, 'estado', 'estado_contribuyente', 'status'))
+      const condicionApi = firstNonEmpty(getField(payload, 'condicion', 'condicion_contribuyente'))
+      const estado = estadoApi || condicionApi || 'Activo'
 
       setModal(prev => ({
         ...prev,
@@ -403,9 +460,15 @@ const ControlInversionistas = () => {
           numero_documento: numero,
           tipo_documento,
           naturaleza,
-          razon_social: naturaleza === 'PJ' ? (razonSocial || prev.form.razon_social) : (razonSocial && tipo_documento === 'RUC' ? razonSocial : prev.form.razon_social),
-          nombre: naturaleza === 'PN' ? (nombres || prev.form.nombre) : '',
-          apellido: naturaleza === 'PN' ? (`${apellidos || ''} ${apellidoMaterno || ''}`.trim() || prev.form.apellido) : '',
+          razon_social: naturaleza === 'PJ' || tipo_documento === 'RUC'
+            ? (razonSocial || prev.form.razon_social)
+            : prev.form.razon_social,
+          nombre: naturaleza === 'PN'
+            ? (nombres || (tipo_documento === 'RUC' ? razonSocial : '') || prev.form.nombre)
+            : '',
+          apellido: naturaleza === 'PN'
+            ? (apellidos || prev.form.apellido)
+            : '',
           direccion: direccion || prev.form.direccion,
           estado,
         }
@@ -652,7 +715,7 @@ const ControlInversionistas = () => {
                   <td style={S.td}><code style={S.code}>{row.codigo}</code></td>
                   <td style={S.td}>{getTipoDocumentoLabel(row.tipo_documento)}</td>
                   <td style={S.td}>{row.numero_documento}</td>
-                  <td style={S.td}>{row.naturaleza === 'PN' ? 'Persona Natural' : row.naturaleza === 'PJ' ? 'Persona Jurídica' : (getTipoDocumentoLabel(row.tipo_documento) === 'RUC' ? 'Persona Jurídica' : getTipoDocumentoLabel(row.tipo_documento) === 'DNI' ? 'Persona Natural' : row.naturaleza)}</td>
+                  <td style={S.td}>{row.naturaleza === 'PN' ? 'Persona Natural' : row.naturaleza === 'PJ' ? 'Persona Jurídica' : (String(row.numero_documento || '').startsWith('20') ? 'Persona Jurídica' : getTipoDocumentoLabel(row.tipo_documento) === 'DNI' || getTipoDocumentoLabel(row.tipo_documento) === 'RUC' ? 'Persona Natural' : row.naturaleza)}</td>
                   <td style={S.td}>{row.razon_social}</td>
                   <td style={S.td}>{[row.nombre, row.apellido].filter(Boolean).join(' ')}</td>
                   <td style={S.td}>{row.email}</td>
