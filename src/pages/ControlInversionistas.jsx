@@ -87,7 +87,19 @@ const getField = (obj, ...keys) => {
   return ''
 }
 
-const unwrapPayload = (res) => res?.json ?? res?.data ?? res ?? {}
+const parseMaybeJson = (value) => {
+  if (typeof value !== 'string') return value
+  const text = value.trim()
+  if (!text) return value
+  if (!text.startsWith('{') && !text.startsWith('[')) return value
+  try {
+    return JSON.parse(text)
+  } catch (_) {
+    return value
+  }
+}
+
+const unwrapPayload = (res) => parseMaybeJson(res?.json ?? res?.data ?? res ?? {})
 
 const unwrapDocumentPayload = (res) => {
   let payload = unwrapPayload(res)
@@ -192,16 +204,41 @@ const pickDocumentField = (payload, rawResponse, ...keys) => {
 const safeDocumentValue = (payload, rawResponse, ...keys) => safeApiValue(pickDocumentField(payload, rawResponse, ...keys))
 
 const safeArray = (res) => {
-  const payload = unwrapPayload(res)
+  let payload = unwrapPayload(res)
 
+  // Soporta respuestas de n8n/Vercel como:
+  // [...], "[...]", { json: [...] }, { data: [...] }, { body: "[...]" }, etc.
+  for (let i = 0; i < 8; i += 1) {
+    payload = parseMaybeJson(payload)
+
+    if (Array.isArray(payload)) return payload
+
+    if (!payload || typeof payload !== 'object') break
+
+    const candidates = [
+      payload.json,
+      payload.data,
+      payload.rows,
+      payload.items,
+      payload.result,
+      payload.results,
+      payload.bancos,
+      payload.monedas,
+      payload.body,
+      payload.response,
+    ]
+
+    const arr = candidates.find(v => Array.isArray(parseMaybeJson(v)))
+    if (arr) return parseMaybeJson(arr)
+
+    const next = candidates.find(v => v !== undefined && v !== null && v !== payload)
+    if (!next) break
+    payload = next
+  }
+
+  payload = parseMaybeJson(payload)
   if (Array.isArray(payload)) return payload
-  if (Array.isArray(payload?.data)) return payload.data
-  if (Array.isArray(payload?.rows)) return payload.rows
-  if (Array.isArray(payload?.items)) return payload.items
-  if (Array.isArray(payload?.result)) return payload.result
-  if (Array.isArray(payload?.results)) return payload.results
-  if (Array.isArray(payload?.bancos)) return payload.bancos
-  if (Array.isArray(payload?.monedas)) return payload.monedas
+  if (payload && typeof payload === 'object') return [payload]
 
   return toArray ? toArray(payload) : []
 }
@@ -209,7 +246,7 @@ const safeArray = (res) => {
 const getBancoId = (b) => getField(b, 'id', 'ID', 'banco_id', 'BANCO_ID', 'codigo', 'CODIGO', 'value', 'Value')
 const getBancoLabel = (b) => getField(b, 'name', 'nombre', 'Name', 'NOMBRE', 'descripcion', 'DESCRIPCION', 'label', 'Label', 'VALORTEXTO', 'valortexto')
 const getMonedaId = (m) => getField(m, 'ID', 'id', 'moneda_id', 'MONEDA_ID', 'codigo', 'CODIGO', 'value', 'Value')
-const getMonedaLabel = (m) => getField(m, 'CODIGO', 'codigo', 'simbolo', 'SIMBOLO', 'DESCRIPCION', 'descripcion', 'nombre', 'NOMBRE', 'VALORTEXTO', 'valortexto', 'label', 'Label')
+const getMonedaLabel = (m) => getField(m, 'CODIGO', 'codigo', 'VALORTEXTO1', 'valortexto1', 'simbolo', 'SIMBOLO', 'DESCRIPCION', 'descripcion', 'nombre', 'NOMBRE', 'VALORTEXTO', 'valortexto', 'label', 'Label')
 
 const getBancoNombre = (bancoId, bancos) => {
   const item = bancos.find(b => String(getBancoId(b)) === String(bancoId))
