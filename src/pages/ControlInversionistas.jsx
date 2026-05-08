@@ -92,9 +92,9 @@ const unwrapPayload = (res) => res?.json ?? res?.data ?? res ?? {}
 const unwrapDocumentPayload = (res) => {
   let payload = unwrapPayload(res)
 
-  // La validacion puede venir directa desde proveedores externos
-  // o envuelta por el webhook/n8n/backend en { json }, { data }, { result }, etc.
-  for (let i = 0; i < 4; i += 1) {
+  // Soporta respuestas directas, arrays de Decolecta: [{...}], y envolturas tipo
+  // { json }, { data }, { result }, { results }, { body }, { response }.
+  for (let i = 0; i < 8; i += 1) {
     if (Array.isArray(payload)) {
       payload = payload[0] || {}
       continue
@@ -102,14 +102,13 @@ const unwrapDocumentPayload = (res) => {
 
     if (!payload || typeof payload !== 'object') break
 
-    const next = payload.data ?? payload.result ?? payload.results ?? payload.body ?? payload.response
+    const next = payload.json ?? payload.data ?? payload.result ?? payload.results ?? payload.body ?? payload.response
     if (!next || next === payload) break
 
     payload = next
   }
 
-  if (Array.isArray(payload)) return payload[0] || {}
-  return payload || {}
+  return Array.isArray(payload) ? (payload[0] || {}) : (payload || {})
 }
 
 const firstNonEmpty = (...values) => values.find(v => String(v ?? '').trim() !== '') || ''
@@ -497,12 +496,12 @@ const ControlInversionistas = () => {
       )
 
       const nombres = firstNonEmpty(
-        getField(payload, 'nombres', 'preNombres'),
-        tipo_documento === 'DNI' ? getField(payload, 'nombre') : ''
+        getField(payload, 'nombres', 'preNombres', 'first_name'),
+        tipo_documento === 'DNI' ? getField(payload, 'nombre', 'full_name') : ''
       )
 
-      const apellidoPaterno = getField(payload, 'apellido_paterno', 'apellidoPaterno', 'apePaterno')
-      const apellidoMaterno = getField(payload, 'apellido_materno', 'apellidoMaterno', 'apeMaterno')
+      const apellidoPaterno = getField(payload, 'apellido_paterno', 'apellidoPaterno', 'apePaterno', 'first_last_name')
+      const apellidoMaterno = getField(payload, 'apellido_materno', 'apellidoMaterno', 'apeMaterno', 'second_last_name')
       const apellidos = firstNonEmpty(
         joinNames(apellidoPaterno, apellidoMaterno),
         getField(payload, 'apellidos', 'apellido')
@@ -524,6 +523,23 @@ const ControlInversionistas = () => {
       const condicionApi = firstNonEmpty(getField(payload, 'condicion', 'condicion_contribuyente'))
       const estado = estadoApi || condicionApi || 'Activo'
 
+      const ubigeoApi = getField(payload, 'ubigeo')
+      const viaTipoApi = getField(payload, 'via_tipo', 'tipoVia')
+      const viaNombreApi = getField(payload, 'via_nombre', 'nombreVia')
+      const zonaCodigoApi = getField(payload, 'zona_codigo')
+      const zonaTipoApi = getField(payload, 'zona_tipo')
+      const numeroDireccionApi = getField(payload, 'numero_direccion', 'numero')
+      const interiorApi = getField(payload, 'interior')
+      const loteApi = getField(payload, 'lote')
+      const dptoApi = getField(payload, 'dpto')
+      const manzanaApi = getField(payload, 'manzana')
+      const kilometroApi = getField(payload, 'kilometro')
+      const distritoApi = getField(payload, 'distrito')
+      const provinciaApi = getField(payload, 'provincia')
+      const departamentoApi = getField(payload, 'departamento')
+      const esAgenteRetencionApi = Boolean(getField(payload, 'es_agente_retencion'))
+      const esBuenContribuyenteApi = Boolean(getField(payload, 'es_buen_contribuyente'))
+
       const sunatFields = {
         condicion: condicionApi,
         ubigeo: safeApiValue(getField(payload, 'ubigeo')),
@@ -531,7 +547,7 @@ const ControlInversionistas = () => {
         via_nombre: safeApiValue(getField(payload, 'via_nombre', 'nombreVia')),
         zona_codigo: safeApiValue(getField(payload, 'zona_codigo')),
         zona_tipo: safeApiValue(getField(payload, 'zona_tipo')),
-        numero_direccion: safeApiValue(getField(payload, 'numero')),
+        numero_direccion: safeApiValue(getField(payload, 'numero_direccion', 'numero')),
         interior: safeApiValue(getField(payload, 'interior')),
         lote: safeApiValue(getField(payload, 'lote')),
         dpto: safeApiValue(getField(payload, 'dpto')),
@@ -1018,7 +1034,9 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
           <Field label="Estado">
             <select className="form-control" value={form.estado || 'Activo'} onChange={e => onChange('estado', e.target.value)} style={S.input}>
               <option value="Activo">Activo</option>
+              <option value="ACTIVO">ACTIVO</option>
               <option value="Inactivo">Inactivo</option>
+              <option value="INACTIVO">INACTIVO</option>
               <option value="Pendiente">Pendiente</option>
             </select>
           </Field>
