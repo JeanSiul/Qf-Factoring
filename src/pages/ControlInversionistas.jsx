@@ -55,30 +55,6 @@ const normalizeTipoDocumento = (value) => {
   return 'DNI'
 }
 
-
-const inferDocument = (value) => {
-  const numero = String(value || '').replace(/\D/g, '').slice(0, 11)
-  const tipo_documento = numero.length === 11 ? 'RUC' : 'DNI'
-  const naturaleza = numero.length === 11 && numero.startsWith('20') ? 'PJ' : 'PN'
-  return { numero, tipo_documento, naturaleza }
-}
-
-const normalizeEstado = (payload, fallback = 'Activo') => {
-  const estado = getField(payload, 'estado', 'estado_contribuyente', 'condicion', 'status')
-  if (!estado) return fallback || 'Activo'
-  const value = String(estado).trim()
-  if (!value) return fallback || 'Activo'
-  if (normalize(value).includes('activo') || normalize(value).includes('habido')) return 'Activo'
-  return value
-}
-
-const firstNonEmpty = (...values) => {
-  for (const value of values) {
-    if (value !== undefined && value !== null && String(value).trim() !== '') return String(value).trim()
-  }
-  return ''
-}
-
 const getBit = (value, index) => String(value || '00000000000')[index] === '1'
 
 const getField = (obj, ...keys) => {
@@ -93,36 +69,27 @@ const getField = (obj, ...keys) => {
   return ''
 }
 
+const unwrapPayload = (res) => res?.json ?? res?.data ?? res ?? {}
+
 const safeArray = (res) => {
-  const payload = res?.json || res
+  const payload = unwrapPayload(res)
+
   if (Array.isArray(payload)) return payload
   if (Array.isArray(payload?.data)) return payload.data
   if (Array.isArray(payload?.rows)) return payload.rows
   if (Array.isArray(payload?.items)) return payload.items
   if (Array.isArray(payload?.result)) return payload.result
   if (Array.isArray(payload?.results)) return payload.results
-  if (Array.isArray(payload?.data?.rows)) return payload.data.rows
-  if (Array.isArray(payload?.data?.items)) return payload.data.items
+  if (Array.isArray(payload?.bancos)) return payload.bancos
+  if (Array.isArray(payload?.monedas)) return payload.monedas
+
   return toArray ? toArray(payload) : []
 }
 
 const getBancoId = (b) => getField(b, 'id', 'ID', 'banco_id', 'BANCO_ID', 'codigo', 'CODIGO', 'value', 'Value')
-const getBancoLabel = (b) => getField(b, 'name', 'nombre', 'Name', 'NOMBRE', 'descripcion', 'DESCRIPCION', 'label', 'Label', 'valorTexto', 'VALORTEXTO')
+const getBancoLabel = (b) => getField(b, 'name', 'nombre', 'Name', 'NOMBRE', 'descripcion', 'DESCRIPCION', 'label', 'Label', 'VALORTEXTO', 'valortexto')
 const getMonedaId = (m) => getField(m, 'ID', 'id', 'moneda_id', 'MONEDA_ID', 'codigo', 'CODIGO', 'value', 'Value')
-const getMonedaLabel = (m) => firstNonEmpty(
-  getField(m, 'CODIGO', 'codigo', 'simbolo', 'SIMBOLO'),
-  getField(m, 'DESCRIPCION', 'descripcion', 'nombre', 'NOMBRE', 'VALORTEXTO', 'valortexto', 'label', 'Label')
-)
-
-const uniqueByValue = (rows, getValue) => {
-  const seen = new Set()
-  return rows.filter(row => {
-    const value = String(getValue(row) || '').trim()
-    if (!value || seen.has(value)) return false
-    seen.add(value)
-    return true
-  })
-}
+const getMonedaLabel = (m) => getField(m, 'CODIGO', 'codigo', 'simbolo', 'SIMBOLO', 'DESCRIPCION', 'descripcion', 'nombre', 'NOMBRE', 'VALORTEXTO', 'valortexto', 'label', 'Label')
 
 const getBancoNombre = (bancoId, bancos) => {
   const item = bancos.find(b => String(getBancoId(b)) === String(bancoId))
@@ -133,6 +100,15 @@ const getMonedaNombre = (monedaId, monedas) => {
   const item = monedas.find(m => String(getMonedaId(m)) === String(monedaId))
   return item ? getMonedaLabel(item) : ''
 }
+
+const inferDocumentInfo = (value) => {
+  const numero = String(value || '').replace(/\D/g, '').slice(0, 11)
+  const tipo_documento = numero.length === 11 ? 'RUC' : 'DNI'
+  const naturaleza = tipo_documento === 'RUC' && numero.startsWith('20') ? 'PJ' : 'PN'
+  return { numero, tipo_documento, naturaleza }
+}
+
+const getNaturalezaLabel = (value) => value === 'PJ' ? 'Persona Jurídica' : 'Persona Natural'
 
 const normalize = (v) => String(v ?? '').toLowerCase().trim()
 
@@ -197,14 +173,8 @@ const ControlInversionistas = () => {
         apiCall(`${API_BASE}/monedas`),
       ])
 
-      const banks = uniqueByValue(
-        safeArray(banksRes).filter(b => getBancoId(b) && getBancoLabel(b)),
-        getBancoId
-      )
-      const mons = uniqueByValue(
-        safeArray(monedasRes).filter(m => getMonedaId(m) && getMonedaLabel(m)),
-        getMonedaId
-      )
+      const banks = safeArray(banksRes).filter(b => getBancoId(b) && getBancoLabel(b))
+      const mons = safeArray(monedasRes).filter(m => getMonedaId(m) && getMonedaLabel(m))
 
       setBancos(banks)
       setMonedas(mons)
@@ -389,7 +359,7 @@ const ControlInversionistas = () => {
   }
 
   const validateDocument = async () => {
-    const { numero, tipo_documento, naturaleza } = inferDocument(modal.form.numero_documento)
+    const { numero, tipo_documento, naturaleza } = inferDocumentInfo(modal.form.numero_documento)
 
     if (!numero) {
       setError('Ingrese un DNI/RUC para validar.')
@@ -414,21 +384,17 @@ const ControlInversionistas = () => {
         tipo_documento,
         nro_documento: numero,
         numero_documento: numero,
-        documento: numero,
       })
 
       const res = await apiCall(`${API_BASE}/validar-documento?${params.toString()}`)
-      const payload = res?.json?.data || res?.json || res?.data || res || {}
+      const payload = unwrapPayload(res)
 
-      const razonSocial = firstNonEmpty(
-        getField(payload, 'razon_social', 'razonSocial', 'nombre_o_razon_social', 'nombreORazonSocial', 'nombre_completo', 'nombreCompleto'),
-        naturaleza === 'PJ' ? getField(payload, 'nombre', 'nombres') : ''
-      )
-      const nombre = firstNonEmpty(getField(payload, 'nombre', 'nombres'), naturaleza === 'PN' ? razonSocial : '')
-      const apellido = firstNonEmpty(
-        getField(payload, 'apellido', 'apellidos'),
-        `${getField(payload, 'apellido_paterno', 'apellidoPaterno')} ${getField(payload, 'apellido_materno', 'apellidoMaterno')}`.trim()
-      )
+      const razonSocial = getField(payload, 'razon_social', 'razonSocial', 'nombre_o_razon_social', 'nombreORazonSocial', 'nombre_razon_social', 'nombre')
+      const nombres = getField(payload, 'nombres', 'nombre', 'preNombres')
+      const apellidos = getField(payload, 'apellidos', 'apellido', 'apellido_paterno', 'apellidoPaterno')
+      const apellidoMaterno = getField(payload, 'apellido_materno', 'apellidoMaterno')
+      const direccion = getField(payload, 'direccion', 'domicilio', 'direccion_completa')
+      const estado = getField(payload, 'estado', 'estado_contribuyente', 'condicion', 'status') || 'Activo'
 
       setModal(prev => ({
         ...prev,
@@ -437,20 +403,26 @@ const ControlInversionistas = () => {
           numero_documento: numero,
           tipo_documento,
           naturaleza,
-          razon_social: naturaleza === 'PJ' ? (razonSocial || prev.form.razon_social) : '',
-          nombre: naturaleza === 'PN' ? (nombre || prev.form.nombre) : '',
-          apellido: naturaleza === 'PN' ? (apellido || prev.form.apellido) : '',
-          direccion: firstNonEmpty(getField(payload, 'direccion', 'domicilio_fiscal', 'direccionFiscal'), prev.form.direccion),
-          estado: normalizeEstado(payload, prev.form.estado),
+          razon_social: naturaleza === 'PJ' ? (razonSocial || prev.form.razon_social) : (razonSocial && tipo_documento === 'RUC' ? razonSocial : prev.form.razon_social),
+          nombre: naturaleza === 'PN' ? (nombres || prev.form.nombre) : '',
+          apellido: naturaleza === 'PN' ? (`${apellidos || ''} ${apellidoMaterno || ''}`.trim() || prev.form.apellido) : '',
+          direccion: direccion || prev.form.direccion,
+          estado,
         }
       }))
 
       if (modal.mode === 'create') {
         const codeRes = await apiCall(`${API_BASE}/siguiente-codigo?naturaleza=${naturaleza}`)
-        setModal(prev => ({ ...prev, form: { ...prev.form, codigo: codeRes?.codigo || prev.form.codigo } }))
+        setModal(prev => ({
+          ...prev,
+          form: {
+            ...prev.form,
+            codigo: codeRes?.codigo || codeRes?.data?.codigo || prev.form.codigo,
+          }
+        }))
       }
     } catch (err) {
-      setError(err?.message || 'No se pudo validar el documento.')
+      setError(err?.message || 'No se pudo validar el documento contra el API.')
     } finally {
       setSaving(false)
     }
@@ -458,24 +430,21 @@ const ControlInversionistas = () => {
 
   const handleFormChange = async (name, value) => {
     if (name === 'numero_documento') {
-      const inferred = inferDocument(value)
+      const info = inferDocumentInfo(value)
       setModal(prev => ({
         ...prev,
         form: {
           ...prev.form,
-          numero_documento: inferred.numero,
-          tipo_documento: inferred.tipo_documento,
-          naturaleza: inferred.naturaleza,
-          razon_social: inferred.naturaleza === 'PJ' ? prev.form.razon_social : '',
-          nombre: inferred.naturaleza === 'PN' ? prev.form.nombre : '',
-          apellido: inferred.naturaleza === 'PN' ? prev.form.apellido : '',
+          numero_documento: info.numero,
+          tipo_documento: info.tipo_documento,
+          naturaleza: info.naturaleza,
         }
       }))
 
-      if (modal.mode === 'create' && inferred.numero.length === 11) {
+      if (modal.mode === 'create' && info.numero.length >= 8) {
         try {
-          const res = await apiCall(`${API_BASE}/siguiente-codigo?naturaleza=${inferred.naturaleza}`)
-          setModal(prev => ({ ...prev, form: { ...prev.form, codigo: res?.codigo || prev.form.codigo } }))
+          const res = await apiCall(`${API_BASE}/siguiente-codigo?naturaleza=${info.naturaleza}`)
+          setModal(prev => ({ ...prev, form: { ...prev.form, codigo: res?.codigo || res?.data?.codigo || prev.form.codigo } }))
         } catch (_) {}
       }
       return
@@ -488,11 +457,9 @@ const ControlInversionistas = () => {
     if (!form.codigo) return 'El código es obligatorio.'
     if (!form.tipo_documento) return 'El tipo de documento es obligatorio.'
     if (!form.numero_documento) return 'El número de documento es obligatorio.'
-    const inferred = inferDocument(form.numero_documento)
-    if (inferred.tipo_documento === 'DNI' && inferred.numero.length !== 8) return 'El DNI debe tener 8 dígitos.'
-    if (inferred.tipo_documento === 'RUC' && inferred.numero.length !== 11) return 'El RUC debe tener 11 dígitos.'
-    if (inferred.naturaleza === 'PJ' && !form.razon_social) return 'Valide el RUC para obtener la razón social.'
-    if (inferred.naturaleza === 'PN' && !form.nombre) return 'Valide el documento para obtener el nombre.'
+    if (form.tipo_documento === 'DNI' && String(form.numero_documento).length !== 8) return 'El DNI debe tener 8 dígitos.'
+    if (form.tipo_documento === 'RUC' && String(form.numero_documento).length !== 11) return 'El RUC debe tener 11 dígitos.'
+    if (!form.razon_social && !form.nombre) return 'Ingrese razón social o nombre.'
     if (!form.banco) return 'Seleccione un banco.'
     if (!form.moneda) return 'Seleccione una moneda.'
     return ''
@@ -513,18 +480,10 @@ const ControlInversionistas = () => {
 
       const endpoint = modal.mode === 'edit' ? 'actualizar' : 'crear'
 
-      const inferred = inferDocument(form.numero_documento)
-      const payload = {
-        ...form,
-        numero_documento: inferred.numero,
-        tipo_documento: inferred.tipo_documento,
-        naturaleza: inferred.naturaleza,
-      }
-
       await apiCall(`${API_BASE}/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(form),
       })
 
       setModal({ open: false, mode: 'create', form: EMPTY_FORM })
@@ -809,8 +768,7 @@ const DetailModal = ({ row, bancos, monedas, onClose }) => {
 
 const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChange, onValidate, onSave }) => {
   const isEdit = mode === 'edit'
-  const activeBanks = bancos.filter(b => !['inactive', 'inactivo', '0', 'false'].includes(normalize(getField(b, 'status', 'estado', 'activo'))))
-  const tipoPersonaLabel = form.naturaleza === 'PJ' ? 'Persona Jurídica' : 'Persona Natural'
+  const activeBanks = bancos.filter(b => normalize(getField(b, 'status', 'estado')) !== 'inactive')
 
   return (
     <div className="modal-overlay" style={S.modalOverlay}>
@@ -828,7 +786,12 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
           </Field>
 
           <Field label="Tipo documento">
-            <input className="form-control" value={form.tipo_documento || 'DNI'} readOnly style={S.input} />
+            <input
+              className="form-control"
+              value={form.tipo_documento || 'DNI'}
+              readOnly
+              style={{ ...S.input, background: '#f8fafc', fontWeight: 800 }}
+            />
           </Field>
 
           <Field label="Número">
@@ -841,13 +804,20 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
           </Field>
 
           <Field label="Validación">
-            <button type="button" className="btn btn-secondary btn-sm" disabled={saving} onClick={onValidate}>Validar DNI/RUC</button>
+            <button type="button" className="btn btn-secondary btn-sm" disabled={saving} onClick={onValidate}>
+              {saving ? 'Validando...' : 'Validar DNI/RUC'}
+            </button>
           </Field>
         </div>
 
         <div style={S.formGrid3}>
           <Field label="Naturaleza">
-            <input className="form-control" value={tipoPersonaLabel} readOnly style={S.input} />
+            <input
+              className="form-control"
+              value={getNaturalezaLabel(form.naturaleza)}
+              readOnly
+              style={{ ...S.input, background: '#f8fafc', fontWeight: 800 }}
+            />
           </Field>
 
           <Field label="Razón social">
