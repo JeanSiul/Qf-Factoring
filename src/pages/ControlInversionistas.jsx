@@ -147,6 +147,50 @@ const safeApiValue = (value) => {
   return v === '-' ? '' : v
 }
 
+const findFieldDeep = (source, keys, maxDepth = 8) => {
+  const wanted = keys.map(k => String(k).toLowerCase())
+  const seen = new Set()
+
+  const walk = (value, depth) => {
+    if (value === null || value === undefined || depth > maxDepth) return ''
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const found = walk(item, depth + 1)
+        if (found !== '') return found
+      }
+      return ''
+    }
+
+    if (typeof value !== 'object') return ''
+    if (seen.has(value)) return ''
+    seen.add(value)
+
+    for (const [key, val] of Object.entries(value)) {
+      if (wanted.includes(String(key).toLowerCase()) && val !== undefined && val !== null && String(val).trim() !== '') {
+        return val
+      }
+    }
+
+    for (const val of Object.values(value)) {
+      const found = walk(val, depth + 1)
+      if (found !== '') return found
+    }
+
+    return ''
+  }
+
+  return walk(source, 0)
+}
+
+const pickDocumentField = (payload, rawResponse, ...keys) => {
+  const direct = getField(payload, ...keys)
+  if (direct !== undefined && direct !== null && String(direct).trim() !== '') return direct
+  return findFieldDeep(rawResponse, keys)
+}
+
+const safeDocumentValue = (payload, rawResponse, ...keys) => safeApiValue(pickDocumentField(payload, rawResponse, ...keys))
+
 const safeArray = (res) => {
   const payload = unwrapPayload(res)
 
@@ -523,42 +567,25 @@ const ControlInversionistas = () => {
       const condicionApi = firstNonEmpty(getField(payload, 'condicion', 'condicion_contribuyente'))
       const estado = estadoApi || condicionApi || 'Activo'
 
-      const ubigeoApi = getField(payload, 'ubigeo')
-      const viaTipoApi = getField(payload, 'via_tipo', 'tipoVia')
-      const viaNombreApi = getField(payload, 'via_nombre', 'nombreVia')
-      const zonaCodigoApi = getField(payload, 'zona_codigo')
-      const zonaTipoApi = getField(payload, 'zona_tipo')
-      const numeroDireccionApi = getField(payload, 'numero_direccion', 'numero')
-      const interiorApi = getField(payload, 'interior')
-      const loteApi = getField(payload, 'lote')
-      const dptoApi = getField(payload, 'dpto')
-      const manzanaApi = getField(payload, 'manzana')
-      const kilometroApi = getField(payload, 'kilometro')
-      const distritoApi = getField(payload, 'distrito')
-      const provinciaApi = getField(payload, 'provincia')
-      const departamentoApi = getField(payload, 'departamento')
-      const esAgenteRetencionApi = Boolean(getField(payload, 'es_agente_retencion'))
-      const esBuenContribuyenteApi = Boolean(getField(payload, 'es_buen_contribuyente'))
-
       const sunatFields = {
-        condicion: condicionApi,
-        ubigeo: safeApiValue(getField(payload, 'ubigeo')),
-        via_tipo: safeApiValue(getField(payload, 'via_tipo', 'tipoVia')),
-        via_nombre: safeApiValue(getField(payload, 'via_nombre', 'nombreVia')),
-        zona_codigo: safeApiValue(getField(payload, 'zona_codigo')),
-        zona_tipo: safeApiValue(getField(payload, 'zona_tipo')),
-        numero_direccion: safeApiValue(getField(payload, 'numero_direccion', 'numero')),
-        interior: safeApiValue(getField(payload, 'interior')),
-        lote: safeApiValue(getField(payload, 'lote')),
-        dpto: safeApiValue(getField(payload, 'dpto')),
-        manzana: safeApiValue(getField(payload, 'manzana')),
-        kilometro: safeApiValue(getField(payload, 'kilometro')),
-        distrito: safeApiValue(getField(payload, 'distrito')),
-        provincia: safeApiValue(getField(payload, 'provincia')),
-        departamento: safeApiValue(getField(payload, 'departamento')),
-        es_agente_retencion: normalizeBoolean(getField(payload, 'es_agente_retencion')),
-        es_buen_contribuyente: normalizeBoolean(getField(payload, 'es_buen_contribuyente')),
-        locales_anexos: safeJsonText(getField(payload, 'locales_anexos')),
+        condicion: safeDocumentValue(payload, res, 'condicion', 'condicion_contribuyente'),
+        ubigeo: safeDocumentValue(payload, res, 'ubigeo'),
+        via_tipo: safeDocumentValue(payload, res, 'via_tipo', 'tipoVia'),
+        via_nombre: safeDocumentValue(payload, res, 'via_nombre', 'nombreVia'),
+        zona_codigo: safeDocumentValue(payload, res, 'zona_codigo'),
+        zona_tipo: safeDocumentValue(payload, res, 'zona_tipo'),
+        numero_direccion: safeDocumentValue(payload, res, 'numero_direccion', 'numero'),
+        interior: safeDocumentValue(payload, res, 'interior'),
+        lote: safeDocumentValue(payload, res, 'lote'),
+        dpto: safeDocumentValue(payload, res, 'dpto'),
+        manzana: safeDocumentValue(payload, res, 'manzana'),
+        kilometro: safeDocumentValue(payload, res, 'kilometro'),
+        distrito: safeDocumentValue(payload, res, 'distrito'),
+        provincia: safeDocumentValue(payload, res, 'provincia'),
+        departamento: safeDocumentValue(payload, res, 'departamento'),
+        es_agente_retencion: normalizeBoolean(pickDocumentField(payload, res, 'es_agente_retencion')),
+        es_buen_contribuyente: normalizeBoolean(pickDocumentField(payload, res, 'es_buen_contribuyente')),
+        locales_anexos: safeJsonText(pickDocumentField(payload, res, 'locales_anexos')),
       }
 
       setModal(prev => ({
