@@ -684,6 +684,7 @@ const ControlInversionistas = () => {
   const handleFormChange = async (name, value) => {
     if (name === 'numero_documento') {
       const info = inferDocumentInfo(value)
+
       setModal(prev => ({
         ...prev,
         form: {
@@ -691,6 +692,31 @@ const ControlInversionistas = () => {
           numero_documento: info.numero,
           tipo_documento: info.tipo_documento,
           naturaleza: info.naturaleza,
+
+          // Al cambiar documento se limpian datos traídos por API para forzar nueva validación.
+          razon_social: '',
+          nombre: '',
+          apellido: '',
+          direccion: '',
+          estado: 'Activo',
+          condicion: '',
+          ubigeo: '',
+          via_tipo: '',
+          via_nombre: '',
+          zona_codigo: '',
+          zona_tipo: '',
+          numero_direccion: '',
+          interior: '',
+          lote: '',
+          dpto: '',
+          manzana: '',
+          kilometro: '',
+          distrito: '',
+          provincia: '',
+          departamento: '',
+          es_agente_retencion: false,
+          es_buen_contribuyente: false,
+          locales_anexos: '',
         }
       }))
 
@@ -705,6 +731,7 @@ const ControlInversionistas = () => {
 
     setModal(prev => ({ ...prev, form: { ...prev.form, [name]: value } }))
   }
+
 
   const validateForm = (form) => {
     if (!form.codigo) return 'El código es obligatorio.'
@@ -1069,6 +1096,7 @@ const DetailModal = ({ row, bancos, monedas, onClose }) => {
 const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChange, onValidate, onSave }) => {
   const isEdit = mode === 'edit'
   const activeBanks = bancos.filter(b => normalize(getField(b, 'status', 'estado')) !== 'inactive')
+  const readOnlyStyle = { ...S.input, ...S.readOnlyInput }
 
   return (
     <div className="modal-overlay" style={S.modalOverlay}>
@@ -1121,27 +1149,21 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
           </Field>
 
           <Field label="Razón social">
-            <input className="form-control" value={form.razon_social || ''} onChange={e => onChange('razon_social', e.target.value)} style={S.input} />
+            <input className="form-control" value={form.razon_social || ''} readOnly style={readOnlyStyle} />
           </Field>
 
           <Field label="Estado">
-            <select className="form-control" value={form.estado || 'Activo'} onChange={e => onChange('estado', e.target.value)} style={S.input}>
-              <option value="Activo">Activo</option>
-              <option value="ACTIVO">ACTIVO</option>
-              <option value="Inactivo">Inactivo</option>
-              <option value="INACTIVO">INACTIVO</option>
-              <option value="Pendiente">Pendiente</option>
-            </select>
+            <input className="form-control" value={form.estado || 'Activo'} readOnly style={readOnlyStyle} />
           </Field>
         </div>
 
         <div style={S.formGrid3}>
           <Field label="Nombre">
-            <input className="form-control" value={form.nombre || ''} onChange={e => onChange('nombre', e.target.value)} style={S.input} />
+            <input className="form-control" value={form.nombre || ''} readOnly style={readOnlyStyle} />
           </Field>
 
           <Field label="Apellido">
-            <input className="form-control" value={form.apellido || ''} onChange={e => onChange('apellido', e.target.value)} style={S.input} />
+            <input className="form-control" value={form.apellido || ''} readOnly style={readOnlyStyle} />
           </Field>
 
           <Field label="Email">
@@ -1201,7 +1223,7 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
 
         <div style={S.singleFieldWrap}>
           <Field label="Dirección">
-            <input className="form-control" value={form.direccion || ''} onChange={e => onChange('direccion', e.target.value)} style={S.input} />
+            <input className="form-control" value={form.direccion || ''} readOnly style={readOnlyStyle} />
           </Field>
         </div>
 
@@ -1209,91 +1231,85 @@ const FormModal = ({ mode, form, bancos, monedas, saving, error, onClose, onChan
 
         <div style={S.formGrid4}>
           <Field label="Condición SUNAT">
-            <input className="form-control" value={form.condicion || ''} onChange={e => onChange('condicion', e.target.value)} style={S.input} />
+            <input className="form-control" value={form.condicion || ''} readOnly style={readOnlyStyle} />
           </Field>
 
           <Field label="Ubigeo">
-            <input className="form-control" value={form.ubigeo || ''} onChange={e => onChange('ubigeo', e.target.value)} style={S.input} />
+            <input className="form-control" value={form.ubigeo || ''} readOnly style={readOnlyStyle} />
           </Field>
 
           <Field label="Departamento">
-            <input className="form-control" value={form.departamento || ''} onChange={e => onChange('departamento', e.target.value)} style={S.input} />
+            <input className="form-control" value={form.departamento || ''} readOnly style={readOnlyStyle} />
           </Field>
 
           <Field label="Provincia">
-            <input className="form-control" value={form.provincia || ''} onChange={e => onChange('provincia', e.target.value)} style={S.input} />
+            <input className="form-control" value={form.provincia || ''} readOnly style={readOnlyStyle} />
           </Field>
         </div>
 
         <div style={S.formGrid4}>
           <Field label="Distrito">
-            <input className="form-control" value={form.distrito || ''} onChange={e => onChange('distrito', e.target.value)} style={S.input} />
+            <input className="form-control" value={form.distrito || ''} readOnly style={readOnlyStyle} />
           </Field>
 
           <Field label="Tipo vía">
-            <input className="form-control" value={form.via_tipo || ''} onChange={e => onChange('via_tipo', e.target.value)} style={S.input} />
+            <input className="form-control" value={form.via_tipo || ''} readOnly style={readOnlyStyle} />
           </Field>
 
           <Field label="Nombre vía">
-            <input className="form-control" value={form.via_nombre || ''} onChange={e => onChange('via_nombre', e.target.value)} style={S.input} />
+            <input className="form-control" value={form.via_nombre || ''} readOnly style={readOnlyStyle} />
           </Field>
 
           <Field label="Número dirección">
-            <input className="form-control" value={form.numero_direccion || ''} onChange={e => onChange('numero_direccion', e.target.value)} style={S.input} />
+            <input className="form-control" value={form.numero_direccion || ''} readOnly style={readOnlyStyle} />
           </Field>
         </div>
 
         <div style={S.formGrid4}>
           <Field label="Zona código">
-            <input className="form-control" value={form.zona_codigo || ''} onChange={e => onChange('zona_codigo', e.target.value)} style={S.input} />
+            <input className="form-control" value={form.zona_codigo || ''} readOnly style={readOnlyStyle} />
           </Field>
 
           <Field label="Zona tipo">
-            <input className="form-control" value={form.zona_tipo || ''} onChange={e => onChange('zona_tipo', e.target.value)} style={S.input} />
+            <input className="form-control" value={form.zona_tipo || ''} readOnly style={readOnlyStyle} />
           </Field>
 
           <Field label="Interior">
-            <input className="form-control" value={form.interior || ''} onChange={e => onChange('interior', e.target.value)} style={S.input} />
+            <input className="form-control" value={form.interior || ''} readOnly style={readOnlyStyle} />
           </Field>
 
           <Field label="Lote">
-            <input className="form-control" value={form.lote || ''} onChange={e => onChange('lote', e.target.value)} style={S.input} />
+            <input className="form-control" value={form.lote || ''} readOnly style={readOnlyStyle} />
           </Field>
         </div>
 
         <div style={S.formGrid4}>
           <Field label="Dpto.">
-            <input className="form-control" value={form.dpto || ''} onChange={e => onChange('dpto', e.target.value)} style={S.input} />
+            <input className="form-control" value={form.dpto || ''} readOnly style={readOnlyStyle} />
           </Field>
 
           <Field label="Manzana">
-            <input className="form-control" value={form.manzana || ''} onChange={e => onChange('manzana', e.target.value)} style={S.input} />
+            <input className="form-control" value={form.manzana || ''} readOnly style={readOnlyStyle} />
           </Field>
 
           <Field label="Kilómetro">
-            <input className="form-control" value={form.kilometro || ''} onChange={e => onChange('kilometro', e.target.value)} style={S.input} />
+            <input className="form-control" value={form.kilometro || ''} readOnly style={readOnlyStyle} />
           </Field>
 
           <Field label="Agente retención">
-            <select className="form-control" value={form.es_agente_retencion ? '1' : '0'} onChange={e => onChange('es_agente_retencion', e.target.value === '1')} style={S.input}>
-              <option value="0">No</option>
-              <option value="1">Sí</option>
-            </select>
+            <input className="form-control" value={formatBoolean(form.es_agente_retencion)} readOnly style={readOnlyStyle} />
           </Field>
         </div>
 
         <div style={S.formGrid4}>
           <Field label="Buen contribuyente">
-            <select className="form-control" value={form.es_buen_contribuyente ? '1' : '0'} onChange={e => onChange('es_buen_contribuyente', e.target.value === '1')} style={S.input}>
-              <option value="0">No</option>
-              <option value="1">Sí</option>
-            </select>
+            <input className="form-control" value={formatBoolean(form.es_buen_contribuyente)} readOnly style={readOnlyStyle} />
           </Field>
         </div>
 
         <div style={S.singleFieldWrap}>
           <Field label="Locales anexos">
-            <textarea className="form-control" value={form.locales_anexos || ''} onChange={e => onChange('locales_anexos', e.target.value)} style={S.textarea} />
+            <textarea className="form-control" value={form.locales_anexos || ''} readOnly style={{ ...S.textarea, ...S.readOnlyInput }} />
           </Field>
         </div>
 
@@ -1395,6 +1411,7 @@ const S = {
   sectionTitle: { margin: '8px 18px 10px', paddingTop: 10, borderTop: '1px solid var(--qf-border)', fontFamily: 'Montserrat', fontSize: 13, fontWeight: 800, color: 'var(--qf-navy)' },
   input: { height: 34, fontSize: 12, borderRadius: 6, border: '1px solid var(--qf-border)', padding: '0 8px', width: '100%' },
   textarea: { minHeight: 58, fontSize: 12, borderRadius: 6, border: '1px solid var(--qf-border)', padding: '8px', width: '100%', resize: 'vertical' },
+  readOnlyInput: { background: '#f8fafc', color: 'var(--qf-navy)', fontWeight: 700, cursor: 'not-allowed' },
   modalActions: { display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12, padding: '12px 18px', borderTop: '1px solid var(--qf-border)' },
 }
 
