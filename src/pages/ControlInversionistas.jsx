@@ -733,14 +733,24 @@ const ControlInversionistas = () => {
 
       const endpoint = modal.mode === 'edit' ? 'actualizar' : 'crear'
 
-      await apiCall(`${API_BASE}/${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
+	const res = await apiCall(`${API_BASE}/${endpoint}`, {
+	  method: 'POST',
+	  headers: { 'Content-Type': 'application/json' },
+	  body: JSON.stringify(form),
+	})
 
-      setModal({ open: false, mode: 'create', form: EMPTY_FORM })
-      await loadData()
+	// Detectar duplicado
+	const text = JSON.stringify(res || {})
+
+	if (
+	  text.includes('Duplicate entry') ||
+	  text.includes('uq_inversionistas_numero_documento')
+	) {
+	  throw new Error('El número de documento ya existe')
+	}
+
+	setModal({ open: false, mode: 'create', form: EMPTY_FORM })
+	await loadData()
     } catch (err) {
       setError(err?.message || 'No se pudo guardar el inversionista.')
     } finally {
