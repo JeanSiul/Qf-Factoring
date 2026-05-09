@@ -731,28 +731,47 @@ const ControlInversionistas = () => {
       setSaving(true)
       setError('')
 
+      const numero = String(form.numero_documento || '').trim()
+
+      const duplicated = data.some(row =>
+        String(row.numero_documento || '').trim() === numero &&
+        String(row.id || '') !== String(form.id || '')
+      )
+
+      if (duplicated) {
+        throw new Error('El número de documento ya existe. No se puede registrar duplicado.')
+      }
+
       const endpoint = modal.mode === 'edit' ? 'actualizar' : 'crear'
 
-	const res = await apiCall(`${API_BASE}/${endpoint}`, {
-	  method: 'POST',
-	  headers: { 'Content-Type': 'application/json' },
-	  body: JSON.stringify(form),
-	})
+      const res = await apiCall(`${API_BASE}/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
 
-	// Detectar duplicado
-	const text = JSON.stringify(res || {})
+      const responseText = JSON.stringify(res || {})
 
-	if (
-	  text.includes('Duplicate entry') ||
-	  text.includes('uq_inversionistas_numero_documento')
-	) {
-	  throw new Error('El número de documento ya existe')
-	}
+      if (
+        responseText.includes('Duplicate entry') ||
+        responseText.includes('uq_inversionistas_numero_documento') ||
+        responseText.includes('ER_DUP_ENTRY')
+      ) {
+        throw new Error('El número de documento ya existe. No se puede registrar duplicado.')
+      }
 
-	setModal({ open: false, mode: 'create', form: EMPTY_FORM })
-	await loadData()
+      setModal({ open: false, mode: 'create', form: EMPTY_FORM })
+      await loadData()
     } catch (err) {
-      setError(err?.message || 'No se pudo guardar el inversionista.')
+      const errText = JSON.stringify(err || {})
+      const duplicateMessage =
+        errText.includes('Duplicate entry') ||
+        errText.includes('uq_inversionistas_numero_documento') ||
+        errText.includes('ER_DUP_ENTRY')
+          ? 'El número de documento ya existe. No se puede registrar duplicado.'
+          : ''
+
+      setError(duplicateMessage || err?.message || 'No se pudo guardar el inversionista.')
     } finally {
       setSaving(false)
     }
