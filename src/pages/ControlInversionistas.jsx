@@ -500,7 +500,7 @@ const ControlInversionistas = () => {
         codigo: row.codigo || '',
         tipo_documento: normalizeTipoDocumento(row.tipo_documento),
         numero_documento: row.numero_documento || '',
-        naturaleza: row.naturaleza === 'PN' || row.naturaleza === 'Persona Natural' ? 'PN' : (row.naturaleza === 'PJ' || row.naturaleza === 'Persona Jurídica' ? 'PJ' : row.naturaleza || 'PN'),
+        naturaleza: row.naturaleza || row.tipo_ruc || (normalizeTipoDocumento(row.tipo_documento) === 'RUC' ? 'PJ' : 'PN'),
         razon_social: row.razon_social || '',
         nombre: row.nombre || '',
         apellido: row.apellido || '',
