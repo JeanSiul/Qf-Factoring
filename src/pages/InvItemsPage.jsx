@@ -283,6 +283,9 @@ const ModalReporte = ({ grupos, filtroGrupoActual, onClose }) => {
     qs.set('grupo_id', params.grupo_id || '0')
     qs.set('inline', '1')
 
+    // Fuerza una ejecución nueva en n8n/Carbone y evita cache del iframe/navegador.
+    qs.set('_ts', Date.now().toString())
+
     if (params.enviar_email) {
       const email = params.email.trim()
 
@@ -292,11 +295,18 @@ const ModalReporte = ({ grupos, filtroGrupoActual, onClose }) => {
       }
 
       qs.set('email', email)
+      qs.set('send', '1')
     }
 
     const url = `${REPORT_BASE_URL}?${qs.toString()}`
-    setLoadingPreview(true)
-    setUrlReporte(url)
+
+    // Limpia el iframe anterior para permitir generar/enviar varias veces desde el mismo modal.
+    setUrlReporte('')
+
+    window.setTimeout(() => {
+      setLoadingPreview(true)
+      setUrlReporte(url)
+    }, 100)
   }
 
   const descargarUrl = () => {
