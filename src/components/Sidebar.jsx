@@ -52,9 +52,9 @@ const menuItems = [
       { icon: '📊', label: 'Dashboard Ejecutivo', path: '/gerencia/GerenciaBI', claim: 'GERBI' },
       { icon: '📈', label: 'Facturación BI', path: '/gerencia/facturacion', claim: 'GERBI' },
       { icon: '🏦', label: 'Cobranza BI', path: '/gerencia/cobranza', claim: 'GERBI' },
+      { icon: '💵', label: 'Tesorería BI', path: '/gerencia/tesoreria', claim: 'GERBI' },
       { icon: '⚠️', label: 'Riesgo BI', path: '/gerencia/riesgo', claim: 'GERBI' },
-      { icon: '🧊', label: 'Dashboard 3D', path: '/gerencia/3d', claim: 'GERBI' },
-      { icon: '📋', label: 'Tabla Dinámica', path: '/gerencia/tablas', claim: 'GERBI' },
+      { icon: '🧊', label: 'Operaciones 3D', path: '/gerencia/3d', claim: 'GERBI' },
     ]
   },
 ]
