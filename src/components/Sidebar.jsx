@@ -49,7 +49,7 @@ const menuItems = [
   {
     icon: '🏢', label: 'Gerencia', path: null,
     children: [
-      { icon: '📊', label: 'Dashboard Ejecutivo', path: '/gerencia/bi', claim: 'GERBI' },
+      { icon: '📊', label: 'Dashboard Ejecutivo', path: '/gerencia/GerenciaBi', claim: 'GERBI' },
       { icon: '📈', label: 'Facturación BI', path: '/gerencia/facturacion', claim: 'GERBI' },
       { icon: '🏦', label: 'Cobranza BI', path: '/gerencia/cobranza', claim: 'GERBI' },
       { icon: '⚠️', label: 'Riesgo BI', path: '/gerencia/riesgo', claim: 'GERBI' },
