@@ -270,70 +270,7 @@ function ThreeDView({ analytics }) {
   return <Panel title="Vista 3D experimental" sub="Volumen estimado por banco y periodo para demostración gerencial" className="full"><ReactECharts option={option} style={{height:520}} /></Panel>
 }
 function RiesgoView({ analytics, rows }) {
-  const riesgo = useMemo(() => {
-    return rows
-      .map(r => ({
-        ...r,
-        score: Math.min(
-          100,
-          (norm(r._estado).includes('error') ? 40 : 0) +
-          (norm(r._estado).includes('pendiente') ? 25 : 0) +
-          Math.min(35, r._dias * 2) +
-          (
-            r._monto > analytics.total / Math.max(analytics.count, 1)
-              ? 10
-              : 0
-          )
-        )
-      }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 12)
-  }, [rows, analytics])
-
-  return (
-    <div className="qf-bi-layout two">
-      <Panel
-        title="Matriz de riesgo"
-        sub="Score calculado en frontend con estado, días e importe"
-      >
-        <div className="qf-risk-list">
-          {riesgo.map(r => (
-            <div key={r.id} className="qf-risk-row">
-              <b>{r._operacion}</b>
-              <span>{r._cliente}</span>
-              <i>{r._estado}</i>
-              <strong>{r.score}</strong>
-            </div>
-          ))}
-        </div>
-      </Panel>
-
-      <Panel
-        title="Recomendación ejecutiva"
-        sub="Indicadores para decisión"
-      >
-        <div className="qf-bi-advice">
-          <h4>
-            {analytics.errores > 0
-              ? 'Atención requerida'
-              : 'Operación estable'}
-          </h4>
-
-          <p>
-            Hay <b>{analytics.pendientes}</b> registros pendientes y{' '}
-            <b>{analytics.errores}</b> con posible incidencia.
-            La efectividad actual es{' '}
-            <b>{analytics.efectividad}%</b>.
-          </p>
-
-          <p>
-            Usar esta pestaña para priorizar seguimiento,
-            conciliación bancaria y revisión por bancos
-            con mayor volumen.
-          </p>
-        </div>
-      </Panel>
-    </div>
-  )
+  const riesgo = useMemo(() => rows.map(r => ({ ...r, score: Math.min(100, (norm(r._estado).includes('error') ? 40 : 0) + (norm(r._estado).includes('pendiente') ? 25 : 0) + Math.min(35, r._dias * 2) + (r._monto > analytics.total / Math.max(analytics.count,1) ? 10 : 0) })).sort((a,b)=>b.score-a.score).slice(0,12), [rows, analytics])
+  return <div className="qf-bi-layout two"><Panel title="Matriz de riesgo" sub="Score calculado en frontend con estado, días e importe"><div className="qf-risk-list">{riesgo.map(r => <div key={r.id} className="qf-risk-row"><b>{r._operacion}</b><span>{r._cliente}</span><i>{r._estado}</i><strong>{r.score}</strong></div>)}</div></Panel><Panel title="Recomendación ejecutiva" sub="Indicadores para decisión"><div className="qf-bi-advice"><h4>{analytics.errores > 0 ? 'Atención requerida' : 'Operación estable'}</h4><p>Hay <b>{analytics.pendientes}</b> registros pendientes y <b>{analytics.errores}</b> con posible incidencia. La efectividad actual es <b>{analytics.efectividad}%</b>.</p><p>Usar esta pestaña para priorizar seguimiento, conciliación bancaria y revisión por bancos con mayor volumen.</p></div></Panel></div>
 }
 function TopList({ data }) { return <div className="qf-top-list">{data.length === 0 ? <div className="qf-empty">Sin información</div> : data.map((x,i) => <div className="qf-top-row" key={x.name}><span>{i+1}</span><div><b>{x.name}</b><small>{x.count} registros</small></div><strong>{compact(x.value)}</strong></div>)}</div> }
