@@ -21,6 +21,7 @@ import PermisosModulosPage from './pages/PermisosModulosPage'
 import DevolucionesPage from './pages/DevolucionesPage'
 import ControlInversionistas from './pages/ControlInversionistas'
 import DashboardOperacionesBI from './pages/DashboardOperacionesBI'
+import GerenciaBI from './pages/GerenciaBI'
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth()
@@ -68,6 +69,7 @@ const App = () => (
           <Route path="/operaciones/devoluciones" element={<DevolucionesPage />} />
           <Route path="/operaciones/inversionistas" element={<ControlInversionistas />} />
           <Route path="/operaciones/dashboard-bi" element={<DashboardOperacionesBI />} />
+          <Route path="/gerencia-bi" element={<GerenciaBI />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
