@@ -20,7 +20,7 @@ import OperacionesFacturasPage from './pages/OperacionesFacturasPage'
 import PermisosModulosPage from './pages/PermisosModulosPage'
 import DevolucionesPage from './pages/DevolucionesPage'
 import ControlInversionistas from './pages/ControlInversionistas'
-import DashboardOperacionesBI from './pages/operaciones/DashboardOperacionesBI'
+import DashboardOperacionesBI from './pages/DashboardOperacionesBI'
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth()
