@@ -38,6 +38,7 @@ const menuItems = [
     icon: '💼', label: 'Operaciones', path: null,
     children: [
       { icon: '📊', label: 'Dashboard', path: '/operaciones/dashboard', claim: 'OPELIS' },
+      { icon: '📈', label: 'Dashboard BI', path: '/operaciones/dashboard-bi', claim: 'OPELIS' },
       { icon: '🧾', label: 'Facturas', path: '/operaciones/facturas', claim: 'FACLIS' },
       { icon: '🧾', label: 'Devoluciones', path: '/operaciones/devoluciones', claim: 'OPEDEV' },
       { icon: '💰', label: 'Finanzas', path: '/operaciones/finanzas', claim: 'OPELIS' },
