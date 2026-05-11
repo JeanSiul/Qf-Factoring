@@ -27,6 +27,8 @@ import CobranzaBI from './pages/gerencia/CobranzaBI'
 import TesoreriaBI from './pages/gerencia/TesoreriaBI'
 import RiesgoBI from './pages/gerencia/RiesgoBI'
 import Operaciones3D from './pages/gerencia/Operaciones3D'
+import PowerBIGerencias from './pages/gerencia/PowerBIGerencias'
+import GerenciaPowerBIReplica from './pages/gerencia/GerenciaPowerBIReplica'
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth()
@@ -80,6 +82,8 @@ const App = () => (
           <Route path="/gerencia/tesoreria" element={<TesoreriaBI />} />
           <Route path="/gerencia/riesgo" element={<RiesgoBI />} />
           <Route path="/gerencia/3d" element={<Operaciones3D />} />
+          <Route path="/gerencia/powerbi" element={<PowerBIGerencias />} />
+          <Route path="/gerencia/powerbi-react" element={<GerenciaPowerBIReplica />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
