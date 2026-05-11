@@ -73,44 +73,6 @@ export default function PowerBIGerencia() {
         </a>
       </div>
 
-      {/* KPIs SUPERIORES */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-          gap: 10,
-          marginBottom: 12,
-        }}
-      >
-        <Kpi
-          title="Estado"
-          value="Online"
-          color="#22c55e"
-          subtitle="Power BI conectado"
-        />
-
-        <Kpi
-          title="Fuente"
-          value="MySQL"
-          color="#38bdf8"
-          subtitle="Dataset activo"
-        />
-
-        <Kpi
-          title="Modo"
-          value="Embedded"
-          color="#7c3aed"
-          subtitle="Integrado en React"
-        />
-
-        <Kpi
-          title="Acceso"
-          value="Seguro"
-          color="#f59e0b"
-          subtitle="Power BI Service"
-        />
-      </div>
-
       {/* CONTENEDOR POWER BI */}
       <div
         style={{
@@ -119,7 +81,7 @@ export default function PowerBIGerencia() {
           padding: 10,
           border: '1px solid #17324a',
           boxShadow: '0 10px 25px rgba(0,0,0,.25)',
-          height: 'calc(100vh - 240px)',
+          height: 'calc(100vh - 120px)',
           overflow: 'hidden',
         }}
       >
