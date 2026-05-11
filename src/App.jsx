@@ -22,6 +22,11 @@ import DevolucionesPage from './pages/DevolucionesPage'
 import ControlInversionistas from './pages/ControlInversionistas'
 import DashboardOperacionesBI from './pages/DashboardOperacionesBI'
 import GerenciaBI from './pages/gerencia/GerenciaBI'
+import FacturacionBI from './pages/gerencia/FacturacionBI'
+import CobranzaBI from './pages/gerencia/CobranzaBI'
+import TesoreriaBI from './pages/gerencia/TesoreriaBI'
+import RiesgoBI from './pages/gerencia/RiesgoBI'
+import Operaciones3D from './pages/gerencia/Operaciones3D'
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth()
@@ -70,6 +75,11 @@ const App = () => (
           <Route path="/operaciones/inversionistas" element={<ControlInversionistas />} />
           <Route path="/operaciones/dashboard-bi" element={<DashboardOperacionesBI />} />
           <Route path="/gerencia/GerenciaBI" element={<GerenciaBI />} />
+          <Route path="/gerencia/facturacion" element={<FacturacionBI />} />
+          <Route path="/gerencia/cobranza" element={<CobranzaBI />} />
+          <Route path="/gerencia/tesoreria" element={<TesoreriaBI />} />
+          <Route path="/gerencia/riesgo" element={<RiesgoBI />} />
+          <Route path="/gerencia/3d" element={<Operaciones3D />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
