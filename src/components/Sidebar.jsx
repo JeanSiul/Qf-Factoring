@@ -55,6 +55,8 @@ const menuItems = [
       { icon: '💵', label: 'Tesorería BI', path: '/gerencia/tesoreria', claim: 'GERBI' },
       { icon: '⚠️', label: 'Riesgo BI', path: '/gerencia/riesgo', claim: 'GERBI' },
       { icon: '🧊', label: 'Operaciones 3D', path: '/gerencia/3d', claim: 'GERBI' },
+      { icon: '📺', label: 'Power BI', path: '/gerencia/powerbi', claim: 'GERBI' },
+      { icon: '🧩', label: 'Power BI React', path: '/gerencia/powerbi-react', claim: 'GERBI' },
     ]
   },
 ]
