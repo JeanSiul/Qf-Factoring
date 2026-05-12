@@ -29,10 +29,22 @@ export default function PowerBIEmbeddedGerencia() {
         await loadScript()
 
         const res = await fetch(EMBED_TOKEN_ENDPOINT)
-        const data = await res.json()
+        const text = await res.text()
+
+        let data
+        
+        try {
+          data = JSON.parse(text)
+        } catch (e) {
+          throw new Error(text)
+        }
 
         if (!res.ok) {
-          throw new Error(data?.message || 'No se pudo obtener embed token')
+          throw new Error(
+            data?.message ||
+            data?.detail ||
+            'No se pudo obtener embed token'
+          )
         }
 
         const models = window['powerbi-client'].models
