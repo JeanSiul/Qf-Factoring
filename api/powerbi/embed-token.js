@@ -1,5 +1,5 @@
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   try {
     if (req.method !== 'GET') {
       return res.status(405).json({
