@@ -489,7 +489,7 @@ const TareasPage = () => {
       vb = String(vb || '').toLowerCase()
       return va < vb ? (sortDir === 'asc' ? -1 : 1) : va > vb ? (sortDir === 'asc' ? 1 : -1) : 0
     })
-  }, [filteredData, sortField, sortDir]
+  }, [filteredData, sortField, sortDir])
 
   const si = f => sortField !== f ? ' ↕' : sortDir === 'asc' ? ' ▲' : ' ▼'
   const paginatedData = useMemo(() => sortedData.slice((page - 1) * pageSize, page * pageSize), [sortedData, page, pageSize])
