@@ -19,7 +19,10 @@
     "ag-grid-react": "^31.x",
     "ag-grid-community": "^31.x",
     "react-select": "^5.x",
-    "react-datepicker": "^6.x"
+    "react-datepicker": "^6.x",
+    "axios": "^1.7.9",
+    "powerbi-client": "^2.23.10", 
+    "powerbi-client-react": "^2.0.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",
