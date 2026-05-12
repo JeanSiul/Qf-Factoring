@@ -1,109 +1,84 @@
-import React, { useMemo } from 'react'
-import { PowerBIEmbed } from 'powerbi-client-react'
-import { models } from 'powerbi-client'
+import React, { useEffect, useRef, useState } from 'react'
+
+const EMBED_TOKEN_ENDPOINT = '/api/powerbi/embed-token'
+const POWERBI_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/powerbi-client/2.23.7/powerbi.min.js'
 
 export default function PowerBIEmbeddedGerencia() {
-  const embedConfig = useMemo(() => {
-    return {
-      type: 'report',
+  const containerRef = useRef(null)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
 
-      // REPORT ID DEL LINK
-      id: '1cf00a37-bb58-4dc2-a000-1bfa3d0750ed',
+  useEffect(() => {
+    const loadScript = () =>
+      new Promise((resolve, reject) => {
+        if (window.powerbi) return resolve()
 
-      // LINK EMBED
-      embedUrl:
-        'https://app.powerbi.com/reportEmbed?reportId=1cf00a37-bb58-4dc2-a000-1bfa3d0750ed&autoAuth=true&ctid=9355aa78-a68e-4a0c-8fb3-536b4f040888',
+        const script = document.createElement('script')
+        script.src = POWERBI_CDN
+        script.async = true
+        script.onload = resolve
+        script.onerror = () => reject(new Error('No se pudo cargar powerbi-client desde CDN'))
+        document.body.appendChild(script)
+      })
 
-      // ⚠️ SIN TOKEN AÚN
-      accessToken: '',
+    const init = async () => {
+      try {
+        setLoading(true)
+        setError('')
 
-      tokenType: models.TokenType.Embed,
+        await loadScript()
 
-      permissions: models.Permissions.All,
+        const res = await fetch(EMBED_TOKEN_ENDPOINT)
+        const data = await res.json()
 
-      settings: {
-        background: models.BackgroundType.Transparent,
+        if (!res.ok) {
+          throw new Error(data?.message || 'No se pudo obtener embed token')
+        }
 
-        panes: {
-          filters: {
-            visible: true,
-            expanded: false,
+        const models = window['powerbi-client'].models
+
+        const config = {
+          type: 'report',
+          id: data.reportId,
+          embedUrl: data.embedUrl,
+          accessToken: data.embedToken,
+          tokenType: models.TokenType.Embed,
+          permissions: models.Permissions.All,
+          settings: {
+            panes: {
+              filters: { visible: true, expanded: false },
+              pageNavigation: { visible: true },
+            },
+            background: models.BackgroundType.Transparent,
           },
+        }
 
-          pageNavigation: {
-            visible: true,
-          },
-        },
-
-        bars: {
-          statusBar: {
-            visible: true,
-          },
-        },
-      },
+        window.powerbi.reset(containerRef.current)
+        window.powerbi.embed(containerRef.current, config)
+      } catch (e) {
+        setError(e.message)
+      } finally {
+        setLoading(false)
+      }
     }
+
+    init()
   }, [])
 
   return (
-    <div
-      className="fade-in"
-      style={{
-        width: '100%',
-        height: '100vh',
-        background: '#071726',
-        padding: 10,
-      }}
-    >
+    <div style={{ height: '100vh', background: '#071726', padding: 10 }}>
+      {loading && <div style={{ color: '#fff' }}>Cargando Power BI Embedded...</div>}
+      {error && <div style={{ color: '#fecaca', padding: 12 }}>{error}</div>}
+
       <div
+        ref={containerRef}
         style={{
           height: 'calc(100vh - 20px)',
-          borderRadius: 18,
-          overflow: 'hidden',
           background: '#fff',
-          border: '1px solid #17324a',
-          boxShadow: '0 10px 25px rgba(0,0,0,.25)',
+          borderRadius: 14,
+          overflow: 'hidden',
         }}
-      >
-        <PowerBIEmbed
-          embedConfig={embedConfig}
-          cssClassName="qf-powerbi-embedded-frame"
-          eventHandlers={
-            new Map([
-              [
-                'loaded',
-                () => {
-                  console.log('Power BI loaded')
-                },
-              ],
-
-              [
-                'rendered',
-                () => {
-                  console.log('Power BI rendered')
-                },
-              ],
-
-              [
-                'error',
-                event => {
-                  console.error(event?.detail)
-                },
-              ],
-            ])
-          }
-        />
-      </div>
-
-      <style>{`
-        .qf-powerbi-embedded-frame {
-          width: 100%;
-          height: 100%;
-        }
-
-        .qf-powerbi-embedded-frame iframe {
-          border: 0 !important;
-        }
-      `}</style>
+      />
     </div>
   )
 }
