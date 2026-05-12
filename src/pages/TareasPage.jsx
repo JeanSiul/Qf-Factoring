@@ -38,6 +38,24 @@ const toDateInput = value => {
 
 const toTimeInput = value => String(value || '').slice(0, 5)
 
+const toDateFilterValue = value => {
+  const iso = toDateInput(value)
+  if (!iso) return null
+  const [y, m, d] = iso.split('-').map(Number)
+  if (!y || !m || !d) return null
+  return new Date(y, m - 1, d)
+}
+
+const dateComparator = (filterDate, cellValue) => {
+  const cellDate = cellValue instanceof Date ? cellValue : toDateFilterValue(cellValue)
+  if (!cellDate) return -1
+  const f = new Date(filterDate.getFullYear(), filterDate.getMonth(), filterDate.getDate())
+  const c = new Date(cellDate.getFullYear(), cellDate.getMonth(), cellDate.getDate())
+  if (c < f) return -1
+  if (c > f) return 1
+  return 0
+}
+
 const today = () => new Date().toISOString().slice(0, 10)
 const nowTime = () => new Date().toTimeString().slice(0, 5)
 
@@ -383,8 +401,10 @@ const TareasPage = () => {
 
   const agRows = useMemo(() => data.map(r => ({
     ...r,
-    _inicio_sort: `${r.fecha_inicio || ''} ${r.hora_inicio || ''}`,
-    _fin_sort: `${r.fecha_fin || ''} ${r.hora_fin || ''}`,
+    _inicio_sort: toDateFilterValue(r.fecha_inicio),
+    _fin_sort: toDateFilterValue(r.fecha_fin),
+    _inicio_text: `${formatDate(r.fecha_inicio)} ${toTimeInput(r.hora_inicio)}`,
+    _fin_text: `${formatDate(r.fecha_fin)} ${toTimeInput(r.hora_fin)}`,
     _duracion: calcMinutes(r),
   })), [data])
 
@@ -415,6 +435,8 @@ const TareasPage = () => {
     before: 'Antes de',
     after: 'Después de',
     inRange: 'Entre',
+    inRangeStart: 'Desde',
+    inRangeEnd: 'Hasta',
     lessThan: 'Menor que',
     greaterThan: 'Mayor que',
     filterOoo: 'Filtrar...',
@@ -452,29 +474,39 @@ const TareasPage = () => {
     {
       headerName: 'Inicio',
       field: '_inicio_sort',
-      width: 110,
+      width: 150,
+      minWidth: 150,
       sort: 'desc',
+      comparator: (a, b) => (a?.getTime?.() || 0) - (b?.getTime?.() || 0),
+      filterParams: {
+        comparator: dateComparator,
+        browserDatePicker: true,
+        inRangeInclusive: true,
+      },
       cellRenderer: p => (
         <div>
-          <code style={S.opCode}>{formatDate(p.data?.fecha_inicio)}</code>
-          <div style={S.timeMini}>{toTimeInput(p.data?.hora_inicio)}</div>
+          <span style={S.dateTimeInline}><code style={S.opCode}>{formatDate(p.data?.fecha_inicio)}</code><span style={S.timeMiniInline}>{toTimeInput(p.data?.hora_inicio)}</span></span>
         </div>
       ),
       filter: 'agDateColumnFilter',
-      filterValueGetter: p => toDateInput(p.data?.fecha_inicio),
     },
     {
       headerName: 'Fin',
       field: '_fin_sort',
-      width: 110,
+      width: 150,
+      minWidth: 150,
+      comparator: (a, b) => (a?.getTime?.() || 0) - (b?.getTime?.() || 0),
+      filterParams: {
+        comparator: dateComparator,
+        browserDatePicker: true,
+        inRangeInclusive: true,
+      },
       cellRenderer: p => (
         <div>
-          <code style={S.opCode}>{formatDate(p.data?.fecha_fin)}</code>
-          <div style={S.timeMini}>{toTimeInput(p.data?.hora_fin)}</div>
+          <span style={S.dateTimeInline}><code style={S.opCode}>{formatDate(p.data?.fecha_fin)}</code><span style={S.timeMiniInline}>{toTimeInput(p.data?.hora_fin)}</span></span>
         </div>
       ),
       filter: 'agDateColumnFilter',
-      filterValueGetter: p => toDateInput(p.data?.fecha_fin),
     },
     {
       headerName: 'Tipo',
@@ -640,6 +672,11 @@ const TareasPage = () => {
           display: flex;
           align-items: center;
         }
+        .qf-tareas-grid .ag-cell[col-id="_inicio_sort"],
+        .qf-tareas-grid .ag-cell[col-id="_fin_sort"] {
+          white-space: nowrap;
+          overflow: visible;
+        }
       `}</style>
 
       <div style={S.topHeader}>
@@ -798,6 +835,8 @@ const S = {
   opCode: { background: '#e8eef5', padding: '1px 4px', borderRadius: 3, fontSize: 9.5, fontWeight: 800, color: 'var(--qf-navy)' },
   typePill: { background: '#e8eef5', color: 'var(--qf-navy)', borderRadius: 3, padding: '1px 4px', fontSize: 9.5, fontWeight: 700, whiteSpace: 'nowrap' },
   timeMini: { fontSize: 9, color: 'var(--qf-text-light)', marginTop: 2, fontWeight: 700 },
+  dateTimeInline: { display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' },
+  timeMiniInline: { fontSize: 9, color: 'var(--qf-text-light)', fontWeight: 700, whiteSpace: 'nowrap' },
   aBtn: { fontSize: 9, padding: '1px 4px' },
   footerCount: { padding: '6px 14px', borderTop: '1px solid var(--qf-border)', fontSize: 10.5, color: 'var(--qf-text-light)', background: '#fff' },
   detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 },
