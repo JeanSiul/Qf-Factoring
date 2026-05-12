@@ -60,6 +60,9 @@ const menuItems = [
       { icon: '🔐', label: 'Power BI Embedded', path: '/gerencia/powerbi-embedded', claim: 'GERBI' },
     ]
   },
+  {
+    icon: '📝', label: 'Tareas', path: '/tareas', claim: 'TAREAS'
+  },
 ]
 
 const Sidebar = ({ mobileOpen, onClose }) => {
