@@ -3,7 +3,7 @@ import { apiCall, toArray } from '../utils/api'
 import { useToast } from '../hooks/useToast'
 import ToastContainer from '../components/ToastContainer'
 import { useAuth } from '../context/AuthContext'
-import { AgGridReact } from './Gerencia/GerenciaCommon'
+import { AgGridReact } from 'ag-grid-react'
 
 const CLAIM = 'TAREAS'
 const DEBOUNCE_MS = 450
