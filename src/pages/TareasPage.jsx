@@ -73,6 +73,57 @@ const prioridadStyle = value => {
 
 const norm = value => String(value ?? '').toLowerCase().trim()
 
+const operadoresFiltro = [
+  { value: 'contains', label: 'Contiene' },
+  { value: 'not_contains', label: 'No contiene' },
+  { value: 'equals', label: 'Igual' },
+  { value: 'not_equals', label: 'Distinto' },
+  { value: 'starts', label: 'Empieza con' },
+  { value: 'ends', label: 'Termina con' },
+  { value: 'blank', label: 'Vacío' },
+  { value: 'not_blank', label: 'No vacío' },
+]
+
+const columnasFiltro = [
+  { key: 'fecha_inicio', type: 'date' },
+  { key: 'fecha_fin', type: 'date' },
+  { key: 'tipo_tarea', type: 'select', options: tipos },
+  { key: 'titulo', type: 'text' },
+  { key: 'usuario_nombre', type: 'text' },
+  { key: 'duracion_minutos', type: 'number' },
+  { key: 'estado', type: 'select', options: estados },
+  { key: 'prioridad', type: 'select', options: prioridades },
+]
+
+const initialColumnFilters = columnasFiltro.reduce((acc, col) => {
+  acc[col.key] = { op: col.type === 'select' ? 'equals' : 'contains', value: '' }
+  return acc
+}, {})
+
+const getFilterValue = (item, key) => {
+  if (key === 'duracion_minutos') return String(calcMinutes(item))
+  if (key === 'fecha_inicio' || key === 'fecha_fin') return toDateInput(item?.[key])
+  return item?.[key] ?? ''
+}
+
+const matchColumnFilter = (rawValue, filter) => {
+  const op = filter?.op || 'contains'
+  const value = filter?.value ?? ''
+  const left = norm(rawValue)
+  const right = norm(value)
+
+  if (op === 'blank') return left === ''
+  if (op === 'not_blank') return left !== ''
+  if (!right) return true
+
+  if (op === 'not_contains') return !left.includes(right)
+  if (op === 'equals') return left === right
+  if (op === 'not_equals') return left !== right
+  if (op === 'starts') return left.startsWith(right)
+  if (op === 'ends') return left.endsWith(right)
+  return left.includes(right)
+}
+
 const emptyTask = user => ({
   tipo_tarea: 'Soporte',
   titulo: '',
@@ -273,6 +324,8 @@ const TareasPage = () => {
   const [compactMode, setCompactMode] = useState(true)
   const [sortField, setSortField] = useState('fecha_inicio')
   const [sortDir, setSortDir] = useState('desc')
+  const [columnFilters, setColumnFilters] = useState(initialColumnFilters)
+  const [openFilter, setOpenFilter] = useState(null)
 
   const cv = permisos?.[CLAIM] || '11111111111'
   const canList = cv[1] !== '0'
@@ -327,9 +380,35 @@ const TareasPage = () => {
     setEstado('all')
     setDesde('')
     setHasta('')
+    setColumnFilters(initialColumnFilters)
+    setOpenFilter(null)
     setPage(1)
     cargar({ page: 1, campo: 'all', busqueda: '', tipo: 'all', estado: 'all', desde: '', hasta: '' })
   }
+
+  const setColumnFilter = (key, patch) => {
+    setColumnFilters(prev => ({
+      ...prev,
+      [key]: { ...prev[key], ...patch },
+    }))
+    setPage(1)
+  }
+
+  const clearColumnFilter = key => {
+    setColumnFilters(prev => ({
+      ...prev,
+      [key]: { ...initialColumnFilters[key] },
+    }))
+    setOpenFilter(null)
+    setPage(1)
+  }
+
+  const columnFiltersActive = useMemo(() => (
+    Object.values(columnFilters).some(f => {
+      const op = f?.op || 'contains'
+      return ['blank', 'not_blank'].includes(op) || String(f?.value || '').trim()
+    })
+  ), [columnFilters])
 
   const handleSave = async payload => {
     const p = {
@@ -364,20 +443,29 @@ const TareasPage = () => {
     }
   }
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize))
-  const from = total === 0 ? 0 : ((page - 1) * pageSize) + 1
-  const to = Math.min(page * pageSize, total)
+  const filteredData = useMemo(() => (
+    data.filter(row => columnasFiltro.every(col => matchColumnFilter(getFilterValue(row, col.key), columnFilters[col.key])))
+  ), [data, columnFilters])
+
+  const vistaTotal = filteredData.length
+  const totalPages = Math.max(1, Math.ceil(vistaTotal / pageSize))
+  const from = vistaTotal === 0 ? 0 : ((page - 1) * pageSize) + 1
+  const to = Math.min(page * pageSize, vistaTotal)
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
 
   const metrics = useMemo(() => {
-    const mins = data.reduce((s, r) => s + calcMinutes(r), 0)
+    const mins = filteredData.reduce((s, r) => s + calcMinutes(r), 0)
     return {
       horas: minToTime(mins),
-      soporte: data.filter(r => r.tipo_tarea === 'Soporte').length,
-      programacion: data.filter(r => r.tipo_tarea === 'Programación').length,
-      completadas: data.filter(r => r.estado === 'Completado').length,
-      pendientes: data.filter(r => ['Pendiente', 'En proceso'].includes(r.estado)).length,
+      soporte: filteredData.filter(r => r.tipo_tarea === 'Soporte').length,
+      programacion: filteredData.filter(r => r.tipo_tarea === 'Programación').length,
+      completadas: filteredData.filter(r => r.estado === 'Completado').length,
+      pendientes: filteredData.filter(r => ['Pendiente', 'En proceso'].includes(r.estado)).length,
     }
-  }, [data])
+  }, [filteredData])
 
   const handleSort = f => {
     if (sortField === f) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -388,8 +476,8 @@ const TareasPage = () => {
   }
 
   const sortedData = useMemo(() => {
-    if (!sortField) return data
-    return [...data].sort((a, b) => {
+    if (!sortField) return filteredData
+    return [...filteredData].sort((a, b) => {
       let va = a[sortField]
       let vb = b[sortField]
       if (sortField === 'duracion_minutos') return sortDir === 'asc' ? calcMinutes(a) - calcMinutes(b) : calcMinutes(b) - calcMinutes(a)
@@ -401,9 +489,69 @@ const TareasPage = () => {
       vb = String(vb || '').toLowerCase()
       return va < vb ? (sortDir === 'asc' ? -1 : 1) : va > vb ? (sortDir === 'asc' ? 1 : -1) : 0
     })
-  }, [data, sortField, sortDir])
+  }, [filteredData, sortField, sortDir]
 
   const si = f => sortField !== f ? ' ↕' : sortDir === 'asc' ? ' ▲' : ' ▼'
+  const paginatedData = useMemo(() => sortedData.slice((page - 1) * pageSize, page * pageSize), [sortedData, page, pageSize])
+
+  const FilterCell = ({ col, align = 'left' }) => {
+    const filter = columnFilters[col.key] || initialColumnFilters[col.key]
+    const active = ['blank', 'not_blank'].includes(filter.op) || String(filter.value || '').trim()
+    const showInput = !['blank', 'not_blank'].includes(filter.op)
+
+    return (
+      <th style={{ ...S.filterTh, textAlign: align }}>
+        <div style={{ ...S.colFilterWrap, justifyContent: align === 'center' ? 'center' : 'flex-start' }}>
+          {col.type === 'select' ? (
+            <select
+              className="filter-input"
+              value={filter.value}
+              onChange={e => setColumnFilter(col.key, { value: e.target.value })}
+              style={S.colSelect}
+            >
+              <option value="">Todos</option>
+              {(col.options || []).map(x => <option key={x} value={x}>{x}</option>)}
+            </select>
+          ) : showInput ? (
+            <input
+              className="filter-input"
+              type={col.type === 'date' ? 'date' : col.type === 'number' ? 'number' : 'text'}
+              value={filter.value}
+              onChange={e => setColumnFilter(col.key, { value: e.target.value })}
+              style={S.colInput}
+            />
+          ) : (
+            <span style={S.blankFilterLabel}>{filter.op === 'blank' ? 'Vacío' : 'No vacío'}</span>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setOpenFilter(openFilter === col.key ? null : col.key)}
+            style={{ ...S.filterIconBtn, color: active ? '#185FA5' : 'var(--qf-text-light)' }}
+            title="Opciones de filtro"
+          >
+            ≡
+          </button>
+
+          {openFilter === col.key && (
+            <div style={S.filterMenu}>
+              {operadoresFiltro.map(op => (
+                <button
+                  key={op.value}
+                  type="button"
+                  onClick={() => setColumnFilter(col.key, { op: op.value, value: ['blank', 'not_blank'].includes(op.value) ? '' : filter.value })}
+                  style={{ ...S.filterOption, ...(filter.op === op.value ? S.filterOptionActive : {}) }}
+                >
+                  {op.label}
+                </button>
+              ))}
+              <button type="button" onClick={() => clearColumnFilter(col.key)} style={S.filterClear}>Limpiar columna</button>
+            </div>
+          )}
+        </div>
+      </th>
+    )
+  }
 
   if (!canList) {
     return (
@@ -434,7 +582,7 @@ const TareasPage = () => {
       <div style={S.kpiGrid}>
         {[
           { l: 'Total registros', v: total, c: 'var(--qf-navy)', b: '#2196f3' },
-          { l: 'Mostradas', v: data.length, c: '#185FA5', b: '#03a9f4' },
+          { l: 'Mostradas', v: vistaTotal, c: '#185FA5', b: '#03a9f4' },
           { l: 'Horas registradas', v: metrics.horas, c: '#2e7d32', b: '#4caf50' },
           { l: 'Soporte', v: metrics.soporte, c: '#e65100', b: '#ff9800' },
           { l: 'Programación', v: metrics.programacion, c: '#5e35b1', b: '#7e57c2' },
@@ -491,7 +639,7 @@ const TareasPage = () => {
           </div>
 
           <div style={S.pagRow}>
-            <span style={S.pill}>{from}-{to} de {total}</span>
+            <span style={S.pill}>{from}-{to} de {vistaTotal}</span>
             <select className="filter-input" value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }} style={{ width: 'auto', minWidth: 52, height: 28, fontSize: 11, padding: '0 4px' }}>
               <option value={25}>25</option>
               <option value={50}>50</option>
@@ -511,7 +659,7 @@ const TareasPage = () => {
         <div style={{ overflow: 'auto', width: '100%', maxHeight: compactMode ? 'calc(100vh - 340px)' : 'calc(100vh - 400px)' }}>
           {loading && data.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner dark" /></div>
-          ) : data.length === 0 ? (
+          ) : filteredData.length === 0 ? (
             <div className="empty-state"><div className="icon">📝</div><p>No se encontraron tareas</p></div>
           ) : (
             <table className="qf-table" style={{ width: '100%', tableLayout: 'auto', fontSize: compactMode ? 10.5 : 12 }}>
@@ -527,10 +675,25 @@ const TareasPage = () => {
                   <th style={S.ths} onClick={() => handleSort('prioridad')}>Prioridad<span style={S.si}>{si('prioridad')}</span></th>
                   <th style={{ ...S.th0, textAlign: 'center' }}>Acc.</th>
                 </tr>
+                <tr>
+                  <FilterCell col={columnasFiltro[0]} />
+                  <FilterCell col={columnasFiltro[1]} />
+                  <FilterCell col={columnasFiltro[2]} />
+                  <FilterCell col={columnasFiltro[3]} />
+                  <FilterCell col={columnasFiltro[4]} />
+                  <FilterCell col={columnasFiltro[5]} />
+                  <FilterCell col={columnasFiltro[6]} />
+                  <FilterCell col={columnasFiltro[7]} />
+                  <th style={{ ...S.filterTh, textAlign: 'center' }}>
+                    {columnFiltersActive && (
+                      <button className="btn btn-secondary btn-sm" onClick={limpiar} style={S.aBtn}>Limpiar</button>
+                    )}
+                  </th>
+                </tr>
               </thead>
 
               <tbody>
-                {sortedData.map(r => (
+                {paginatedData.map(r => (
                   <tr key={r.id} style={compactMode ? { height: 32 } : undefined}>
                     <td style={S.td}>
                       <code style={S.opCode}>{formatDate(r.fecha_inicio)}</code>
@@ -560,7 +723,7 @@ const TareasPage = () => {
           )}
         </div>
 
-        {!loading && <div style={S.footerCount}>{data.length} de {total} tareas</div>}
+        {!loading && <div style={S.footerCount}>{paginatedData.length} de {vistaTotal} tareas</div>}
       </div>
 
       {modal?.type === 'detalle' && <ModalDetalle item={modal.data} onClose={() => setModal(null)} />}
@@ -595,6 +758,16 @@ const S = {
   th0: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 9, padding: '5px 4px' },
   ths: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 9, padding: '5px 4px', cursor: 'pointer', userSelect: 'none' },
   si: { fontSize: 7, opacity: 0.45, marginLeft: 1 },
+  filterTh: { position: 'sticky', top: 24, zIndex: 9, background: '#fff', borderBottom: '1px solid var(--qf-border)', padding: '4px', whiteSpace: 'nowrap' },
+  colFilterWrap: { display: 'flex', alignItems: 'center', gap: 4, position: 'relative' },
+  colInput: { width: '100%', minWidth: 62, height: 24, fontSize: 10, padding: '2px 4px' },
+  colSelect: { width: '100%', minWidth: 82, height: 24, fontSize: 10, padding: '2px 4px' },
+  filterIconBtn: { border: '0', background: 'transparent', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '2px 3px', transform: 'rotate(90deg)' },
+  filterMenu: { position: 'absolute', top: 26, right: 0, zIndex: 30, background: '#fff', border: '1px solid var(--qf-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.16)', minWidth: 150, padding: 5 },
+  filterOption: { display: 'block', width: '100%', border: 0, background: '#fff', textAlign: 'left', padding: '6px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', color: 'var(--qf-navy)' },
+  filterOptionActive: { background: '#e8f2ff', fontWeight: 800 },
+  filterClear: { display: 'block', width: '100%', border: 0, background: '#f8fafc', textAlign: 'left', padding: '6px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', color: '#c62828', marginTop: 4, fontWeight: 700 },
+  blankFilterLabel: { height: 24, minWidth: 62, display: 'inline-flex', alignItems: 'center', padding: '0 6px', border: '1px solid var(--qf-border)', borderRadius: 6, fontSize: 10, color: 'var(--qf-text-light)', background: '#f8fafc' },
   td: { padding: '3px 4px', verticalAlign: 'middle', lineHeight: 1.15 },
   opCode: { background: '#e8eef5', padding: '1px 4px', borderRadius: 3, fontSize: 9.5, fontWeight: 800, color: 'var(--qf-navy)' },
   typePill: { background: '#e8eef5', color: 'var(--qf-navy)', borderRadius: 3, padding: '1px 4px', fontSize: 9.5, fontWeight: 700, whiteSpace: 'nowrap' },
