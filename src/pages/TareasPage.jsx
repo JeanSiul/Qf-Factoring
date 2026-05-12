@@ -1,432 +1,613 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { apiCall, toArray } from '../utils/api'
-import ToastContainer from '../components/ToastContainer'
 import { useToast } from '../hooks/useToast'
+import ToastContainer from '../components/ToastContainer'
 import { useAuth } from '../context/AuthContext'
 
-const ENDPOINTS = {
-  listar: '/qf/tareas/listar',
-  crear: '/qf/tareas/crear',
-  actualizar: '/qf/tareas/actualizar',
-  eliminar: '/qf/tareas/eliminar',
-}
+const CLAIM = 'TAREAS'
+const DEBOUNCE_MS = 450
 
-const emptyForm = {
-  id: null,
-  tipo_tarea: 'Soporte',
-  titulo: '',
-  descripcion: '',
-  fecha_inicio: '',
-  hora_inicio: '',
-  fecha_fin: '',
-  hora_fin: '',
-  estado: 'Completado',
-  prioridad: 'Media',
-  observaciones: '',
-}
+const camposBusqueda = [
+  { value: 'all', label: 'Todos' },
+  { value: 'titulo', label: 'Título' },
+  { value: 'descripcion', label: 'Descripción' },
+  { value: 'tipo_tarea', label: 'Tipo' },
+  { value: 'estado', label: 'Estado' },
+  { value: 'prioridad', label: 'Prioridad' },
+  { value: 'usuario_nombre', label: 'Usuario' },
+]
 
 const tipos = ['Soporte', 'Programación', 'Reunión', 'Análisis', 'Gestión', 'Documentación', 'Otro']
 const estados = ['Pendiente', 'En proceso', 'Completado', 'Cancelado']
 const prioridades = ['Baja', 'Media', 'Alta', 'Crítica']
 
-const norm = v => String(v ?? '').toLowerCase().trim()
-const fmtDate = v => v ? new Date(`${v}T00:00:00`).toLocaleDateString('es-PE') : '-'
-const minToTime = min => {
-  const n = Number(min || 0)
+const formatDate = value => {
+  if (!value) return '-'
+  const d = new Date(String(value).includes('T') ? value : `${value}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return String(value).slice(0, 10)
+  return d.toLocaleDateString('es-PE')
+}
+
+const toDateInput = value => {
+  if (!value) return ''
+  const d = new Date(String(value).includes('T') ? value : `${value}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return String(value).slice(0, 10)
+  return d.toISOString().slice(0, 10)
+}
+
+const toTimeInput = value => String(value || '').slice(0, 5)
+
+const today = () => new Date().toISOString().slice(0, 10)
+const nowTime = () => new Date().toTimeString().slice(0, 5)
+
+const minToTime = value => {
+  const n = Number(value || 0)
   const h = Math.floor(n / 60)
   const m = n % 60
   return `${h}h ${String(m).padStart(2, '0')}m`
 }
-const today = () => new Date().toISOString().slice(0, 10)
-const nowTime = () => new Date().toTimeString().slice(0, 5)
 
-export default function TareasPage() {
-  const { user } = useAuth()
+const calcMinutes = item => {
+  if (item?.duracion_minutos !== undefined && item?.duracion_minutos !== null) return Number(item.duracion_minutos || 0)
+  if (!item?.fecha_inicio || !item?.hora_inicio || !item?.fecha_fin || !item?.hora_fin) return 0
+  const ini = new Date(`${item.fecha_inicio}T${toTimeInput(item.hora_inicio)}`)
+  const fin = new Date(`${item.fecha_fin}T${toTimeInput(item.hora_fin)}`)
+  if (Number.isNaN(ini.getTime()) || Number.isNaN(fin.getTime())) return 0
+  return Math.max(0, Math.round((fin - ini) / 60000))
+}
+
+const badgeClass = status => {
+  const s = String(status || '').toLowerCase()
+  if (s.includes('pendiente') || s.includes('proceso')) return 'warning'
+  if (s.includes('completado') || s.includes('finalizado')) return 'active'
+  if (s.includes('cancelado') || s.includes('error')) return 'inactive'
+  return 'warning'
+}
+
+const prioridadStyle = value => {
+  const s = String(value || '').toLowerCase()
+  if (s.includes('crítica') || s.includes('critica') || s.includes('alta')) return 'inactive'
+  if (s.includes('media')) return 'warning'
+  return 'active'
+}
+
+const norm = value => String(value ?? '').toLowerCase().trim()
+
+const emptyTask = user => ({
+  tipo_tarea: 'Soporte',
+  titulo: '',
+  descripcion: '',
+  fecha_inicio: today(),
+  hora_inicio: nowTime(),
+  fecha_fin: today(),
+  hora_fin: nowTime(),
+  estado: 'Completado',
+  prioridad: 'Media',
+  observaciones: '',
+  usuario_id: user?.id || user?.userId || user?.email || user?.username || '',
+  usuario_nombre: user?.name || user?.nombre || user?.username || user?.email || 'Usuario',
+  usuario_email: user?.email || '',
+})
+
+const ModalDetalle = ({ item, onClose }) => (
+  <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="modal" style={{ maxWidth: 820 }}>
+      <div className="modal-header">
+        <h3>Detalle — {item.titulo || item.id}</h3>
+        <button className="modal-close" onClick={onClose}>x</button>
+      </div>
+
+      <div className="modal-body">
+        <div style={S.detailGrid}>
+          {[
+            ['ID', item.id || '-'],
+            ['Tipo', item.tipo_tarea || '-'],
+            ['Título', item.titulo || '-'],
+            ['Usuario', item.usuario_nombre || item.usuario_email || item.usuario_id || '-'],
+            ['Email', item.usuario_email || '-'],
+            ['Inicio', `${formatDate(item.fecha_inicio)} ${toTimeInput(item.hora_inicio)}`],
+            ['Fin', `${formatDate(item.fecha_fin)} ${toTimeInput(item.hora_fin)}`],
+            ['Duración', minToTime(calcMinutes(item))],
+            ['Estado', item.estado || '-'],
+            ['Prioridad', item.prioridad || '-'],
+            ['Descripción', item.descripcion || '-'],
+            ['Observaciones', item.observaciones || '-'],
+            ['Creado', formatDate(item.created_at)],
+            ['Actualizado', formatDate(item.updated_at)],
+          ].map(([k, v]) => (
+            <div key={k} style={S.detailBox}>
+              <div style={S.detailLabel}>{k}</div>
+              <div style={S.detailValue}>{v}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="modal-footer">
+        <button className="btn btn-secondary" onClick={onClose}>Cerrar</button>
+      </div>
+    </div>
+  </div>
+)
+
+const ModalTarea = ({ item, user, onClose, onSave }) => {
+  const isEdit = !!item?.id
+  const [form, setForm] = useState({
+    ...emptyTask(user),
+    ...(item || {}),
+    fecha_inicio: toDateInput(item?.fecha_inicio) || today(),
+    fecha_fin: toDateInput(item?.fecha_fin) || today(),
+    hora_inicio: toTimeInput(item?.hora_inicio) || nowTime(),
+    hora_fin: toTimeInput(item?.hora_fin) || nowTime(),
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const submit = async () => {
+    if (!form.titulo?.trim()) return setError('El título es requerido')
+    if (!form.fecha_inicio || !form.hora_inicio) return setError('Fecha y hora de inicio son requeridas')
+    if (!form.fecha_fin || !form.hora_fin) return setError('Fecha y hora final son requeridas')
+
+    const ini = new Date(`${form.fecha_inicio}T${form.hora_inicio}`)
+    const fin = new Date(`${form.fecha_fin}T${form.hora_fin}`)
+    if (fin < ini) return setError('La fecha/hora final no puede ser menor que la inicial')
+
+    setSaving(true)
+    setError('')
+    try {
+      await onSave({
+        ...form,
+        titulo: form.titulo.trim(),
+        descripcion: form.descripcion || '',
+        observaciones: form.observaciones || '',
+      })
+      onClose()
+    } catch (e) {
+      setError(e.message || 'No se pudo guardar')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 920, width: '94vw' }}>
+        <div className="modal-header">
+          <h3>{isEdit ? 'Editar Tarea' : 'Nueva Tarea'}</h3>
+          <button className="modal-close" onClick={onClose}>x</button>
+        </div>
+
+        <div className="modal-body" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
+          <div style={S.g3}>
+            <div className="form-group">
+              <label className="form-label">Tipo *</label>
+              <select className="form-control" value={form.tipo_tarea} onChange={e => set('tipo_tarea', e.target.value)}>
+                {tipos.map(x => <option key={x} value={x}>{x}</option>)}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Estado *</label>
+              <select className="form-control" value={form.estado} onChange={e => set('estado', e.target.value)}>
+                {estados.map(x => <option key={x} value={x}>{x}</option>)}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Prioridad *</label>
+              <select className="form-control" value={form.prioridad} onChange={e => set('prioridad', e.target.value)}>
+                {prioridades.map(x => <option key={x} value={x}>{x}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Título *</label>
+            <input className="form-control" value={form.titulo} onChange={e => set('titulo', e.target.value)} maxLength={180} />
+          </div>
+
+          <div style={S.g4}>
+            <div className="form-group">
+              <label className="form-label">Fecha inicio *</label>
+              <input className="form-control" type="date" value={form.fecha_inicio} onChange={e => set('fecha_inicio', e.target.value)} />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Hora inicio *</label>
+              <input className="form-control" type="time" value={form.hora_inicio} onChange={e => set('hora_inicio', e.target.value)} />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Fecha fin *</label>
+              <input className="form-control" type="date" value={form.fecha_fin} onChange={e => set('fecha_fin', e.target.value)} />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Hora fin *</label>
+              <input className="form-control" type="time" value={form.hora_fin} onChange={e => set('hora_fin', e.target.value)} />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Descripción</label>
+            <textarea className="form-control" rows={4} value={form.descripcion || ''} onChange={e => set('descripcion', e.target.value)} />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Observaciones</label>
+            <textarea className="form-control" rows={3} value={form.observaciones || ''} onChange={e => set('observaciones', e.target.value)} />
+          </div>
+
+          {error && <div style={S.errorBox}>⚠ {error}</div>}
+        </div>
+
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-primary" onClick={submit} disabled={saving}>
+            {saving ? 'Guardando...' : isEdit ? 'Actualizar' : 'Registrar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const TareasPage = () => {
+  const { permisos, user } = useAuth()
   const { toasts, show } = useToast()
 
-  const [rows, setRows] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [modal, setModal] = useState(null)
-  const [form, setForm] = useState(emptyForm)
-
-  const [q, setQ] = useState('')
-  const [tipo, setTipo] = useState('')
-  const [estado, setEstado] = useState('')
-  const [usuario, setUsuario] = useState('')
+  const [data, setData] = useState([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
+  const [campo, setCampo] = useState('all')
+  const [busqueda, setBusqueda] = useState('')
+  const [tipo, setTipo] = useState('all')
+  const [estado, setEstado] = useState('all')
   const [desde, setDesde] = useState('')
   const [hasta, setHasta] = useState('')
-  const [sort, setSort] = useState({ key: 'fecha_inicio', dir: 'desc' })
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [loading, setLoading] = useState(true)
+  const [modal, setModal] = useState(null)
+  const [compactMode, setCompactMode] = useState(true)
+  const [sortField, setSortField] = useState('fecha_inicio')
+  const [sortDir, setSortDir] = useState('desc')
+
+  const cv = permisos?.[CLAIM] || '11111111111'
+  const canList = cv[1] !== '0'
+  const canView = cv[2] !== '0'
+  const canEdit = cv[3] !== '0'
+  const canCreate = cv[5] !== '0'
+  const canDelete = cv[6] !== '0'
 
   const userId = user?.id || user?.userId || user?.email || user?.username || ''
   const userName = user?.name || user?.nombre || user?.username || user?.email || 'Usuario'
   const userEmail = user?.email || ''
-  const isAdmin = Boolean(user?.isAdmin || user?.role === 'admin' || user?.claims?.TAREAS_ADMIN || user?.permissions?.TAREAS_ADMIN)
 
-  const cargar = async () => {
+  const cargar = async (opts = {}) => {
     setLoading(true)
     try {
-      const endpoint = `${ENDPOINTS.listar}?page=1&pageSize=5000${!isAdmin && userId ? `&usuario_id=${encodeURIComponent(userId)}` : ''}`
-      const res = await apiCall(endpoint)
-      const data = Array.isArray(res) ? res : (res?.data || res?.items || res?.rows || [])
-      setRows(toArray(data))
+      const qs = new URLSearchParams()
+      qs.set('page', String(opts.page || page))
+      qs.set('pageSize', String(opts.pageSize || pageSize))
+      qs.set('field', opts.campo ?? campo)
+      if ((opts.busqueda ?? busqueda).trim()) qs.set('q', (opts.busqueda ?? busqueda).trim())
+      if ((opts.tipo ?? tipo) !== 'all') qs.set('tipo_tarea', opts.tipo ?? tipo)
+      if ((opts.estado ?? estado) !== 'all') qs.set('estado', opts.estado ?? estado)
+      if (opts.desde ?? desde) qs.set('desde', opts.desde ?? desde)
+      if (opts.hasta ?? hasta) qs.set('hasta', opts.hasta ?? hasta)
+      if (userId) qs.set('usuario_id', userId)
+
+      const res = await apiCall(`/qf/tareas/listar?${qs}`)
+      const rows = Array.isArray(res) ? res : (res?.data || res?.items || [])
+      setData(toArray(rows))
+      setTotal(Number(res?.total ?? rows.length))
     } catch (e) {
-      show('No se pudo cargar tareas: ' + (e.message || ''), 'error')
+      show('Error: ' + e.message, 'error')
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { cargar() }, [])
+  useEffect(() => { cargar() }, [page, pageSize])
 
-  const usuarios = useMemo(() => {
-    const set = new Set(rows.map(r => r.usuario_nombre || r.usuario_email || r.usuario_id).filter(Boolean))
-    return [...set].sort()
-  }, [rows])
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setPage(1)
+      cargar({ page: 1 })
+    }, DEBOUNCE_MS)
+    return () => clearTimeout(t)
+  }, [busqueda, campo, tipo, estado, desde, hasta])
 
-  const filtered = useMemo(() => {
-    const term = norm(q)
-    return rows
-      .filter(r => {
-        const txt = `${r.titulo} ${r.descripcion} ${r.tipo_tarea} ${r.estado} ${r.prioridad} ${r.usuario_nombre} ${r.usuario_email} ${r.observaciones}`
-        const okQ = !term || norm(txt).includes(term)
-        const okTipo = !tipo || r.tipo_tarea === tipo
-        const okEstado = !estado || r.estado === estado
-        const okUser = !usuario || (r.usuario_nombre === usuario || r.usuario_email === usuario || r.usuario_id === usuario)
-        const okDesde = !desde || String(r.fecha_inicio || '') >= desde
-        const okHasta = !hasta || String(r.fecha_inicio || '') <= hasta
-        return okQ && okTipo && okEstado && okUser && okDesde && okHasta
-      })
-      .sort((a, b) => {
-        const av = a[sort.key] ?? ''
-        const bv = b[sort.key] ?? ''
-        const mult = sort.dir === 'asc' ? 1 : -1
-        if (sort.key === 'duracion_minutos') return (Number(av) - Number(bv)) * mult
-        return String(av).localeCompare(String(bv)) * mult
-      })
-  }, [rows, q, tipo, estado, usuario, desde, hasta, sort])
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
-  const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize)
-
-  const kpis = useMemo(() => {
-    const totalMin = filtered.reduce((s, r) => s + Number(r.duracion_minutos || 0), 0)
-    return {
-      total: filtered.length,
-      horas: minToTime(totalMin),
-      soporte: filtered.filter(r => r.tipo_tarea === 'Soporte').length,
-      programacion: filtered.filter(r => r.tipo_tarea === 'Programación').length,
-      completadas: filtered.filter(r => r.estado === 'Completado').length,
-      pendientes: filtered.filter(r => r.estado !== 'Completado' && r.estado !== 'Cancelado').length,
-    }
-  }, [filtered])
-
-  const resetFilters = () => {
-    setQ('')
-    setTipo('')
-    setEstado('')
-    setUsuario('')
+  const limpiar = () => {
+    setCampo('all')
+    setBusqueda('')
+    setTipo('all')
+    setEstado('all')
     setDesde('')
     setHasta('')
     setPage(1)
+    cargar({ page: 1, campo: 'all', busqueda: '', tipo: 'all', estado: 'all', desde: '', hasta: '' })
   }
 
-  const openCreate = () => {
-    const d = today()
-    const h = nowTime()
-    setForm({ ...emptyForm, fecha_inicio: d, fecha_fin: d, hora_inicio: h, hora_fin: h })
-    setModal('create')
-  }
+  const handleSave = async payload => {
+    const p = {
+      ...payload,
+      usuario_id: payload.usuario_id || userId,
+      usuario_nombre: payload.usuario_nombre || userName,
+      usuario_email: payload.usuario_email || userEmail,
+    }
 
-  const openEdit = r => {
-    setForm({
-      id: r.id,
-      tipo_tarea: r.tipo_tarea || 'Otro',
-      titulo: r.titulo || '',
-      descripcion: r.descripcion || '',
-      fecha_inicio: r.fecha_inicio || '',
-      hora_inicio: String(r.hora_inicio || '').slice(0, 5),
-      fecha_fin: r.fecha_fin || '',
-      hora_fin: String(r.hora_fin || '').slice(0, 5),
-      estado: r.estado || 'Completado',
-      prioridad: r.prioridad || 'Media',
-      observaciones: r.observaciones || '',
+    const res = await apiCall(p.id ? '/qf/tareas/actualizar' : '/qf/tareas/crear', {
+      method: p.id ? 'PUT' : 'POST',
+      body: JSON.stringify(p),
     })
-    setModal('edit')
+
+    if (res?.success === false) throw new Error(res?.message || 'Error')
+    show(p.id ? 'Tarea actualizada' : 'Tarea registrada')
+    cargar()
   }
 
-  const openView = r => {
-    setForm({ ...r, hora_inicio: String(r.hora_inicio || '').slice(0, 5), hora_fin: String(r.hora_fin || '').slice(0, 5) })
-    setModal('view')
-  }
-
-  const validar = () => {
-    if (!form.titulo.trim()) return 'Ingrese título de tarea'
-    if (!form.fecha_inicio || !form.hora_inicio) return 'Ingrese fecha/hora de inicio'
-    if (!form.fecha_fin || !form.hora_fin) return 'Ingrese fecha/hora final'
-    const ini = new Date(`${form.fecha_inicio}T${form.hora_inicio}`)
-    const fin = new Date(`${form.fecha_fin}T${form.hora_fin}`)
-    if (fin < ini) return 'La fecha/hora final no puede ser menor que la inicial'
-    return ''
-  }
-
-  const guardar = async () => {
-    const error = validar()
-    if (error) return show(error, 'warning')
-
-    const payload = { ...form, usuario_id: userId, usuario_nombre: userName, usuario_email: userEmail }
-
+  const handleDelete = async item => {
+    if (!confirm(`¿Eliminar la tarea "${item.titulo || item.id}"?`)) return
     try {
-      if (modal === 'edit') {
-        await apiCall(ENDPOINTS.actualizar, { method: 'PUT', body: payload })
-        show('Tarea actualizada correctamente', 'success')
-      } else {
-        await apiCall(ENDPOINTS.crear, { method: 'POST', body: payload })
-        show('Tarea creada correctamente', 'success')
+      const res = await apiCall('/qf/tareas/eliminar', {
+        method: 'DELETE',
+        body: JSON.stringify({ id: item.id }),
+      })
+      if (res?.success === false) throw new Error(res?.message || 'Error')
+      show('Tarea eliminada')
+      cargar()
+    } catch (e) {
+      show(e.message, 'error')
+    }
+  }
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const from = total === 0 ? 0 : ((page - 1) * pageSize) + 1
+  const to = Math.min(page * pageSize, total)
+
+  const metrics = useMemo(() => {
+    const mins = data.reduce((s, r) => s + calcMinutes(r), 0)
+    return {
+      horas: minToTime(mins),
+      soporte: data.filter(r => r.tipo_tarea === 'Soporte').length,
+      programacion: data.filter(r => r.tipo_tarea === 'Programación').length,
+      completadas: data.filter(r => r.estado === 'Completado').length,
+      pendientes: data.filter(r => ['Pendiente', 'En proceso'].includes(r.estado)).length,
+    }
+  }, [data])
+
+  const handleSort = f => {
+    if (sortField === f) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else {
+      setSortField(f)
+      setSortDir('asc')
+    }
+  }
+
+  const sortedData = useMemo(() => {
+    if (!sortField) return data
+    return [...data].sort((a, b) => {
+      let va = a[sortField]
+      let vb = b[sortField]
+      if (sortField === 'duracion_minutos') return sortDir === 'asc' ? calcMinutes(a) - calcMinutes(b) : calcMinutes(b) - calcMinutes(a)
+      if (sortField === 'fecha_inicio') {
+        va = `${a.fecha_inicio || ''} ${a.hora_inicio || ''}`
+        vb = `${b.fecha_inicio || ''} ${b.hora_inicio || ''}`
       }
-      setModal(null)
-      cargar()
-    } catch (e) {
-      show('No se pudo guardar: ' + (e.message || ''), 'error')
-    }
-  }
+      va = String(va || '').toLowerCase()
+      vb = String(vb || '').toLowerCase()
+      return va < vb ? (sortDir === 'asc' ? -1 : 1) : va > vb ? (sortDir === 'asc' ? 1 : -1) : 0
+    })
+  }, [data, sortField, sortDir])
 
-  const eliminar = async r => {
-    if (!window.confirm(`¿Eliminar la tarea "${r.titulo}"?`)) return
-    try {
-      await apiCall(ENDPOINTS.eliminar, { method: 'DELETE', body: { id: r.id } })
-      show('Tarea eliminada', 'success')
-      cargar()
-    } catch (e) {
-      show('No se pudo eliminar: ' + (e.message || ''), 'error')
-    }
-  }
+  const si = f => sortField !== f ? ' ↕' : sortDir === 'asc' ? ' ▲' : ' ▼'
 
-  const th = (key, label) => (
-    <th onClick={() => setSort(s => ({ key, dir: s.key === key && s.dir === 'asc' ? 'desc' : 'asc' }))}>
-      {label} {sort.key === key ? (sort.dir === 'asc' ? '▲' : '▼') : ''}
-    </th>
-  )
+  if (!canList) {
+    return (
+      <div className="fade-in" style={S.page}>
+        <div style={S.topHeader}>
+          <h1 style={S.title}>📝 Tareas</h1>
+          <p style={S.subtitle}>No tienes permisos para ver esta lista</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="fade-in">
+    <div className="fade-in" style={S.page}>
       <ToastContainer toasts={toasts} />
 
-      <div className="page-header compact">
-        <div>
-          <h1>📝 Tareas</h1>
-          <p>Bitácora de tareas realizadas por usuario, con fechas, horas y reporte filtrable.</p>
-        </div>
-        <div className="header-actions">
-          <button className="btn btn-primary btn-sm" onClick={openCreate}>+ Nueva tarea</button>
-          <button className="btn btn-secondary btn-sm" onClick={cargar}>Actualizar</button>
-        </div>
+      <div style={S.topHeader}>
+        <h1 style={S.title}>📝 Tareas</h1>
+        <p style={S.subtitle}>Bitácora de tareas realizadas por usuario, con fechas, horas y reporte filtrable.</p>
       </div>
 
-      <section className="metrics-grid compact">
-        <Metric label="Tareas" value={kpis.total} color="#185FA5" />
-        <Metric label="Horas" value={kpis.horas} color="#2E7D32" />
-        <Metric label="Soporte" value={kpis.soporte} color="#F57C00" />
-        <Metric label="Programación" value={kpis.programacion} color="#7E57C2" />
-        <Metric label="Completadas" value={kpis.completadas} color="#0097A7" />
-        <Metric label="Pendientes" value={kpis.pendientes} color="#C62828" />
-      </section>
+      <div style={S.actionBar}>
+        <button className="btn btn-secondary btn-sm" onClick={() => setCompactMode(v => !v)}>
+          {compactMode ? 'Vista cómoda' : 'Vista compacta'}
+        </button>
+      </div>
 
-      <section className="page-card compact">
-        <div className="filters-row">
-          <div className="filter-group wide">
-            <label>Buscar</label>
-            <input className="filter-input" value={q} onChange={e => { setQ(e.target.value); setPage(1) }} placeholder="Título, descripción, usuario..." />
+      <div style={S.kpiGrid}>
+        {[
+          { l: 'Total registros', v: total, c: 'var(--qf-navy)', b: '#2196f3' },
+          { l: 'Mostradas', v: data.length, c: '#185FA5', b: '#03a9f4' },
+          { l: 'Horas registradas', v: metrics.horas, c: '#2e7d32', b: '#4caf50' },
+          { l: 'Soporte', v: metrics.soporte, c: '#e65100', b: '#ff9800' },
+          { l: 'Programación', v: metrics.programacion, c: '#5e35b1', b: '#7e57c2' },
+          { l: 'Pendientes', v: metrics.pendientes, c: '#c62828', b: '#f44336' },
+        ].map(s => (
+          <div key={s.l} style={{ ...S.kpiCard, borderTop: `3px solid ${s.b}` }}>
+            <div style={S.kpiLabel}>{s.l}</div>
+            <div style={{ ...S.kpiValue, color: s.c }}>{s.v}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="page-card" style={S.card}>
+        <div style={S.stickyTools}>
+          <div style={S.cardTitleWrap}>
+            <h2 style={S.cardTitle}>Lista de Tareas</h2>
+            {canCreate && (
+              <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ color: '#4CAF50', fontWeight: 800, fontSize: 16 }}>+</span> Nueva Tarea
+              </button>
+            )}
           </div>
 
-          <div className="filter-group">
-            <label>Tipo</label>
-            <select className="filter-input" value={tipo} onChange={e => { setTipo(e.target.value); setPage(1) }}>
-              <option value="">Todos</option>
-              {tipos.map(x => <option key={x}>{x}</option>)}
+          <div style={S.filtersRow}>
+            <select className="filter-input" value={campo} onChange={e => setCampo(e.target.value)} style={S.fieldSelect}>
+              {camposBusqueda.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-          </div>
 
-          <div className="filter-group">
-            <label>Estado</label>
-            <select className="filter-input" value={estado} onChange={e => { setEstado(e.target.value); setPage(1) }}>
-              <option value="">Todos</option>
-              {estados.map(x => <option key={x}>{x}</option>)}
-            </select>
-          </div>
-
-          {isAdmin && (
-            <div className="filter-group">
-              <label>Usuario</label>
-              <select className="filter-input" value={usuario} onChange={e => { setUsuario(e.target.value); setPage(1) }}>
-                <option value="">Todos</option>
-                {usuarios.map(x => <option key={x}>{x}</option>)}
-              </select>
+            <div style={{ position: 'relative', flex: 1, maxWidth: 360 }}>
+              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5', pointerEvents: 'none' }}>🔍</span>
+              <input
+                className="filter-input"
+                placeholder={campo === 'all' ? 'Buscar...' : `Buscar por ${camposBusqueda.find(f => f.value === campo)?.label || ''}...`}
+                value={busqueda}
+                onChange={e => setBusqueda(e.target.value)}
+                style={{ ...S.searchInput, paddingLeft: 32, width: '100%' }}
+              />
             </div>
-          )}
 
-          <div className="filter-group">
-            <label>Desde</label>
-            <input className="filter-input" type="date" value={desde} onChange={e => { setDesde(e.target.value); setPage(1) }} />
+            <select className="filter-input" value={tipo} onChange={e => setTipo(e.target.value)} style={S.fieldSelect}>
+              <option value="all">Tipo: Todos</option>
+              {tipos.map(x => <option key={x} value={x}>{x}</option>)}
+            </select>
+
+            <select className="filter-input" value={estado} onChange={e => setEstado(e.target.value)} style={S.fieldSelect}>
+              <option value="all">Estado: Todos</option>
+              {estados.map(x => <option key={x} value={x}>{x}</option>)}
+            </select>
+
+            <input className="filter-input" type="date" value={desde} onChange={e => setDesde(e.target.value)} style={S.dateInput} />
+            <input className="filter-input" type="date" value={hasta} onChange={e => setHasta(e.target.value)} style={S.dateInput} />
+
+            <button className="btn btn-secondary btn-sm" onClick={limpiar}>Limpiar</button>
           </div>
 
-          <div className="filter-group">
-            <label>Hasta</label>
-            <input className="filter-input" type="date" value={hasta} onChange={e => { setHasta(e.target.value); setPage(1) }} />
+          <div style={S.pagRow}>
+            <span style={S.pill}>{from}-{to} de {total}</span>
+            <select className="filter-input" value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }} style={{ width: 'auto', minWidth: 52, height: 28, fontSize: 11, padding: '0 4px' }}>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={200}>200</option>
+            </select>
+
+            <button className="btn btn-secondary btn-sm" disabled={page <= 1 || loading} onClick={() => setPage(1)}>«</button>
+            <button className="btn btn-secondary btn-sm" disabled={page <= 1 || loading} onClick={() => setPage(p => Math.max(1, p - 1))}>‹</button>
+            <span style={S.pageInfo}>{page}/{totalPages}</span>
+            <button className="btn btn-secondary btn-sm" disabled={page >= totalPages || loading} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>›</button>
+            <button className="btn btn-secondary btn-sm" disabled={page >= totalPages || loading} onClick={() => setPage(totalPages)}>»</button>
+            {loading && <span style={S.loadMini}>...</span>}
           </div>
-
-          <button className="btn btn-secondary btn-sm" onClick={resetFilters}>Limpiar</button>
         </div>
 
-        <div className="table-toolbar">
-          <span>{filtered.length} registros</span>
-          <select className="filter-input small" value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}>
-            {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
-          </select>
-        </div>
-
-        <div className="table-scroll">
-          <table className="data-table compact clickable-head">
-            <thead>
-              <tr>
-                {th('fecha_inicio', 'Inicio')}
-                {th('hora_inicio', 'Hora')}
-                {th('fecha_fin', 'Fin')}
-                {th('tipo_tarea', 'Tipo')}
-                {th('titulo', 'Tarea')}
-                {th('usuario_nombre', 'Usuario')}
-                {th('duracion_minutos', 'Duración')}
-                {th('estado', 'Estado')}
-                {th('prioridad', 'Prioridad')}
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan="10" className="empty-cell">Cargando...</td></tr>
-              ) : pageRows.length === 0 ? (
-                <tr><td colSpan="10" className="empty-cell">Sin registros</td></tr>
-              ) : pageRows.map(r => (
-                <tr key={r.id}>
-                  <td>{fmtDate(r.fecha_inicio)}</td>
-                  <td>{String(r.hora_inicio || '').slice(0, 5)}</td>
-                  <td>{fmtDate(r.fecha_fin)}</td>
-                  <td><Badge text={r.tipo_tarea} type="info" /></td>
-                  <td className="strong">{r.titulo}</td>
-                  <td>{r.usuario_nombre || r.usuario_email || r.usuario_id}</td>
-                  <td>{minToTime(r.duracion_minutos)}</td>
-                  <td><Badge text={r.estado} type={r.estado === 'Completado' ? 'success' : r.estado === 'Cancelado' ? 'danger' : 'warning'} /></td>
-                  <td><Badge text={r.prioridad} type={r.prioridad === 'Crítica' || r.prioridad === 'Alta' ? 'danger' : r.prioridad === 'Media' ? 'warning' : 'success'} /></td>
-                  <td className="actions-cell">
-                    <button className="icon-btn" onClick={() => openView(r)} title="Ver">👁️</button>
-                    <button className="icon-btn" onClick={() => openEdit(r)} title="Editar">✏️</button>
-                    <button className="icon-btn danger" onClick={() => eliminar(r)} title="Eliminar">🗑️</button>
-                  </td>
+        <div style={{ overflow: 'auto', width: '100%', maxHeight: compactMode ? 'calc(100vh - 340px)' : 'calc(100vh - 400px)' }}>
+          {loading && data.length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner dark" /></div>
+          ) : data.length === 0 ? (
+            <div className="empty-state"><div className="icon">📝</div><p>No se encontraron tareas</p></div>
+          ) : (
+            <table className="qf-table" style={{ width: '100%', tableLayout: 'auto', fontSize: compactMode ? 10.5 : 12 }}>
+              <thead>
+                <tr>
+                  <th style={S.ths} onClick={() => handleSort('fecha_inicio')}>Inicio<span style={S.si}>{si('fecha_inicio')}</span></th>
+                  <th style={S.ths} onClick={() => handleSort('fecha_fin')}>Fin<span style={S.si}>{si('fecha_fin')}</span></th>
+                  <th style={S.ths} onClick={() => handleSort('tipo_tarea')}>Tipo<span style={S.si}>{si('tipo_tarea')}</span></th>
+                  <th style={S.ths} onClick={() => handleSort('titulo')}>Tarea<span style={S.si}>{si('titulo')}</span></th>
+                  <th style={S.ths} onClick={() => handleSort('usuario_nombre')}>Usuario<span style={S.si}>{si('usuario_nombre')}</span></th>
+                  <th style={S.ths} onClick={() => handleSort('duracion_minutos')}>Duración<span style={S.si}>{si('duracion_minutos')}</span></th>
+                  <th style={S.ths} onClick={() => handleSort('estado')}>Estado<span style={S.si}>{si('estado')}</span></th>
+                  <th style={S.ths} onClick={() => handleSort('prioridad')}>Prioridad<span style={S.si}>{si('prioridad')}</span></th>
+                  <th style={{ ...S.th0, textAlign: 'center' }}>Acc.</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+
+              <tbody>
+                {sortedData.map(r => (
+                  <tr key={r.id} style={compactMode ? { height: 32 } : undefined}>
+                    <td style={S.td}>
+                      <code style={S.opCode}>{formatDate(r.fecha_inicio)}</code>
+                      <div style={S.timeMini}>{toTimeInput(r.hora_inicio)}</div>
+                    </td>
+                    <td style={S.td}>
+                      <code style={S.opCode}>{formatDate(r.fecha_fin)}</code>
+                      <div style={S.timeMini}>{toTimeInput(r.hora_fin)}</div>
+                    </td>
+                    <td style={S.td}><span style={S.typePill}>{r.tipo_tarea || '-'}</span></td>
+                    <td style={{ ...S.td, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 700 }}>{r.titulo || '-'}</td>
+                    <td style={{ ...S.td, fontSize: 10 }}>{r.usuario_nombre || r.usuario_email || r.usuario_id || '-'}</td>
+                    <td style={{ ...S.td, fontWeight: 800, color: '#2e7d32', whiteSpace: 'nowrap' }}>{minToTime(calcMinutes(r))}</td>
+                    <td style={S.td}><span className={`badge ${badgeClass(r.estado)}`} style={{ fontSize: 8 }}>{String(r.estado || '-').toUpperCase()}</span></td>
+                    <td style={S.td}><span className={`badge ${prioridadStyle(r.prioridad)}`} style={{ fontSize: 8 }}>{String(r.prioridad || '-').toUpperCase()}</span></td>
+                    <td style={{ ...S.td, textAlign: 'center' }}>
+                      <div style={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
+                        {canView && <button className="btn btn-secondary btn-sm" onClick={() => setModal({ type: 'detalle', data: r })} style={S.aBtn}>Ver</button>}
+                        {canEdit && <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'editar', data: r })} style={S.aBtn}>Edit</button>}
+                        {canDelete && <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r)} style={S.aBtn}>Del</button>}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
-        <div className="pagination-row">
-          <button className="btn btn-secondary btn-xs" onClick={() => setPage(1)} disabled={page === 1}>«</button>
-          <button className="btn btn-secondary btn-xs" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>‹</button>
-          <span>{page} / {totalPages}</span>
-          <button className="btn btn-secondary btn-xs" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>›</button>
-          <button className="btn btn-secondary btn-xs" onClick={() => setPage(totalPages)} disabled={page === totalPages}>»</button>
-        </div>
-      </section>
-
-      {modal && <TaskModal mode={modal} form={form} setForm={setForm} onClose={() => setModal(null)} onSave={guardar} />}
-    </div>
-  )
-}
-
-function Metric({ label, value, color }) {
-  return <div className="metric-card compact" style={{ borderTopColor: color }}><span>{label}</span><strong style={{ color }}>{value}</strong></div>
-}
-
-function Badge({ text, type }) {
-  return <span className={`status-badge ${type || 'info'}`}>{text || '-'}</span>
-}
-
-function TaskModal({ mode, form, setForm, onClose, onSave }) {
-  const readOnly = mode === 'view'
-  const title = mode === 'create' ? 'Nueva tarea' : mode === 'edit' ? 'Editar tarea' : 'Detalle de tarea'
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
-
-  return (
-    <div className="modal-overlay">
-      <div className="modal-card large">
-        <div className="modal-header">
-          <h2>{title}</h2>
-          <button className="icon-btn" onClick={onClose}>✕</button>
-        </div>
-
-        <div className="modal-body grid">
-          <div className="form-group">
-            <label>Tipo</label>
-            <select disabled={readOnly} value={form.tipo_tarea} onChange={e => set('tipo_tarea', e.target.value)}>
-              {tipos.map(x => <option key={x}>{x}</option>)}
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label>Estado</label>
-            <select disabled={readOnly} value={form.estado} onChange={e => set('estado', e.target.value)}>
-              {estados.map(x => <option key={x}>{x}</option>)}
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label>Prioridad</label>
-            <select disabled={readOnly} value={form.prioridad} onChange={e => set('prioridad', e.target.value)}>
-              {prioridades.map(x => <option key={x}>{x}</option>)}
-            </select>
-          </div>
-
-          <div className="form-group span-3">
-            <label>Título</label>
-            <input disabled={readOnly} value={form.titulo} onChange={e => set('titulo', e.target.value)} maxLength={180} />
-          </div>
-
-          <div className="form-group">
-            <label>Fecha inicio</label>
-            <input disabled={readOnly} type="date" value={form.fecha_inicio || ''} onChange={e => set('fecha_inicio', e.target.value)} />
-          </div>
-
-          <div className="form-group">
-            <label>Hora inicio</label>
-            <input disabled={readOnly} type="time" value={form.hora_inicio || ''} onChange={e => set('hora_inicio', e.target.value)} />
-          </div>
-
-          <div className="form-group">
-            <label>Fecha fin</label>
-            <input disabled={readOnly} type="date" value={form.fecha_fin || ''} onChange={e => set('fecha_fin', e.target.value)} />
-          </div>
-
-          <div className="form-group">
-            <label>Hora fin</label>
-            <input disabled={readOnly} type="time" value={form.hora_fin || ''} onChange={e => set('hora_fin', e.target.value)} />
-          </div>
-
-          <div className="form-group span-3">
-            <label>Descripción</label>
-            <textarea disabled={readOnly} value={form.descripcion || ''} onChange={e => set('descripcion', e.target.value)} rows={4} />
-          </div>
-
-          <div className="form-group span-3">
-            <label>Observaciones</label>
-            <textarea disabled={readOnly} value={form.observaciones || ''} onChange={e => set('observaciones', e.target.value)} rows={3} />
-          </div>
-        </div>
-
-        <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose}>Cerrar</button>
-          {!readOnly && <button className="btn btn-primary" onClick={onSave}>Guardar</button>}
-        </div>
+        {!loading && <div style={S.footerCount}>{data.length} de {total} tareas</div>}
       </div>
+
+      {modal?.type === 'detalle' && <ModalDetalle item={modal.data} onClose={() => setModal(null)} />}
+      {modal?.type === 'nuevo' && <ModalTarea user={user} onClose={() => setModal(null)} onSave={handleSave} />}
+      {modal?.type === 'editar' && <ModalTarea item={modal.data} user={user} onClose={() => setModal(null)} onSave={handleSave} />}
     </div>
   )
 }
+
+const S = {
+  page: { paddingBottom: 12, maxWidth: '100%', overflowX: 'hidden' },
+  topHeader: { marginBottom: 6 },
+  title: { fontFamily: 'Montserrat', fontSize: 22, fontWeight: 800, color: 'var(--qf-navy)', marginBottom: 2 },
+  subtitle: { color: 'var(--qf-text-light)', fontSize: 12 },
+  actionBar: { display: 'flex', gap: 8, marginBottom: 8 },
+  kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, marginBottom: 10 },
+  kpiCard: { background: '#fff', borderRadius: 10, padding: '8px 12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', minHeight: 56 },
+  kpiLabel: { fontSize: 8.5, color: 'var(--qf-text-light)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 3 },
+  kpiValue: { fontWeight: 850, fontFamily: 'Montserrat', lineHeight: 1.1, fontSize: 19 },
+  card: { overflow: 'hidden' },
+  stickyTools: { background: '#fff', borderTopLeftRadius: 12, borderTopRightRadius: 12, borderBottom: '1px solid var(--qf-border)' },
+  cardTitleWrap: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 14px 6px' },
+  cardTitle: { margin: 0, fontSize: 16, fontFamily: 'Montserrat', color: 'var(--qf-navy)' },
+  pill: { fontSize: 10, fontWeight: 700, color: 'var(--qf-navy)', background: '#e8eef5', borderRadius: 999, padding: '3px 8px' },
+  filtersRow: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '0 14px 6px' },
+  fieldSelect: { width: 'auto', minWidth: 120, height: 32, fontSize: 12 },
+  dateInput: { width: 130, height: 32, fontSize: 12 },
+  searchInput: { minWidth: 180, maxWidth: 340, height: 32, fontSize: 12 },
+  pagRow: { display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', padding: '5px 14px 7px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
+  pageInfo: { fontSize: 11, color: 'var(--qf-text-light)', fontWeight: 600 },
+  loadMini: { fontSize: 11, color: '#185FA5', fontWeight: 700 },
+  th0: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 9, padding: '5px 4px' },
+  ths: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 9, padding: '5px 4px', cursor: 'pointer', userSelect: 'none' },
+  si: { fontSize: 7, opacity: 0.45, marginLeft: 1 },
+  td: { padding: '3px 4px', verticalAlign: 'middle', lineHeight: 1.15 },
+  opCode: { background: '#e8eef5', padding: '1px 4px', borderRadius: 3, fontSize: 9.5, fontWeight: 800, color: 'var(--qf-navy)' },
+  typePill: { background: '#e8eef5', color: 'var(--qf-navy)', borderRadius: 3, padding: '1px 4px', fontSize: 9.5, fontWeight: 700, whiteSpace: 'nowrap' },
+  timeMini: { fontSize: 9, color: 'var(--qf-text-light)', marginTop: 2, fontWeight: 700 },
+  aBtn: { fontSize: 9, padding: '1px 4px' },
+  footerCount: { padding: '6px 14px', borderTop: '1px solid var(--qf-border)', fontSize: 10.5, color: 'var(--qf-text-light)', background: '#fff' },
+  detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 },
+  detailBox: { background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 8 },
+  detailLabel: { fontSize: 9, fontWeight: 700, color: 'var(--qf-text-light)', textTransform: 'uppercase' },
+  detailValue: { fontSize: 12, fontWeight: 600, color: 'var(--qf-navy)', wordBreak: 'break-word' },
+  g3: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' },
+  g4: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0 16px' },
+  errorBox: { background: '#fce4e4', color: '#c62828', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginTop: 8 },
+}
+
+export default TareasPage
