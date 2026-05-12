@@ -1,7 +1,9 @@
 export default async function handler(req, res) {
   try {
     if (req.method !== 'GET') {
-      return res.status(405).json({ message: 'Method not allowed' })
+      return res.status(405).json({
+        message: 'Method not allowed',
+      })
     }
 
     const {
@@ -13,27 +15,18 @@ export default async function handler(req, res) {
       POWERBI_DATASET_ID,
     } = process.env
 
-    if (
-      !POWERBI_TENANT_ID ||
-      !POWERBI_CLIENT_ID ||
-      !POWERBI_CLIENT_SECRET ||
-      !POWERBI_WORKSPACE_ID ||
-      !POWERBI_REPORT_ID ||
-      !POWERBI_DATASET_ID
-    ) {
-      return res.status(500).json({
-        message: 'Faltan variables de entorno Power BI',
-      })
-    }
-
     const tokenUrl =
       `https://login.microsoftonline.com/${POWERBI_TENANT_ID}/oauth2/v2.0/token`
 
     const tokenBody = new URLSearchParams()
+
     tokenBody.append('grant_type', 'client_credentials')
     tokenBody.append('client_id', POWERBI_CLIENT_ID)
     tokenBody.append('client_secret', POWERBI_CLIENT_SECRET)
-    tokenBody.append('scope', 'https://analysis.windows.net/powerbi/api/.default')
+    tokenBody.append(
+      'scope',
+      'https://analysis.windows.net/powerbi/api/.default'
+    )
 
     const aadResponse = await fetch(tokenUrl, {
       method: 'POST',
@@ -43,19 +36,21 @@ export default async function handler(req, res) {
       body: tokenBody,
     })
 
-    if (!aadResponse.ok) {
-      const errorText = await aadResponse.text()
+    const aadToken = await aadResponse.json()
+
+    if (!aadToken.access_token) {
       return res.status(500).json({
-        message: 'No se pudo obtener token Azure AD',
-        detail: errorText,
+        message: 'No se pudo obtener access token',
+        detail: aadToken,
       })
     }
 
-    const aadToken = await aadResponse.json()
     const accessToken = aadToken.access_token
 
     const reportUrl =
-      `https://api.powerbi.com/v1.0/myorg/groups/${POWERBI_WORKSPACE_ID}/reports/${POWERBI_REPORT_ID}`
+      POWERBI_WORKSPACE_ID === 'me'
+        ? `https://api.powerbi.com/v1.0/myorg/reports/${POWERBI_REPORT_ID}`
+        : `https://api.powerbi.com/v1.0/myorg/groups/${POWERBI_WORKSPACE_ID}/reports/${POWERBI_REPORT_ID}`
 
     const reportResponse = await fetch(reportUrl, {
       headers: {
@@ -63,18 +58,19 @@ export default async function handler(req, res) {
       },
     })
 
-    if (!reportResponse.ok) {
-      const errorText = await reportResponse.text()
+    const report = await reportResponse.json()
+
+    if (!report.embedUrl) {
       return res.status(500).json({
-        message: 'No se pudo obtener información del reporte',
-        detail: errorText,
+        message: 'No se pudo obtener embedUrl',
+        detail: report,
       })
     }
 
-    const report = await reportResponse.json()
-
     const embedTokenUrl =
-      `https://api.powerbi.com/v1.0/myorg/groups/${POWERBI_WORKSPACE_ID}/reports/${POWERBI_REPORT_ID}/GenerateToken`
+      POWERBI_WORKSPACE_ID === 'me'
+        ? `https://api.powerbi.com/v1.0/myorg/reports/${POWERBI_REPORT_ID}/GenerateToken`
+        : `https://api.powerbi.com/v1.0/myorg/groups/${POWERBI_WORKSPACE_ID}/reports/${POWERBI_REPORT_ID}/GenerateToken`
 
     const embedResponse = await fetch(embedTokenUrl, {
       method: 'POST',
@@ -84,28 +80,23 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         accessLevel: 'View',
+
         datasets: [
           {
             id: POWERBI_DATASET_ID,
           },
         ],
-        reports: [
-          {
-            id: POWERBI_REPORT_ID,
-          },
-        ],
       }),
     })
 
-    if (!embedResponse.ok) {
-      const errorText = await embedResponse.text()
+    const embedToken = await embedResponse.json()
+
+    if (!embedToken.token) {
       return res.status(500).json({
         message: 'No se pudo generar embed token',
-        detail: errorText,
+        detail: embedToken,
       })
     }
-
-    const embedToken = await embedResponse.json()
 
     return res.status(200).json({
       reportId: POWERBI_REPORT_ID,
@@ -115,7 +106,7 @@ export default async function handler(req, res) {
     })
   } catch (error) {
     return res.status(500).json({
-      message: error.message || 'Error generando token Power BI',
+      message: error.message,
     })
   }
 }
