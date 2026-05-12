@@ -73,13 +73,35 @@ const prioridadStyle = value => {
 
 const norm = value => String(value ?? '').toLowerCase().trim()
 
-const operadoresFiltro = [
+const operadoresTexto = [
   { value: 'contains', label: 'Contiene' },
   { value: 'not_contains', label: 'No contiene' },
   { value: 'equals', label: 'Igual' },
   { value: 'not_equals', label: 'Distinto' },
   { value: 'starts', label: 'Empieza con' },
   { value: 'ends', label: 'Termina con' },
+  { value: 'blank', label: 'Vacío' },
+  { value: 'not_blank', label: 'No vacío' },
+]
+
+const operadoresFecha = [
+  { value: 'equals', label: 'Igual a' },
+  { value: 'before', label: 'Antes de' },
+  { value: 'after', label: 'Después de' },
+  { value: 'between', label: 'Entre fechas' },
+  { value: 'last_7', label: 'Últimos 7 días' },
+  { value: 'last_30', label: 'Últimos 30 días' },
+  { value: 'this_month', label: 'Este mes' },
+  { value: 'last_month', label: 'Mes anterior' },
+  { value: 'blank', label: 'Vacío' },
+  { value: 'not_blank', label: 'No vacío' },
+]
+
+const operadoresNumero = [
+  { value: 'equals', label: 'Igual a' },
+  { value: 'greater', label: 'Mayor que' },
+  { value: 'less', label: 'Menor que' },
+  { value: 'between', label: 'Entre valores' },
   { value: 'blank', label: 'Vacío' },
   { value: 'not_blank', label: 'No vacío' },
 ]
@@ -96,7 +118,11 @@ const columnasFiltro = [
 ]
 
 const initialColumnFilters = columnasFiltro.reduce((acc, col) => {
-  acc[col.key] = { op: col.type === 'select' ? 'equals' : 'contains', value: '' }
+  acc[col.key] = {
+    op: col.type === 'date' || col.type === 'select' || col.type === 'number' ? 'equals' : 'contains',
+    value: '',
+    value2: '',
+  }
   return acc
 }, {})
 
@@ -106,16 +132,86 @@ const getFilterValue = (item, key) => {
   return item?.[key] ?? ''
 }
 
-const matchColumnFilter = (rawValue, filter) => {
+const dateOnly = value => {
+  if (!value) return ''
+  const s = String(value).slice(0, 10)
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : toDateInput(value)
+}
+
+const addDays = (date, days) => {
+  const d = new Date(date)
+  d.setDate(d.getDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+const monthRange = offset => {
+  const now = new Date()
+  const start = new Date(now.getFullYear(), now.getMonth() + offset, 1)
+  const end = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0)
+  return [start.toISOString().slice(0, 10), end.toISOString().slice(0, 10)]
+}
+
+const matchColumnFilter = (rawValue, filter, type = 'text') => {
   const op = filter?.op || 'contains'
   const value = filter?.value ?? ''
+  const value2 = filter?.value2 ?? ''
   const left = norm(rawValue)
   const right = norm(value)
+  const right2 = norm(value2)
 
   if (op === 'blank') return left === ''
   if (op === 'not_blank') return left !== ''
-  if (!right) return true
 
+  if (type === 'date') {
+    if (!left) return false
+
+    if (op === 'last_7') {
+      const todayValue = today()
+      return left >= addDays(todayValue, -6) && left <= todayValue
+    }
+
+    if (op === 'last_30') {
+      const todayValue = today()
+      return left >= addDays(todayValue, -29) && left <= todayValue
+    }
+
+    if (op === 'this_month' || op === 'last_month') {
+      const [ini, fin] = monthRange(op === 'this_month' ? 0 : -1)
+      return left >= ini && left <= fin
+    }
+
+    if (op === 'between') {
+      if (!right && !right2) return true
+      if (right && left < right) return false
+      if (right2 && left > right2) return false
+      return true
+    }
+
+    if (!right) return true
+    if (op === 'before') return left < right
+    if (op === 'after') return left > right
+    return left === right
+  }
+
+  if (type === 'number') {
+    const n = Number(left)
+    const a = Number(right)
+    const b = Number(right2)
+    if (Number.isNaN(n)) return false
+    if (op === 'between') {
+      if (!right && !right2) return true
+      if (right && n < a) return false
+      if (right2 && n > b) return false
+      return true
+    }
+    if (!right) return true
+    if (Number.isNaN(a)) return true
+    if (op === 'greater') return n > a
+    if (op === 'less') return n < a
+    return n === a
+  }
+
+  if (!right) return true
   if (op === 'not_contains') return !left.includes(right)
   if (op === 'equals') return left === right
   if (op === 'not_equals') return left !== right
@@ -406,7 +502,9 @@ const TareasPage = () => {
   const columnFiltersActive = useMemo(() => (
     Object.values(columnFilters).some(f => {
       const op = f?.op || 'contains'
-      return ['blank', 'not_blank'].includes(op) || String(f?.value || '').trim()
+      return ['blank', 'not_blank', 'last_7', 'last_30', 'this_month', 'last_month'].includes(op)
+        || String(f?.value || '').trim()
+        || String(f?.value2 || '').trim()
     })
   ), [columnFilters])
 
@@ -444,7 +542,7 @@ const TareasPage = () => {
   }
 
   const filteredData = useMemo(() => (
-    data.filter(row => columnasFiltro.every(col => matchColumnFilter(getFilterValue(row, col.key), columnFilters[col.key])))
+    data.filter(row => columnasFiltro.every(col => matchColumnFilter(getFilterValue(row, col.key), columnFilters[col.key], col.type)))
   ), [data, columnFilters])
 
   const vistaTotal = filteredData.length
@@ -496,13 +594,24 @@ const TareasPage = () => {
 
   const FilterCell = ({ col, align = 'left' }) => {
     const filter = columnFilters[col.key] || initialColumnFilters[col.key]
-    const active = ['blank', 'not_blank'].includes(filter.op) || String(filter.value || '').trim()
-    const showInput = !['blank', 'not_blank'].includes(filter.op)
+    const active = ['blank', 'not_blank', 'last_7', 'last_30', 'this_month', 'last_month'].includes(filter.op)
+      || String(filter.value || '').trim()
+      || String(filter.value2 || '').trim()
+
+    const operadores = col.type === 'date'
+      ? operadoresFecha
+      : col.type === 'number'
+        ? operadoresNumero
+        : operadoresTexto
+
+    const autoRange = ['last_7', 'last_30', 'this_month', 'last_month'].includes(filter.op)
+    const showInput = !['blank', 'not_blank'].includes(filter.op) && !autoRange
+    const isBetween = filter.op === 'between'
 
     return (
       <th style={{ ...S.filterTh, textAlign: align }}>
         <div style={{ ...S.colFilterWrap, justifyContent: align === 'center' ? 'center' : 'flex-start' }}>
-          {col.type === 'select' ? (
+          {col.type === 'select' && showInput ? (
             <select
               className="filter-input"
               value={filter.value}
@@ -513,15 +622,30 @@ const TareasPage = () => {
               {(col.options || []).map(x => <option key={x} value={x}>{x}</option>)}
             </select>
           ) : showInput ? (
-            <input
-              className="filter-input"
-              type={col.type === 'date' ? 'date' : col.type === 'number' ? 'number' : 'text'}
-              value={filter.value}
-              onChange={e => setColumnFilter(col.key, { value: e.target.value })}
-              style={S.colInput}
-            />
+            <div style={isBetween ? S.rangeWrap : { flex: 1 }}>
+              <input
+                className="filter-input"
+                type={col.type === 'date' ? 'date' : col.type === 'number' ? 'number' : 'text'}
+                value={filter.value}
+                onChange={e => setColumnFilter(col.key, { value: e.target.value })}
+                style={isBetween ? S.rangeInput : S.colInput}
+                placeholder={isBetween ? 'Desde' : ''}
+              />
+              {isBetween && (
+                <input
+                  className="filter-input"
+                  type={col.type === 'date' ? 'date' : col.type === 'number' ? 'number' : 'text'}
+                  value={filter.value2 || ''}
+                  onChange={e => setColumnFilter(col.key, { value2: e.target.value })}
+                  style={S.rangeInput}
+                  placeholder="Hasta"
+                />
+              )}
+            </div>
           ) : (
-            <span style={S.blankFilterLabel}>{filter.op === 'blank' ? 'Vacío' : 'No vacío'}</span>
+            <span style={S.blankFilterLabel}>
+              {operadores.find(x => x.value === filter.op)?.label || 'Activo'}
+            </span>
           )}
 
           <button
@@ -535,11 +659,15 @@ const TareasPage = () => {
 
           {openFilter === col.key && (
             <div style={S.filterMenu}>
-              {operadoresFiltro.map(op => (
+              {operadores.map(op => (
                 <button
                   key={op.value}
                   type="button"
-                  onClick={() => setColumnFilter(col.key, { op: op.value, value: ['blank', 'not_blank'].includes(op.value) ? '' : filter.value })}
+                  onClick={() => setColumnFilter(col.key, {
+                    op: op.value,
+                    value: ['blank', 'not_blank', 'last_7', 'last_30', 'this_month', 'last_month'].includes(op.value) ? '' : filter.value,
+                    value2: op.value === 'between' ? filter.value2 : '',
+                  })}
                   style={{ ...S.filterOption, ...(filter.op === op.value ? S.filterOptionActive : {}) }}
                 >
                   {op.label}
@@ -659,8 +787,6 @@ const TareasPage = () => {
         <div style={{ overflow: 'auto', width: '100%', maxHeight: compactMode ? 'calc(100vh - 340px)' : 'calc(100vh - 400px)' }}>
           {loading && data.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner dark" /></div>
-          ) : filteredData.length === 0 ? (
-            <div className="empty-state"><div className="icon">📝</div><p>No se encontraron tareas</p></div>
           ) : (
             <table className="qf-table" style={{ width: '100%', tableLayout: 'auto', fontSize: compactMode ? 10.5 : 12 }}>
               <thead>
@@ -693,6 +819,16 @@ const TareasPage = () => {
               </thead>
 
               <tbody>
+                {filteredData.length === 0 && (
+                  <tr>
+                    <td colSpan={9} style={S.emptyRow}>
+                      <div className="empty-state" style={{ padding: 18 }}>
+                        <div className="icon">📝</div>
+                        <p>No se encontraron tareas con los filtros aplicados</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
                 {paginatedData.map(r => (
                   <tr key={r.id} style={compactMode ? { height: 32 } : undefined}>
                     <td style={S.td}>
@@ -761,6 +897,8 @@ const S = {
   filterTh: { position: 'sticky', top: 24, zIndex: 9, background: '#fff', borderBottom: '1px solid var(--qf-border)', padding: '4px', whiteSpace: 'nowrap' },
   colFilterWrap: { display: 'flex', alignItems: 'center', gap: 4, position: 'relative' },
   colInput: { width: '100%', minWidth: 62, height: 24, fontSize: 10, padding: '2px 4px' },
+  rangeWrap: { display: 'flex', gap: 3, flex: 1, minWidth: 120 },
+  rangeInput: { width: '50%', minWidth: 58, height: 24, fontSize: 10, padding: '2px 4px' },
   colSelect: { width: '100%', minWidth: 82, height: 24, fontSize: 10, padding: '2px 4px' },
   filterIconBtn: { border: '0', background: 'transparent', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '2px 3px', transform: 'rotate(90deg)' },
   filterMenu: { position: 'absolute', top: 26, right: 0, zIndex: 30, background: '#fff', border: '1px solid var(--qf-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.16)', minWidth: 150, padding: 5 },
@@ -774,6 +912,7 @@ const S = {
   timeMini: { fontSize: 9, color: 'var(--qf-text-light)', marginTop: 2, fontWeight: 700 },
   aBtn: { fontSize: 9, padding: '1px 4px' },
   footerCount: { padding: '6px 14px', borderTop: '1px solid var(--qf-border)', fontSize: 10.5, color: 'var(--qf-text-light)', background: '#fff' },
+  emptyRow: { padding: 0, background: '#fff', textAlign: 'center' },
   detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 },
   detailBox: { background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 8 },
   detailLabel: { fontSize: 9, fontWeight: 700, color: 'var(--qf-text-light)', textTransform: 'uppercase' },
