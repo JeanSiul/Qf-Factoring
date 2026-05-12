@@ -57,6 +57,7 @@ const menuItems = [
       { icon: '🧊', label: 'Operaciones 3D', path: '/gerencia/3d', claim: 'GERBI' },
       { icon: '📺', label: 'Power BI', path: '/gerencia/powerbi', claim: 'GERBI' },
       { icon: '🧩', label: 'Power BI React', path: '/gerencia/powerbi-react', claim: 'GERBI' },
+      { icon: '🔐', label: 'Power BI Embedded', path: '/gerencia/powerbi-embedded', claim: 'GERBI' },
     ]
   },
 ]
