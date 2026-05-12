@@ -274,6 +274,7 @@ const TareasPage = () => {
   const [compactMode, setCompactMode] = useState(true)
   const [sortField, setSortField] = useState('fecha_inicio')
   const [sortDir, setSortDir] = useState('desc')
+  const [gridApi, setGridApi] = useState(null)
 
   const cv = permisos?.[CLAIM] || '11111111111'
   const canList = cv[1] !== '0'
@@ -402,6 +403,51 @@ const TareasPage = () => {
     floatingFilterComponentParams: { suppressFilterButton: false },
   }), [compactMode])
 
+  const agLocaleText = useMemo(() => ({
+    contains: 'Contiene',
+    notContains: 'No contiene',
+    equals: 'Igual',
+    notEqual: 'Distinto',
+    startsWith: 'Empieza con',
+    endsWith: 'Termina con',
+    blank: 'Vacío',
+    notBlank: 'No vacío',
+    before: 'Antes de',
+    after: 'Después de',
+    inRange: 'Entre',
+    lessThan: 'Menor que',
+    greaterThan: 'Mayor que',
+    filterOoo: 'Filtrar...',
+    applyFilter: 'Aplicar',
+    resetFilter: 'Restablecer',
+    clearFilter: 'Limpiar',
+    cancelFilter: 'Cancelar',
+    noRowsToShow: 'No se encontraron tareas',
+    loadingOoo: 'Cargando...',
+    selectAll: 'Seleccionar todo',
+    searchOoo: 'Buscar...',
+    blanks: 'Vacíos',
+    page: 'Página',
+    more: 'Más',
+    to: 'a',
+    of: 'de',
+    next: 'Siguiente',
+    last: 'Última',
+    first: 'Primera',
+    previous: 'Anterior',
+    pageSizeSelectorLabel: 'Filas',
+    ariaFilterInput: 'Entrada de filtro',
+  }), [])
+
+  const limpiarFiltrosTabla = () => {
+    if (!gridApi) return
+    gridApi.setFilterModel(null)
+    gridApi.applyColumnState({
+      defaultState: { sort: null },
+      state: [{ colId: '_inicio_sort', sort: 'desc' }],
+    })
+  }
+
   const agColumnDefs = useMemo(() => [
     {
       headerName: 'Inicio',
@@ -435,7 +481,7 @@ const TareasPage = () => {
       field: 'tipo_tarea',
       width: 130,
       cellRenderer: p => <span style={S.typePill}>{p.value || '-'}</span>,
-      filter: 'agSetColumnFilter',
+      filter: 'agTextColumnFilter',
     },
     {
       headerName: 'Tarea',
@@ -471,14 +517,14 @@ const TareasPage = () => {
       field: 'estado',
       width: 130,
       cellRenderer: p => <span className={`badge ${badgeClass(p.value)}`} style={{ fontSize: 8 }}>{String(p.value || '-').toUpperCase()}</span>,
-      filter: 'agSetColumnFilter',
+      filter: 'agTextColumnFilter',
     },
     {
       headerName: 'Prioridad',
       field: 'prioridad',
       width: 125,
       cellRenderer: p => <span className={`badge ${prioridadStyle(p.value)}`} style={{ fontSize: 8 }}>{String(p.value || '-').toUpperCase()}</span>,
-      filter: 'agSetColumnFilter',
+      filter: 'agTextColumnFilter',
     },
     {
       headerName: 'Acc.',
@@ -534,22 +580,49 @@ const TareasPage = () => {
         }
         .qf-tareas-grid .ag-header-cell-text {
           color: #fff;
-          font-size: 9px;
+          font-size: 8.5px;
+        }
+        .qf-tareas-grid .ag-header-cell {
+          padding-left: 5px;
+          padding-right: 5px;
         }
         .qf-tareas-grid .ag-icon,
         .qf-tareas-grid .ag-header-icon {
           color: #fff;
         }
         .qf-tareas-grid .ag-floating-filter {
-          background: #fff;
+          background: #f8fafc;
           border-bottom: 1px solid var(--qf-border);
+          min-height: 30px;
+        }
+        .qf-tareas-grid .ag-floating-filter-body {
+          width: 100%;
         }
         .qf-tareas-grid .ag-floating-filter-input,
         .qf-tareas-grid .ag-input-field-input {
-          min-height: 22px;
+          min-height: 23px;
+          height: 23px;
           font-size: 10.5px;
+          border-radius: 7px;
+          border: 1px solid #9fb2c8 !important;
+          background: #ffffff !important;
+          color: var(--qf-navy);
+          box-shadow: inset 0 0 0 1px rgba(24,95,165,.08);
+        }
+        .qf-tareas-grid .ag-floating-filter-input:focus,
+        .qf-tareas-grid .ag-input-field-input:focus {
+          border-color: #185FA5 !important;
+          box-shadow: 0 0 0 2px rgba(24,95,165,.14);
+        }
+        .qf-tareas-grid .ag-floating-filter-button {
+          margin-left: 3px;
+        }
+        .qf-tareas-grid .ag-floating-filter-button-button {
+          min-width: 22px;
+          height: 22px;
           border-radius: 6px;
-          border-color: var(--qf-border);
+          border: 1px solid #9fb2c8;
+          background: #e8eef5;
         }
         .qf-tareas-grid .ag-row {
           border-bottom: 1px solid var(--qf-border);
@@ -642,6 +715,7 @@ const TareasPage = () => {
           <div style={S.pagRow}>
             <span style={S.pill}>{from}-{to} de {total}</span>
             <span style={S.pageInfo}>Filtra, ordena y pagina desde la tabla</span>
+            <button className="btn btn-secondary btn-sm" onClick={limpiarFiltrosTabla}>Limpiar filtros tabla</button>
             <select className="filter-input" value={pageSize} onChange={e => setPageSize(Number(e.target.value))} style={{ width: 'auto', minWidth: 70, height: 28, fontSize: 11, padding: '0 4px' }}>
               <option value={25}>25 filas</option>
               <option value={50}>50 filas</option>
@@ -659,9 +733,10 @@ const TareasPage = () => {
             height: compactMode ? 'calc(100vh - 330px)' : 'calc(100vh - 390px)',
             minHeight: 310,
             '--ag-font-size': compactMode ? '10.5px' : '12px',
-            '--ag-header-height': compactMode ? '28px' : '34px',
-            '--ag-row-height': compactMode ? '32px' : '42px',
-            '--ag-list-item-height': '26px',
+            '--ag-header-height': compactMode ? '24px' : '28px',
+            '--ag-row-height': compactMode ? '30px' : '38px',
+            '--ag-list-item-height': '24px',
+            '--ag-header-column-resize-handle-height': '60%',
             '--ag-wrapper-border-radius': '0px',
           }}
         >
@@ -675,6 +750,8 @@ const TareasPage = () => {
               pagination
               paginationPageSize={pageSize}
               paginationPageSizeSelector={[25, 50, 100, 200]}
+              localeText={agLocaleText}
+              onGridReady={params => setGridApi(params.api)}
               animateRows
               suppressCellFocus
               overlayNoRowsTemplate="<span style='padding:10px;color:#64748b;font-size:12px;'>No se encontraron tareas con los filtros aplicados</span>"
