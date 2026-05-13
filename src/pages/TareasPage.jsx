@@ -797,6 +797,7 @@ const TareasPage = () => {
         .qf-tareas-grid .ag-icon,
         .qf-tareas-grid .ag-header-icon {
           color: #fff;
+          font-size: 12px;
         }
         .qf-tareas-grid .ag-floating-filter {
           background: #f8fafc;
@@ -827,7 +828,8 @@ const TareasPage = () => {
         }
         .qf-tareas-grid .ag-floating-filter-button-button {
           min-width: 15px;
-          height: 11px;
+          height: 15px;
+          width: 15px;
           border-radius: 6px;
           border: 1px solid #9fb2c8;
           background: #e8eef5;
@@ -1011,8 +1013,8 @@ const TareasPage = () => {
             <AgGridReact
               rowData={agRows}
               columnDefs={agColumnDefs}
-              headerHeight={30} // Altura del header de columnas
-              floatingFiltersHeight={40}
+              headerHeight={35} // Altura del header de columnas
+              floatingFiltersHeight={35}
               rowHeight={30}                // 60px por fila (default: 42px en Quartz)
               defaultColDef={agDefaultColDef}
               pagination
