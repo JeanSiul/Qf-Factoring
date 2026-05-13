@@ -32,6 +32,34 @@ const downloadTextFile = (filename, content, mime = 'text/csv;charset=utf-8;') =
 }
 
 
+
+const exportExcel = rows => {
+  const headers = ['Nro Operación','Fecha','Banco','Cuenta Cargo','Cuenta Abono','Importe Cargado','Importe Abonado','Comisión','Estado']
+  const body = rows.map(r => `<tr><td>${r.numero_operacion || ''}</td><td>${formatDate(r.fecha_operacion)}</td><td>${r.banco_nombre || ''}</td><td>${r.cuenta_cargo || ''}</td><td>${r.cuenta_abono || ''}</td><td>${r.importe_cargado || 0}</td><td>${r.importe_abonado || 0}</td><td>${r.comision || 0}</td><td>${r.estado || ''}</td></tr>`).join('')
+  const html = `<html><body><table border="1"><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>${body}</table></body></html>`
+  downloadTextFile(`devoluciones_${new Date().toISOString().slice(0,10)}.xls`, html, 'application/vnd.ms-excel')
+}
+
+const exportPdf = rows => {
+  const html = `<html><head><style>body{font-family:Arial;padding:20px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #ccc;padding:4px}th{background:#0f2742;color:#fff}</style></head><body><h2>Reporte Devoluciones</h2><table><tr><th>Nro Op</th><th>Banco</th><th>Cargado</th><th>Abonado</th><th>Estado</th></tr>${rows.map(r=>`<tr><td>${r.numero_operacion||''}</td><td>${r.banco_nombre||''}</td><td>${money(r.importe_cargado)}</td><td>${money(r.importe_abonado)}</td><td>${r.estado||''}</td></tr>`).join('')}</table><script>window.onload=()=>window.print()</script></body></html>`
+  const w = window.open('', '_blank')
+  if (w) { w.document.write(html); w.document.close() }
+}
+
+const buildGroupSummary = (rows, field) => {
+  const map = new Map()
+  rows.forEach(r => {
+    const key = r[field] || 'Sin dato'
+    const curr = map.get(key) || { name: key, count: 0, cargado: 0, abonado: 0 }
+    curr.count += 1
+    curr.cargado += Number(r.importe_cargado || 0)
+    curr.abonado += Number(r.importe_abonado || 0)
+    map.set(key, curr)
+  })
+  return [...map.values()].sort((a,b)=>b.count-a.count)
+}
+
+
 const camposBusqueda = [
   { value: 'all', label: 'Todos' },
   { value: 'numero_operacion', label: 'Nro. Operación' },
@@ -128,6 +156,9 @@ const DevolucionesPage = () => {
   const [savedViews, setSavedViews] = useState(() => safeJsonParse(localStorage.getItem(SAVED_VIEWS_KEY), []))
   const [visibleCols, setVisibleCols] = useState({})
   const [displayedRows, setDisplayedRows] = useState([])
+  const [showDashboard, setShowDashboard] = useState(true)
+  const [showSidePanel, setShowSidePanel] = useState(false)
+  const [groupBy, setGroupBy] = useState('estado')
   const { toasts, show } = useToast()
   const [bancos, setBancos] = useState([])
   const [monedas, setMonedas] = useState([])
@@ -165,6 +196,22 @@ const DevolucionesPage = () => {
   useEffect(() => {
     setDisplayedRows(agRows)
   }, [agRows])
+
+  const applyPreset = preset => {
+    if (!gridApi) return
+    const allCols = ['numero_operacion','fecha_operacion','banco_nombre','cuenta_cargo','moneda_cargo_nombre','cuenta_abono','moneda_abono_nombre','importe_cargado','importe_abonado','comision','referencia','estado','acciones']
+
+    const presets = {
+      gerencia: ['numero_operacion','fecha_operacion','banco_nombre','importe_cargado','importe_abonado','estado','acciones'],
+      operaciones: ['numero_operacion','fecha_operacion','cuenta_cargo','cuenta_abono','importe_cargado','estado','acciones'],
+      auditoria: ['numero_operacion','fecha_operacion','banco_nombre','comision','referencia','estado','acciones'],
+      completo: allCols,
+    }
+
+    const visible = presets[preset] || allCols
+    gridApi.setColumnsVisible(allCols, false)
+    gridApi.setColumnsVisible(visible, true)
+  }
 
   const exportCsv = () => {
     const rows = displayedRows.length ? displayedRows : agRows
@@ -287,6 +334,15 @@ const DevolucionesPage = () => {
         
         <div style={S.erpTools}>
           <div style={S.erpGroup}>
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowSidePanel(v => !v)}>Panel</button>
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowDashboard(v => !v)}>{showDashboard ? 'Ocultar BI' : 'Ver BI'}</button>
+
+            <select className="filter-input" value={groupBy} onChange={e => setGroupBy(e.target.value)} style={{ width: 150, height: 26, fontSize: 10 }}>
+              <option value="estado">Agrupar Estado</option>
+              <option value="banco_nombre">Agrupar Banco</option>
+              <option value="moneda_cargo_nombre">Agrupar Moneda</option>
+            </select>
+
             <div style={{ position: 'relative', minWidth: 280 }}>
               <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: '#8a9bb5' }}>🔍</span>
               <input
@@ -306,6 +362,8 @@ const DevolucionesPage = () => {
             </select>
 
             <button className="btn btn-secondary btn-sm" onClick={exportCsv}>CSV</button>
+            <button className="btn btn-secondary btn-sm" onClick={() => exportExcel(displayedRows.length ? displayedRows : agRows)}>Excel</button>
+            <button className="btn btn-secondary btn-sm" onClick={() => exportPdf(displayedRows.length ? displayedRows : agRows)}>PDF</button>
           </div>
 
           <div style={S.erpGroup}>
@@ -357,6 +415,40 @@ const DevolucionesPage = () => {
             ))}
           </div>
         )}
+
+
+        {showSidePanel && (
+          <div style={S.sidePanel}>
+            <div style={S.sideSection}>
+              <div style={S.sideTitle}>Presets ERP</div>
+              <button className="btn btn-secondary btn-sm" onClick={() => applyPreset('gerencia')}>Gerencia</button>
+              <button className="btn btn-secondary btn-sm" onClick={() => applyPreset('operaciones')}>Operaciones</button>
+              <button className="btn btn-secondary btn-sm" onClick={() => applyPreset('auditoria')}>Auditoría</button>
+              <button className="btn btn-secondary btn-sm" onClick={() => applyPreset('completo')}>Completo</button>
+            </div>
+
+            <div style={S.sideSection}>
+              <div style={S.sideTitle}>Totales dinámicos</div>
+              <div style={S.groupMini}><span>Filtrados</span><b>{displayedRows.length}</b></div>
+              <div style={S.groupMini}><span>Cargado</span><b>{money(displayedRows.reduce((s,r)=>s+Number(r.importe_cargado||0),0))}</b></div>
+              <div style={S.groupMini}><span>Abonado</span><b>{money(displayedRows.reduce((s,r)=>s+Number(r.importe_abonado||0),0))}</b></div>
+            </div>
+          </div>
+        )}
+
+        {showDashboard && (
+          <div style={S.dashboard}>
+            {buildGroupSummary(displayedRows.length ? displayedRows : agRows, groupBy).slice(0,6).map(g => (
+              <div key={g.name} style={S.dashPanel}>
+                <div style={S.sideTitle}>{g.name}</div>
+                <div style={S.kpiValue}>{g.count}</div>
+                <div style={{ fontSize: 10, color: '#64748b' }}>Cargado: {money(g.cargado)}</div>
+                <div style={{ fontSize: 10, color: '#64748b' }}>Abonado: {money(g.abonado)}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
 
         <div
           className="ag-theme-quartz qf-tareas-grid"
@@ -440,6 +532,14 @@ const S = {
   erpTools: { display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', padding: '6px 12px', borderTop: '1px solid var(--qf-border)', background: '#fff' },
   erpGroup: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' },
   savedViews: { display: 'flex', gap: 6, flexWrap: 'wrap', padding: '6px 12px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
+
+  sidePanel: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8, padding: '8px 12px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
+  sideSection: { background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 8, display: 'flex', flexWrap: 'wrap', gap: 6 },
+  sideTitle: { width: '100%', fontSize: 9.5, fontWeight: 800, color: 'var(--qf-navy)', textTransform: 'uppercase' },
+  dashboard: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, padding: '8px 12px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
+  dashPanel: { background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 10 },
+  groupMini: { display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: 10, background: '#fff', padding: '4px 8px', borderRadius: 6, border: '1px solid #d9e2ec' },
+
   detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 },
   detailBox: { background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 8 },
   detailLabel: { fontSize: 9, fontWeight: 700, color: 'var(--qf-text-light)', textTransform: 'uppercase' },
