@@ -615,13 +615,28 @@ const DevolucionesPage = () => {
         .qf-tareas-grid .ag-input-field-input {
           min-height: 2px;
           height: 6px;
-          padding: 0 2px;
+          padding: 0 2px 0 18px !important;
           font-size: 8px;
           border-radius: 7px;
           border: 1px solid #9fb2c8 !important;
           background: #ffffff !important;
           color: var(--qf-navy);
           box-shadow: inset 0 0 0 1px rgba(24,95,165,.08);
+        }
+        .qf-tareas-grid .ag-floating-filter-body {
+          position: relative;
+        }
+        .qf-tareas-grid .ag-floating-filter-body::before {
+          content: '🔍';
+          position: absolute;
+          left: 5px;
+          top: 50%;
+          transform: translateY(-50%);
+          font-size: 11px;
+          line-height: 1;
+          z-index: 3;
+          pointer-events: none;
+          filter: saturate(1.45);
         }
         .qf-tareas-grid .ag-floating-filter-button {
           margin-left: 6px;
@@ -630,9 +645,16 @@ const DevolucionesPage = () => {
           min-width: 22px;
           height: 22px;
           width: 22px;
-          border-radius: 6px;
+          border-radius: 7px;
           border: 1px solid #9fb2c8;
-          background: #e8eef5;
+          background: linear-gradient(135deg, #ffffff, #e8eef5);
+          box-shadow: inset 0 0 0 1px rgba(24,95,165,.08);
+        }
+        .qf-tareas-grid .ag-floating-filter .ag-icon-search,
+        .qf-tareas-grid .ag-floating-filter .ag-icon-filter,
+        .qf-tareas-grid .ag-floating-filter .ag-icon {
+          color: #185FA5 !important;
+          font-size: 13px !important;
         }
         .qf-tareas-grid .ag-row {
           border-bottom: 1px solid var(--qf-border);
