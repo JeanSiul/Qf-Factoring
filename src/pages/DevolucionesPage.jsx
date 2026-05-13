@@ -1091,7 +1091,7 @@ const DevolucionesPage = () => {
           style={{
             width: '100%',
             // Alto del grid: se redujo aprox. 2 filas para que encaje mejor en pantalla.
-            height: compactMode ? 'calc(100vh - 320px)' : 'calc(100vh - 380px)',
+            height: compactMode ? 'calc(100vh - 400px)' : 'calc(100vh - 460px)',
             minHeight: 310,
             '--ag-font-size': compactMode ? '10.5px' : '12px',
             '--ag-header-height': compactMode ? '35px' : '35px',
@@ -1119,7 +1119,7 @@ const DevolucionesPage = () => {
               rowData={agRows}
               columnDefs={agColumnDefs}
               headerHeight={35}
-              floatingFiltersHeight={30}
+              floatingFiltersHeight={25}
               rowHeight={compactMode ? 25 : 32}
               defaultColDef={agDefaultColDef}
               pagination
