@@ -809,9 +809,10 @@ const TareasPage = () => {
         }
         .qf-tareas-grid .ag-floating-filter-input,
         .qf-tareas-grid .ag-input-field-input {
-          min-height: 4px;
+          min-height: 2px;
           height: 6px;
-          font-size: 10px;
+          padding: 0 2px;
+          font-size: 8px;
           border-radius: 7px;
           border: 1px solid #9fb2c8 !important;
           background: #ffffff !important;
