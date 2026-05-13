@@ -1091,7 +1091,7 @@ const DevolucionesPage = () => {
           style={{
             width: '100%',
             // Alto del grid: se redujo aprox. 2 filas para que encaje mejor en pantalla.
-            height: compactMode ? 'calc(100vh - 280px)' : 'calc(100vh - 335px)',
+            height: compactMode ? 'calc(100vh - 320px)' : 'calc(100vh - 380px)',
             minHeight: 310,
             '--ag-font-size': compactMode ? '10.5px' : '12px',
             '--ag-header-height': compactMode ? '35px' : '35px',
