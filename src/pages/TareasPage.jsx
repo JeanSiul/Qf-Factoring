@@ -1001,10 +1001,13 @@ const TareasPage = () => {
             '--ag-font-size': compactMode ? '10.5px' : '12px',
             '--ag-header-height': compactMode ? '9px' : '12px',
             '--ag-row-height': compactMode ? '9px' : '12px',
-            '--ag-list-item-height': '10px',
+            '--ag-list-item-height': '6px',
             '--ag-header-column-resize-handle-height': '60%',
             '--ag-wrapper-border-radius': '0px',
-            '--ag-grid-size': '2px'
+            '--ag-grid-size': '4px'
+            '--ag-cell-horizontal-padding': '4px'
+            '--ag-header-column-separator-display': 'block'
+            '--ag-row-border-color': '#e5e7eb'
           }}
         >
           {loading && data.length === 0 ? (
