@@ -804,7 +804,8 @@ const TareasPage = () => {
           min-height: 12px;
         }
         .qf-tareas-grid .ag-floating-filter-body {
-          width: 100%;
+          min-height: 11px;
+          line-height: 11px;
         }
         .qf-tareas-grid .ag-floating-filter-input,
         .qf-tareas-grid .ag-input-field-input {
@@ -1000,7 +1001,7 @@ const TareasPage = () => {
             '--ag-font-size': compactMode ? '10.5px' : '12px',
             '--ag-header-height': compactMode ? '9px' : '12px',
             '--ag-row-height': compactMode ? '9px' : '12px',
-            '--ag-list-item-height': '14px',
+            '--ag-list-item-height': '10px',
             '--ag-header-column-resize-handle-height': '60%',
             '--ag-wrapper-border-radius': '0px',
             '--ag-grid-size': '2px'
