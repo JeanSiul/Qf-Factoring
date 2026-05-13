@@ -731,6 +731,11 @@ const DevolucionesPage = () => {
           background-image: none !important;
           padding-left: 4px !important;
         }
+        .qf-tareas-grid .ag-header-row-column-filter .ag-header-cell:nth-child(2) .ag-icon-search,
+        .qf-tareas-grid .ag-header-row-column-filter .ag-header-cell:nth-child(2) .ag-icon-filter {
+          display: none !important;
+        }
+        /* qf-date-filter-clean */
       `}</style>
       <div style={S.topHeader}><h1 style={S.title}>↩ Devoluciones</h1><p style={S.subtitle}>Gestión de devoluciones bancarias</p></div>
       <div style={S.kpiGrid}>{[{ l: 'Total registros', v: total, c: 'var(--qf-navy)', b: '#2196f3' },{ l: 'Mostradas', v: data.length, c: '#185FA5', b: '#03a9f4' },{ l: 'Total cargado', v: money(metrics.totalCargado), c: '#c62828', b: '#f44336' },{ l: 'Total abonado', v: money(metrics.totalAbonado), c: '#2e7d32', b: '#4caf50' },{ l: 'Comisiones', v: money(metrics.totalComision), c: '#e65100', b: '#ff9800' },{ l: 'Pendientes', v: metrics.pendientes, c: '#5e35b1', b: '#7e57c2' }].map(s => <div key={s.l} style={{ ...S.kpiCard, borderTop: `3px solid ${s.b}` }}><div style={S.kpiLabel}>{s.l}</div><div style={{ ...S.kpiValue, color: s.c }}>{s.v}</div></div>)}</div>
@@ -738,6 +743,13 @@ const DevolucionesPage = () => {
       <div className="page-card" style={S.card}>
         <div style={S.stickyTools}>
           <div style={S.pagRow}>
+            <select className="filter-input" value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }} style={{ width: 'auto', minWidth: 70, height: 28, fontSize: 11, padding: '0 4px' }}>
+              <option value={25}>25 filas</option>
+              <option value={50}>50 filas</option>
+              <option value={100}>100 filas</option>
+              <option value={200}>200 filas</option>
+            </select>
+
             <div style={S.topPagination}>
               <button className="btn btn-secondary btn-sm" style={S.pageNavBtn} disabled={!gridApi || gridPageInfo.current <= 1} onClick={() => goGridPage('first')}>«</button>
               <button className="btn btn-secondary btn-sm" style={S.pageNavBtn} disabled={!gridApi || gridPageInfo.current <= 1} onClick={() => goGridPage('prev')}>‹</button>
@@ -776,13 +788,7 @@ const DevolucionesPage = () => {
             </select>
 
             <button className="btn btn-secondary btn-sm" onClick={limpiarFiltrosTabla}>Limpiar filtros tabla</button>
-
-            <select className="filter-input" value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }} style={{ width: 'auto', minWidth: 70, height: 28, fontSize: 11, padding: '0 4px' }}>
-              <option value={25}>25 filas</option>
-              <option value={50}>50 filas</option>
-              <option value={100}>100 filas</option>
-              <option value={200}>200 filas</option>
-            </select>
+            <button className="btn btn-secondary btn-sm" onClick={resetGridView} style={S.resetInlineBtn}>Reset</button>
 
             <div style={S.rightActions}>
               {canCreate && (
@@ -831,13 +837,6 @@ const DevolucionesPage = () => {
 
 
             </div>
-            {canCreate && (
-              <div style={S.newRecordWrap}>
-                <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span style={{ color: '#4CAF50', fontWeight: 800, fontSize: 16 }}>+</span> Nuevo Registro
-                </button>
-              </div>
-            )}
           </div>
 
           {showColumnPanel && (
@@ -900,6 +899,12 @@ const DevolucionesPage = () => {
             </div>
           )}
 
+          <div style={S.exportRow}>
+            <button className="btn btn-secondary btn-sm" style={S.exportBtn} onClick={exportCsv}>CSV</button>
+            <button className="btn btn-secondary btn-sm" style={S.exportBtn} onClick={exportExcel}>Excel</button>
+            <button className="btn btn-secondary btn-sm" style={S.exportBtn} onClick={exportPdf}>PDF</button>
+          </div>
+
           {showDashboard && (
             <div style={S.dashboard}>
               <div style={S.dashPanel}>
@@ -939,11 +944,6 @@ const DevolucionesPage = () => {
             position: 'relative',
           }}
         >
-          <div style={S.gridExportOverlay}>
-            <button className="btn btn-secondary btn-sm" style={S.gridExportBtn} onClick={exportCsv}>CSV</button>
-            <button className="btn btn-secondary btn-sm" style={S.gridExportBtn} onClick={exportExcel}>Excel</button>
-            <button className="btn btn-secondary btn-sm" style={S.gridExportBtn} onClick={exportPdf}>PDF</button>
-          </div>
           {loading && data.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner dark" /></div>
           ) : (
@@ -1020,8 +1020,8 @@ const S = {
   resetInlineBtn: { minWidth: 54, height: 24, padding: '0 8px', textTransform: 'uppercase', fontSize: 10, fontWeight: 800 },
   newRecordWrap: { marginLeft: 'auto', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 },
   floatActionBtn: { height: 21, padding: '0 4px', fontSize: 8, borderRadius: 6, whiteSpace: 'nowrap', minWidth: 70 },
-  gridExportOverlay: { position: 'absolute', top: 2, right: 8, zIndex: 20, display: 'flex', gap: 4, alignItems: 'center' },
-  gridExportBtn: { height: 21, padding: '0 6px', fontSize: 8.5, borderRadius: 6, minWidth: 34 },
+  exportRow: { display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '3px 10px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
+  exportBtn: { height: 24, padding: '0 10px', fontSize: 10, borderRadius: 8, fontWeight: 700 },
 
   erpTools: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap', padding: '2px 10px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
   erpGroup: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
