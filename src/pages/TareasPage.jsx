@@ -417,7 +417,7 @@ const TareasPage = () => {
     cellStyle: {
       fontSize: compactMode ? '10.5px' : '12px',
       color: 'var(--qf-navy)',
-      lineHeight: compactMode ? '14px' : '16px',
+      lineHeight: compactMode ? '18px' : '22px',
     },
     headerClass: 'qf-tareas-ag-header',
     floatingFilterComponentParams: { suppressFilterButton: false },
@@ -548,14 +548,14 @@ const TareasPage = () => {
       headerName: 'Estado',
       field: 'estado',
       width: 130,
-      cellRenderer: p => <span className={`badge ${badgeClass(p.value)}`} style={{ fontSize: 7 }}>{String(p.value || '-').toUpperCase()}</span>,
+      cellRenderer: p => <span className={`badge ${badgeClass(p.value)}`} style={{ fontSize: 8 }}>{String(p.value || '-').toUpperCase()}</span>,
       filter: 'agTextColumnFilter',
     },
     {
       headerName: 'Prioridad',
       field: 'prioridad',
       width: 125,
-      cellRenderer: p => <span className={`badge ${prioridadStyle(p.value)}`} style={{ fontSize: 7 }}>{String(p.value || '-').toUpperCase()}</span>,
+      cellRenderer: p => <span className={`badge ${prioridadStyle(p.value)}`} style={{ fontSize: 8 }}>{String(p.value || '-').toUpperCase()}</span>,
       filter: 'agTextColumnFilter',
     },
     {
@@ -612,11 +612,11 @@ const TareasPage = () => {
         }
         .qf-tareas-grid .ag-header-cell-text {
           color: #fff;
-          font-size: 7px;
+          font-size: 8.5px;
         }
         .qf-tareas-grid .ag-header-cell {
-          padding-left: 2px;
-          padding-right: 2px;
+          padding-left: 5px;
+          padding-right: 5px;
         }
         .qf-tareas-grid .ag-icon,
         .qf-tareas-grid .ag-header-icon {
@@ -625,16 +625,16 @@ const TareasPage = () => {
         .qf-tareas-grid .ag-floating-filter {
           background: #f8fafc;
           border-bottom: 1px solid var(--qf-border);
-          min-height: 20px;
+          min-height: 30px;
         }
         .qf-tareas-grid .ag-floating-filter-body {
           width: 100%;
         }
         .qf-tareas-grid .ag-floating-filter-input,
         .qf-tareas-grid .ag-input-field-input {
-          min-height: 18px;
-          height: 18px;
-          font-size: 9px;
+          min-height: 23px;
+          height: 23px;
+          font-size: 10.5px;
           border-radius: 7px;
           border: 1px solid #9fb2c8 !important;
           background: #ffffff !important;
@@ -650,8 +650,8 @@ const TareasPage = () => {
           margin-left: 3px;
         }
         .qf-tareas-grid .ag-floating-filter-button-button {
-          min-width: 18px;
-          height: 18px;
+          min-width: 22px;
+          height: 22px;
           border-radius: 6px;
           border: 1px solid #9fb2c8;
           background: #e8eef5;
@@ -663,8 +663,8 @@ const TareasPage = () => {
           background: #f8fafc;
         }
         .qf-tareas-grid .ag-paging-panel {
-          min-height: 24px;
-          font-size: 9px;
+          min-height: 32px;
+          font-size: 10.5px;
           color: var(--qf-text-light);
           border-top: 1px solid var(--qf-border);
         }
@@ -770,8 +770,8 @@ const TareasPage = () => {
             height: compactMode ? 'calc(100vh - 330px)' : 'calc(100vh - 390px)',
             minHeight: 310,
             '--ag-font-size': compactMode ? '10.5px' : '12px',
-            '--ag-header-height': compactMode ? '18px' : '21px',
-            '--ag-row-height': compactMode ? '24px' : '28px',
+            '--ag-header-height': compactMode ? '24px' : '28px',
+            '--ag-row-height': compactMode ? '30px' : '38px',
             '--ag-list-item-height': '24px',
             '--ag-header-column-resize-handle-height': '60%',
             '--ag-wrapper-border-radius': '0px',
@@ -825,23 +825,23 @@ const S = {
   fieldSelect: { width: 'auto', minWidth: 120, height: 32, fontSize: 12 },
   dateInput: { width: 130, height: 32, fontSize: 12 },
   searchInput: { minWidth: 180, maxWidth: 340, height: 32, fontSize: 12 },
-  pagRow: { display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', padding: '5px 14px 7px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
+  pagRow: { display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', padding: '5px 14px 7px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
   pageInfo: { fontSize: 11, color: 'var(--qf-text-light)', fontWeight: 600 },
   loadMini: { fontSize: 11, color: '#185FA5', fontWeight: 700 },
-  th0: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 8, padding: '5px 4px' },
-  ths: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 8, padding: '5px 4px', cursor: 'pointer', userSelect: 'none' },
+  th0: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 9, padding: '5px 4px' },
+  ths: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 9, padding: '5px 4px', cursor: 'pointer', userSelect: 'none' },
   si: { fontSize: 7, opacity: 0.45, marginLeft: 1 },
   td: { padding: '3px 4px', verticalAlign: 'middle', lineHeight: 1.15 },
   opCode: { background: '#e8eef5', padding: '1px 4px', borderRadius: 3, fontSize: 9.5, fontWeight: 800, color: 'var(--qf-navy)' },
   typePill: { background: '#e8eef5', color: 'var(--qf-navy)', borderRadius: 3, padding: '1px 4px', fontSize: 9.5, fontWeight: 700, whiteSpace: 'nowrap' },
-  timeMini: { fontSize: 8, color: 'var(--qf-text-light)', marginTop: 2, fontWeight: 700 },
-  dateTimeInline: { display: 'inline-flex', alignItems: 'center', gap: 2, whiteSpace: 'nowrap' },
-  timeMiniInline: { fontSize: 8, color: 'var(--qf-text-light)', fontWeight: 700, whiteSpace: 'nowrap' },
-  aBtn: { fontSize: 8, padding: '1px 4px' },
+  timeMini: { fontSize: 9, color: 'var(--qf-text-light)', marginTop: 2, fontWeight: 700 },
+  dateTimeInline: { display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' },
+  timeMiniInline: { fontSize: 9, color: 'var(--qf-text-light)', fontWeight: 700, whiteSpace: 'nowrap' },
+  aBtn: { fontSize: 9, padding: '1px 4px' },
   footerCount: { padding: '6px 14px', borderTop: '1px solid var(--qf-border)', fontSize: 10.5, color: 'var(--qf-text-light)', background: '#fff' },
   detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 },
   detailBox: { background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 8 },
-  detailLabel: { fontSize: 8, fontWeight: 700, color: 'var(--qf-text-light)', textTransform: 'uppercase' },
+  detailLabel: { fontSize: 9, fontWeight: 700, color: 'var(--qf-text-light)', textTransform: 'uppercase' },
   detailValue: { fontSize: 12, fontWeight: 600, color: 'var(--qf-navy)', wordBreak: 'break-word' },
   g3: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' },
   g4: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0 16px' },
