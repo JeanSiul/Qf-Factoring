@@ -1090,8 +1090,8 @@ const DevolucionesPage = () => {
           className="ag-theme-quartz qf-tareas-grid"
           style={{
             width: '100%',
-            // Alto del grid: se redujo aprox. 2 filas para que encaje mejor en pantalla.
-            height: compactMode ? 'calc(100vh - 150px)' : 'calc(100vh - 150px)',
+            // Alto del grid recomendado: más registros visibles manteniendo scroll interno.
+            height: compactMode ? 'calc(100vh - 250px)' : 'calc(100vh - 305px)',
             minHeight: 310,
             '--ag-font-size': compactMode ? '10.5px' : '12px',
             '--ag-header-height': compactMode ? '35px' : '35px',
@@ -1118,9 +1118,9 @@ const DevolucionesPage = () => {
             <AgGridReact
               rowData={agRows}
               columnDefs={agColumnDefs}
-              headerHeight={35}
-              floatingFiltersHeight={20}
-              rowHeight={compactMode ? 25 : 32}
+              headerHeight={32}
+              floatingFiltersHeight={26}
+              rowHeight={compactMode ? 23 : 28}
               defaultColDef={agDefaultColDef}
               pagination
               suppressPaginationPanel={true}
