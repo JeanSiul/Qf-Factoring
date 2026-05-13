@@ -210,12 +210,25 @@ const DevolucionesPage = () => {
   const metrics = useMemo(() => ({ totalCargado: data.reduce((s, r) => s + Number(r.importe_cargado || 0), 0), totalAbonado: data.reduce((s, r) => s + Number(r.importe_abonado || 0), 0), totalComision: data.reduce((s, r) => s + Number(r.comision || 0), 0), pendientes: data.filter(r => String(r.estado || '').toLowerCase().includes('pendiente')).length }), [data])
 
   const quickFilteredData = useMemo(() => {
+    const now = new Date()
+    const todayIso = now.toISOString().slice(0, 10)
+
+    const weekStart = new Date(now)
+    weekStart.setDate(now.getDate() - 6)
+    const weekIso = weekStart.toISOString().slice(0, 10)
+
+    const monthIso = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
+
     return data.filter(row => {
+      const fecha = toDateInput(row.fecha_operacion)
       const estado = normalize(row.estado)
       const bancoNombre = normalize(getBancoNombre(row.banco, bancos))
       const monedaCargo = normalize(getMonedaNombre(row.moneda_cargo, monedas))
       const monedaAbono = normalize(getMonedaNombre(row.moneda_abono, monedas))
 
+      if (quickPreset === 'today') return fecha === todayIso
+      if (quickPreset === 'week') return fecha >= weekIso && fecha <= todayIso
+      if (quickPreset === 'month') return fecha >= monthIso && fecha <= todayIso
       if (quickPreset === 'pending') return estado.includes('pend') || estado.includes('proceso')
       if (quickPreset === 'processed') return estado.includes('proces') || estado.includes('complet') || estado.includes('exitos')
       if (quickPreset === 'errors') return estado.includes('error') || estado.includes('rechaz') || estado.includes('fall')
@@ -612,49 +625,58 @@ const DevolucionesPage = () => {
 
       <div className="page-card" style={S.card}>
         <div style={S.stickyTools}>
-          <div style={S.cardTitleWrap}><h2 style={S.cardTitle}>Lista de Devoluciones</h2>{canCreate && <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })} style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ color: '#4CAF50', fontWeight: 800, fontSize: 16 }}>+</span> Nuevo Registro</button>}</div>
           <div style={S.pagRow}>
             <span style={S.pill}>{from}-{to} de {total}</span>
-            <span style={S.pageInfo}>Filtra, ordena y pagina desde la tabla</span>
             <button className="btn btn-secondary btn-sm" onClick={limpiarFiltrosTabla}>Limpiar filtros tabla</button>
+
+            <div style={S.erpSearchWrap}>
+              <span style={S.erpSearchIcon}>🔍</span>
+              <input
+                className="filter-input"
+                value={quickText}
+                onChange={e => setQuickText(e.target.value)}
+                placeholder="Búsqueda global..."
+                style={S.erpSearch}
+              />
+            </div>
+
+            <select className="filter-input" value={quickPreset} onChange={e => setQuickPreset(e.target.value)} style={S.erpSelect}>
+              <option value="all">Vista: Todos</option>
+              <option value="today">Hoy</option>
+              <option value="week">Últimos 7 días</option>
+              <option value="month">Este mes</option>
+              <option value="pending">Pendientes / En proceso</option>
+              <option value="processed">Procesadas</option>
+              <option value="errors">Errores / Rechazadas</option>
+              <option value="withBank">Con banco</option>
+              <option value="soles">Soles</option>
+              <option value="dollars">Dólares</option>
+              <option value="gerencia">Vista Gerencia</option>
+              <option value="operaciones">Vista Operaciones</option>
+              <option value="auditoria">Vista Auditoría</option>
+            </select>
+
+            <button className="btn btn-secondary btn-sm" onClick={exportCsv}>CSV</button>
+            <button className="btn btn-secondary btn-sm" onClick={exportExcel}>Excel</button>
+            <button className="btn btn-secondary btn-sm" onClick={exportPdf}>PDF</button>
+
             <select className="filter-input" value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }} style={{ width: 'auto', minWidth: 70, height: 28, fontSize: 11, padding: '0 4px' }}>
               <option value={25}>25 filas</option>
               <option value={50}>50 filas</option>
               <option value={100}>100 filas</option>
               <option value={200}>200 filas</option>
             </select>
+
+            {canCreate && (
+              <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })} style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
+                <span style={{ color: '#4CAF50', fontWeight: 800, fontSize: 16 }}>+</span> Nuevo Registro
+              </button>
+            )}
+
             {loading && <span style={S.loadMini}>...</span>}
           </div>
 
           <div style={S.erpTools}>
-            <div style={S.erpGroup}>
-              <div style={S.erpSearchWrap}>
-                <span style={S.erpSearchIcon}>🔍</span>
-                <input
-                  className="filter-input"
-                  value={quickText}
-                  onChange={e => setQuickText(e.target.value)}
-                  placeholder="Búsqueda global..."
-                  style={S.erpSearch}
-                />
-              </div>
-              <select className="filter-input" value={quickPreset} onChange={e => setQuickPreset(e.target.value)} style={S.erpSelect}>
-                <option value="all">Vista: Todos</option>
-                <option value="pending">Pendientes / En proceso</option>
-                <option value="processed">Procesadas</option>
-                <option value="errors">Errores / Rechazadas</option>
-                <option value="withBank">Con banco</option>
-                <option value="soles">Soles</option>
-                <option value="dollars">Dólares</option>
-                <option value="gerencia">Vista Gerencia</option>
-                <option value="operaciones">Vista Operaciones</option>
-                <option value="auditoria">Vista Auditoría</option>
-              </select>
-              <button className="btn btn-secondary btn-sm" onClick={exportCsv}>CSV</button>
-              <button className="btn btn-secondary btn-sm" onClick={exportExcel}>Excel</button>
-              <button className="btn btn-secondary btn-sm" onClick={exportPdf}>PDF</button>
-            </div>
-
             <div style={S.erpGroup}>
               <button className="btn btn-secondary btn-sm" onClick={() => setShowSidePanel(v => !v)}>Panel</button>
               <button className="btn btn-secondary btn-sm" onClick={toggleDashboard}>{showDashboard ? 'Ocultar BI' : 'Ver BI'}</button>
@@ -776,7 +798,7 @@ const DevolucionesPage = () => {
           className="ag-theme-quartz qf-tareas-grid"
           style={{
             width: '100%',
-            height: compactMode ? 'calc(100vh - 330px)' : 'calc(100vh - 390px)',
+            height: compactMode ? 'calc(100vh - 285px)' : 'calc(100vh - 345px)',
             minHeight: 310,
             '--ag-font-size': compactMode ? '10.5px' : '12px',
             '--ag-header-height': compactMode ? '35px' : '35px',
@@ -855,9 +877,9 @@ const S = {
   cardTitle: { margin: 0, fontSize: 16, fontFamily: 'Montserrat', color: 'var(--qf-navy)' },
   pill: { fontSize: 10, fontWeight: 700, color: 'var(--qf-navy)', background: '#e8eef5', borderRadius: 999, padding: '3px 8px' },
 
-  erpTools: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap', padding: '3px 10px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
+  erpTools: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap', padding: '2px 10px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
   erpGroup: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  erpSearchWrap: { position: 'relative', width: 210 },
+  erpSearchWrap: { position: 'relative', width: 210, flexShrink: 0 },
   erpSearchIcon: { position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5', pointerEvents: 'none', zIndex: 1 },
   erpSearch: { width: '100%', height: 24, fontSize: 10, paddingLeft: 30 },
   erpSelect: { minWidth: 150, height: 24, fontSize: 9.5, padding: '0 22px 0 8px' },
@@ -886,7 +908,7 @@ const S = {
   filtersRow: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '0 14px 6px' },
   fieldSelect: { width: 'auto', minWidth: 120, height: 32, fontSize: 12 },
   searchInput: { minWidth: 180, maxWidth: 340, height: 32, fontSize: 12 },
-  pagRow: { display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', padding: '5px 14px 7px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
+  pagRow: { display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', padding: '4px 10px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
   pageInfo: { fontSize: 11, color: 'var(--qf-text-light)', fontWeight: 600 },
   loadMini: { fontSize: 11, color: '#185FA5', fontWeight: 700 },
   th0: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 9, padding: '5px 4px' },
