@@ -568,21 +568,16 @@ const DevolucionesPage = () => {
     {
       headerName: 'Acciones',
       field: 'acciones',
-      width: 190,
+      width: 115,
       pinned: 'right',
       sortable: false,
       filter: 'agTextColumnFilter',
       suppressMenu: true,
       floatingFilter: true,
       floatingFilterComponent: () => (
-        <div style={S.floatActionGroup}>
-          <button className="btn btn-secondary btn-sm" style={S.floatExportBtn} onClick={exportCsv}>CSV</button>
-          <button className="btn btn-secondary btn-sm" style={S.floatExportBtn} onClick={exportExcel}>Excel</button>
-          <button className="btn btn-secondary btn-sm" style={S.floatExportBtn} onClick={exportPdf}>PDF</button>
-          <button className="btn btn-secondary btn-sm" style={S.floatActionBtn} onClick={() => setCompactMode(v => !v)}>
-            {compactMode ? 'Vista cómoda' : 'Vista compacta'}
-          </button>
-        </div>
+        <button className="btn btn-secondary btn-sm" style={S.floatActionBtn} onClick={() => setCompactMode(v => !v)}>
+          {compactMode ? 'Vista cómoda' : 'Vista compacta'}
+        </button>
       ),
       floatingFilterComponentParams: { suppressFilterButton: true },
       cellRenderer: p => (
@@ -652,7 +647,7 @@ const DevolucionesPage = () => {
         .qf-tareas-grid .ag-input-field-input {
           min-height: 2px;
           height: 6px;
-          padding: 0 2px 0 16px !important;
+          padding: 0 2px 0 17px !important;
           font-size: 8px;
           border-radius: 7px;
           border: 1px solid #9fb2c8 !important;
@@ -660,7 +655,7 @@ const DevolucionesPage = () => {
           background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23185FA5' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cline x1='16.5' y1='16.5' x2='21' y2='21'/%3E%3C/svg%3E") !important;
           background-repeat: no-repeat !important;
           background-position: 4px calc(100% - 3px) !important;
-          background-size: 9px 9px !important;
+          background-size: 10px 10px !important;
           color: var(--qf-navy);
           box-shadow: inset 0 0 0 1px rgba(24,95,165,.08);
         }
@@ -731,6 +726,10 @@ const DevolucionesPage = () => {
         }
         .qf-tareas-grid .qf-right-header .ag-header-cell-label {
           justify-content: flex-end;
+        }
+        .qf-tareas-grid .ag-header-row-column-filter .ag-header-cell:nth-child(2) .ag-input-field-input {
+          background-image: none !important;
+          padding-left: 4px !important;
         }
       `}</style>
       <div style={S.topHeader}><h1 style={S.title}>↩ Devoluciones</h1><p style={S.subtitle}>Gestión de devoluciones bancarias</p></div>
@@ -832,6 +831,13 @@ const DevolucionesPage = () => {
 
 
             </div>
+            {canCreate && (
+              <div style={S.newRecordWrap}>
+                <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ color: '#4CAF50', fontWeight: 800, fontSize: 16 }}>+</span> Nuevo Registro
+                </button>
+              </div>
+            )}
           </div>
 
           {showColumnPanel && (
@@ -930,8 +936,14 @@ const DevolucionesPage = () => {
             '--ag-list-item-height': '22px',
             '--ag-header-column-resize-handle-height': '60%',
             '--ag-wrapper-border-radius': '0px',
+            position: 'relative',
           }}
         >
+          <div style={S.gridExportOverlay}>
+            <button className="btn btn-secondary btn-sm" style={S.gridExportBtn} onClick={exportCsv}>CSV</button>
+            <button className="btn btn-secondary btn-sm" style={S.gridExportBtn} onClick={exportExcel}>Excel</button>
+            <button className="btn btn-secondary btn-sm" style={S.gridExportBtn} onClick={exportPdf}>PDF</button>
+          </div>
           {loading && data.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner dark" /></div>
           ) : (
@@ -1006,10 +1018,10 @@ const S = {
   pageMini: { fontSize: 10, fontWeight: 800, color: 'var(--qf-navy)', minWidth: 72, textAlign: 'center' },
   pageNavBtn: { minWidth: 22, height: 22, padding: '0 6px', borderRadius: 999, fontWeight: 900 },
   resetInlineBtn: { minWidth: 54, height: 24, padding: '0 8px', textTransform: 'uppercase', fontSize: 10, fontWeight: 800 },
-  newRecordWrap: { marginLeft: 'auto', display: 'flex', justifyContent: 'flex-end' },
-  floatActionGroup: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 },
-  floatExportBtn: { height: 21, padding: '0 4px', fontSize: 8, borderRadius: 6, minWidth: 31 },
+  newRecordWrap: { marginLeft: 'auto', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 },
   floatActionBtn: { height: 21, padding: '0 4px', fontSize: 8, borderRadius: 6, whiteSpace: 'nowrap', minWidth: 70 },
+  gridExportOverlay: { position: 'absolute', top: 2, right: 8, zIndex: 20, display: 'flex', gap: 4, alignItems: 'center' },
+  gridExportBtn: { height: 21, padding: '0 6px', fontSize: 8.5, borderRadius: 6, minWidth: 34 },
 
   erpTools: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap', padding: '2px 10px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
   erpGroup: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
