@@ -1000,7 +1000,7 @@ const TareasPage = () => {
             minHeight: 310,
             '--ag-font-size': compactMode ? '10.5px' : '12px',
             '--ag-header-height': compactMode ? '9px' : '16px',
-            '--ag-row-height': compactMode ? '20px' : '16px',
+            '--ag-row-height': compactMode ? '20px' : '24px',
             '--ag-list-item-height': '6px',
             '--ag-header-column-resize-handle-height': '60%',
             '--ag-wrapper-border-radius': '0px',
