@@ -208,6 +208,7 @@ const DevolucionesPage = () => {
   const [showSidePanel, setShowSidePanel] = useState(false)
   const [showDashboard, setShowDashboard] = useState(() => safeJsonParse(localStorage.getItem(DASHBOARD_KEY), true))
   const [groupBy, setGroupBy] = useState('estado')
+  const [gridPageInfo, setGridPageInfo] = useState({ current: 1, total: 1 })
   const { toasts, show } = useToast()
   const [bancos, setBancos] = useState([])
   const [monedas, setMonedas] = useState([])
@@ -345,6 +346,13 @@ const DevolucionesPage = () => {
     return rows
   }
 
+  const refreshPaginationInfo = api => {
+    if (!api) return
+    const totalPages = Math.max(api.paginationGetTotalPages?.() || 1, 1)
+    const current = Math.min((api.paginationGetCurrentPage?.() || 0) + 1, totalPages)
+    setGridPageInfo({ current, total: totalPages })
+  }
+
   const refreshDisplayedRows = api => {
     if (!api) return
     const rows = []
@@ -352,6 +360,16 @@ const DevolucionesPage = () => {
       if (node?.data) rows.push(node.data)
     })
     setDisplayedRows(rows)
+    refreshPaginationInfo(api)
+  }
+
+  const goGridPage = action => {
+    if (!gridApi) return
+    if (action === 'first') gridApi.paginationGoToFirstPage()
+    if (action === 'prev') gridApi.paginationGoToPreviousPage()
+    if (action === 'next') gridApi.paginationGoToNextPage()
+    if (action === 'last') gridApi.paginationGoToLastPage()
+    setTimeout(() => refreshPaginationInfo(gridApi), 0)
   }
 
   const limpiarFiltrosTabla = () => {
@@ -656,6 +674,15 @@ const DevolucionesPage = () => {
           color: #185FA5 !important;
           font-size: 13px !important;
         }
+        .qf-tareas-grid .ag-floating-filter-button-button .ag-icon {
+          display: none !important;
+        }
+        .qf-tareas-grid .ag-floating-filter-button-button::before {
+          content: '🔍';
+          font-size: 12px;
+          line-height: 1;
+          filter: saturate(1.55);
+        }
         .qf-tareas-grid .ag-row {
           border-bottom: 1px solid var(--qf-border);
         }
@@ -699,8 +726,17 @@ const DevolucionesPage = () => {
       <div className="page-card" style={S.card}>
         <div style={S.stickyTools}>
           <div style={S.pagRow}>
-            <span style={S.pill}>{from}-{to} de {total}</span>
             <button className="btn btn-secondary btn-sm" onClick={limpiarFiltrosTabla}>Limpiar filtros tabla</button>
+
+            <div style={S.topPagination}>
+              <button className="btn btn-secondary btn-sm" style={S.pageNavBtn} disabled={!gridApi || gridPageInfo.current <= 1} onClick={() => goGridPage('first')}>«</button>
+              <button className="btn btn-secondary btn-sm" style={S.pageNavBtn} disabled={!gridApi || gridPageInfo.current <= 1} onClick={() => goGridPage('prev')}>‹</button>
+              <span style={S.pageMini}>Pág. {gridPageInfo.current} de {gridPageInfo.total}</span>
+              <button className="btn btn-secondary btn-sm" style={S.pageNavBtn} disabled={!gridApi || gridPageInfo.current >= gridPageInfo.total} onClick={() => goGridPage('next')}>›</button>
+              <button className="btn btn-secondary btn-sm" style={S.pageNavBtn} disabled={!gridApi || gridPageInfo.current >= gridPageInfo.total} onClick={() => goGridPage('last')}>»</button>
+            </div>
+
+            <span style={S.pill}>{from}-{to} de {total}</span>
 
             <div style={S.erpSearchWrap}>
               <span style={S.erpSearchIcon}>🔍</span>
@@ -873,7 +909,7 @@ const DevolucionesPage = () => {
           className="ag-theme-quartz qf-tareas-grid"
           style={{
             width: '100%',
-            height: compactMode ? 'calc(100vh - 285px)' : 'calc(100vh - 345px)',
+            height: compactMode ? 'calc(100vh - 230px)' : 'calc(100vh - 285px)',
             minHeight: 310,
             '--ag-font-size': compactMode ? '10.5px' : '12px',
             '--ag-header-height': compactMode ? '35px' : '35px',
@@ -894,6 +930,7 @@ const DevolucionesPage = () => {
               rowHeight={compactMode ? 25 : 32}
               defaultColDef={agDefaultColDef}
               pagination
+              suppressPaginationPanel={true}
               paginationPageSize={pageSize}
               paginationPageSizeSelector={[25, 50, 100, 200]}
               localeText={agLocaleText}
@@ -922,12 +959,12 @@ const DevolucionesPage = () => {
               suppressCellFocus
               onFilterChanged={params => refreshDisplayedRows(params.api)}
               onSortChanged={params => refreshDisplayedRows(params.api)}
+              onPaginationChanged={params => refreshPaginationInfo(params.api)}
               onColumnVisible={params => setVisibleCols(Object.fromEntries(params.api.getColumns().map(c => [c.getColId(), c.isVisible()])))}
               overlayNoRowsTemplate="<span style='padding:10px;color:#64748b;font-size:12px;'>No se encontraron devoluciones</span>"
             />
           )}
         </div>
-        {!loading && <div style={S.footerCount}>{data.length} de {total} devoluciones cargadas</div>}
       </div>
 
       {modal?.type === 'detalle' && <ModalDetalle item={modal.data} bancos={bancos} monedas={monedas} onClose={() => setModal(null)} />}
@@ -952,6 +989,9 @@ const S = {
   cardTitleWrap: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 14px 6px' },
   cardTitle: { margin: 0, fontSize: 16, fontFamily: 'Montserrat', color: 'var(--qf-navy)' },
   pill: { fontSize: 10, fontWeight: 700, color: 'var(--qf-navy)', background: '#e8eef5', borderRadius: 999, padding: '3px 8px' },
+  topPagination: { display: 'flex', alignItems: 'center', gap: 3, background: '#e8eef5', borderRadius: 999, padding: '2px 5px', border: '1px solid #c9d7e6' },
+  pageMini: { fontSize: 10, fontWeight: 800, color: 'var(--qf-navy)', minWidth: 72, textAlign: 'center' },
+  pageNavBtn: { minWidth: 22, height: 22, padding: '0 6px', borderRadius: 999, fontWeight: 900 },
 
   erpTools: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap', padding: '2px 10px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
   erpGroup: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
@@ -984,7 +1024,7 @@ const S = {
   filtersRow: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '0 14px 6px' },
   fieldSelect: { width: 'auto', minWidth: 120, height: 32, fontSize: 12 },
   searchInput: { minWidth: 180, maxWidth: 340, height: 32, fontSize: 12 },
-  pagRow: { display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', padding: '4px 10px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
+  pagRow: { display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', padding: '3px 10px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
   pageInfo: { fontSize: 11, color: 'var(--qf-text-light)', fontWeight: 600 },
   loadMini: { fontSize: 11, color: '#185FA5', fontWeight: 700 },
   th0: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 9, padding: '5px 4px' },
