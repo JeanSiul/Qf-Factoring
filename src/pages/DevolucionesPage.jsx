@@ -433,12 +433,18 @@ const DevolucionesPage = () => {
     setQuickPreset('all')
     setGroupBy('estado')
     setShowDashboard(true)
+    setShowSidePanel(false)
+    setShowColumnPanel(false)
     setPageSize(50)
     gridApi.setFilterModel(null)
     gridApi.resetColumnState()
+    gridApi.setColumnsVisible(['numero_operacion_pdf', 'created_at'], false)
     gridApi.setGridOption?.('quickFilterText', '')
     localStorage.removeItem(GRID_VIEW_KEY)
-    setTimeout(() => refreshDisplayedRows(gridApi), 60)
+    setTimeout(() => {
+      setVisibleCols(Object.fromEntries(gridApi.getColumns().map(c => [c.getColId(), c.isVisible()])))
+      refreshDisplayedRows(gridApi)
+    }, 60)
   }
 
   const exportCsv = () => {
@@ -633,7 +639,7 @@ const DevolucionesPage = () => {
         .qf-tareas-grid .ag-input-field-input {
           min-height: 2px;
           height: 6px;
-          padding: 0 2px 0 18px !important;
+          padding: 0 2px !important;
           font-size: 8px;
           border-radius: 7px;
           border: 1px solid #9fb2c8 !important;
@@ -726,8 +732,6 @@ const DevolucionesPage = () => {
       <div className="page-card" style={S.card}>
         <div style={S.stickyTools}>
           <div style={S.pagRow}>
-            <button className="btn btn-secondary btn-sm" onClick={limpiarFiltrosTabla}>Limpiar filtros tabla</button>
-
             <div style={S.topPagination}>
               <button className="btn btn-secondary btn-sm" style={S.pageNavBtn} disabled={!gridApi || gridPageInfo.current <= 1} onClick={() => goGridPage('first')}>«</button>
               <button className="btn btn-secondary btn-sm" style={S.pageNavBtn} disabled={!gridApi || gridPageInfo.current <= 1} onClick={() => goGridPage('prev')}>‹</button>
@@ -765,6 +769,7 @@ const DevolucionesPage = () => {
               <option value="auditoria">Vista Auditoría</option>
             </select>
 
+            <button className="btn btn-secondary btn-sm" onClick={limpiarFiltrosTabla}>Limpiar filtros tabla</button>
             <button className="btn btn-secondary btn-sm" onClick={exportCsv}>CSV</button>
             <button className="btn btn-secondary btn-sm" onClick={exportExcel}>Excel</button>
             <button className="btn btn-secondary btn-sm" onClick={exportPdf}>PDF</button>
@@ -805,6 +810,16 @@ const DevolucionesPage = () => {
                 style={S.viewInput}
               />
               <button className="btn btn-primary btn-sm" onClick={() => saveCurrentView(viewName)}>Guardar vista</button>
+              {savedViews.length > 0 && (
+                <div style={S.savedViewsInline}>
+                  {savedViews.map(v => (
+                    <span key={v.id} style={S.savedChip}>
+                      <button type="button" onClick={() => applyView(v)} style={S.savedBtn}>{v.name}</button>
+                      <button type="button" onClick={() => deleteView(v.id)} style={S.savedDel}>×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
               <button className="btn btn-secondary btn-sm" onClick={resetGridView}>Reset</button>
             </div>
           </div>
@@ -998,12 +1013,13 @@ const S = {
   erpSearchWrap: { position: 'relative', width: 210, flexShrink: 0 },
   erpSearchIcon: { position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5', pointerEvents: 'none', zIndex: 1 },
   erpSearch: { width: '100%', height: 24, fontSize: 10, paddingLeft: 30 },
-  erpSelect: { minWidth: 150, height: 24, fontSize: 9.5, padding: '0 22px 0 8px' },
+  erpSelect: { minWidth: 170, height: 24, fontSize: 9.5, padding: '0 22px 0 8px' },
   erpSelectSmall: { minWidth: 130, height: 24, fontSize: 9.5, padding: '0 20px 0 7px' },
   viewInput: { width: 140, height: 24, fontSize: 10 },
   columnPanel: { display: 'flex', gap: 8, flexWrap: 'wrap', padding: '6px 14px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
   columnCheck: { fontSize: 10.5, color: 'var(--qf-navy)', display: 'inline-flex', alignItems: 'center', gap: 4, background: '#fff', border: '1px solid var(--qf-border)', borderRadius: 999, padding: '3px 8px' },
   savedViews: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '5px 14px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
+  savedViewsInline: { display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' },
   savedTitle: { fontSize: 10, color: 'var(--qf-text-light)', fontWeight: 700 },
   savedChip: { display: 'inline-flex', alignItems: 'center', border: '1px solid #9fb2c8', borderRadius: 999, overflow: 'hidden', background: '#e8eef5' },
   savedBtn: { border: 0, background: 'transparent', padding: '3px 7px', cursor: 'pointer', fontSize: 10.5, color: 'var(--qf-navy)', fontWeight: 700 },
