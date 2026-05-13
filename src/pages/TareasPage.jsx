@@ -478,7 +478,7 @@ const TareasPage = () => {
     cellStyle: {
       fontSize: compactMode ? '10.5px' : '12px',
       color: 'var(--qf-navy)',
-      lineHeight: compactMode ? '10px' : '12px',
+      lineHeight: compactMode ? '9px' : '11px',
     },
     headerClass: 'qf-tareas-ag-header',
     floatingFilterComponentParams: { suppressFilterButton: false },
@@ -782,11 +782,17 @@ const TareasPage = () => {
         }
         .qf-tareas-grid .ag-header-cell-text {
           color: #fff;
-          font-size: 9px;
+          font-size: 8.5px;
         }
         .qf-tareas-grid .ag-header-cell {
           padding-left: 2px;
           padding-right: 2px;
+          line-height: 1;
+        }
+        .qf-tareas-grid .ag-floating-filter .ag-cell-label-container,
+        .qf-tareas-grid .ag-floating-filter-body {
+          min-height: 15px;
+          line-height: 15px;
         }
         .qf-tareas-grid .ag-icon,
         .qf-tareas-grid .ag-header-icon {
@@ -795,16 +801,16 @@ const TareasPage = () => {
         .qf-tareas-grid .ag-floating-filter {
           background: #f8fafc;
           border-bottom: 1px solid var(--qf-border);
-          min-height: 20px;
+          min-height: 16px;
         }
         .qf-tareas-grid .ag-floating-filter-body {
           width: 100%;
         }
         .qf-tareas-grid .ag-floating-filter-input,
         .qf-tareas-grid .ag-input-field-input {
-          min-height: 18px;
-          height: 18px;
-          font-size: 9px;
+          min-height: 15px;
+          height: 15px;
+          font-size: 8px;
           border-radius: 7px;
           border: 1px solid #9fb2c8 !important;
           background: #ffffff !important;
@@ -820,8 +826,8 @@ const TareasPage = () => {
           margin-left: 3px;
         }
         .qf-tareas-grid .ag-floating-filter-button-button {
-          min-width: 18px;
-          height: 18px;
+          min-width: 15px;
+          height: 15px;
           border-radius: 6px;
           border: 1px solid #9fb2c8;
           background: #e8eef5;
@@ -834,7 +840,7 @@ const TareasPage = () => {
         }
         .qf-tareas-grid .ag-paging-panel {
           min-height: 24px;
-          font-size: 9px;
+          font-size: 8px;
           color: var(--qf-text-light);
           border-top: 1px solid var(--qf-border);
         }
@@ -1021,9 +1027,9 @@ const TareasPage = () => {
             height: compactMode ? 'calc(100vh - 330px)' : 'calc(100vh - 390px)',
             minHeight: 310,
             '--ag-font-size': compactMode ? '10.5px' : '12px',
-            '--ag-header-height': compactMode ? '14px' : '16px',
-            '--ag-row-height': compactMode ? '14px' : '18px',
-            '--ag-list-item-height': '24px',
+            '--ag-header-height': compactMode ? '12px' : '14px',
+            '--ag-row-height': compactMode ? '12px' : '15px',
+            '--ag-list-item-height': '18px',
             '--ag-header-column-resize-handle-height': '60%',
             '--ag-wrapper-border-radius': '0px',
           }}
@@ -1078,11 +1084,11 @@ const TareasPage = () => {
 }
 
 const S = {
-  erpTools: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', padding: '5px 14px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
+  erpTools: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap', padding: '3px 10px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
   erpGroup: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  erpSearch: { width: 220, height: 28, fontSize: 11 },
-  erpSelect: { minWidth: 160, height: 28, fontSize: 11 },
-  viewInput: { width: 150, height: 28, fontSize: 11 },
+  erpSearch: { width: 210, height: 24, fontSize: 10 },
+  erpSelect: { minWidth: 150, height: 24, fontSize: 9.5, padding: '0 22px 0 8px' },
+  viewInput: { width: 140, height: 24, fontSize: 10 },
   columnPanel: { display: 'flex', gap: 8, flexWrap: 'wrap', padding: '6px 14px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
   columnCheck: { fontSize: 10.5, color: 'var(--qf-navy)', display: 'inline-flex', alignItems: 'center', gap: 4, background: '#fff', border: '1px solid var(--qf-border)', borderRadius: 999, padding: '3px 8px' },
   savedViews: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '5px 14px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
@@ -1090,7 +1096,7 @@ const S = {
   savedChip: { display: 'inline-flex', alignItems: 'center', border: '1px solid #9fb2c8', borderRadius: 999, overflow: 'hidden', background: '#e8eef5' },
   savedBtn: { border: 0, background: 'transparent', padding: '3px 7px', cursor: 'pointer', fontSize: 10.5, color: 'var(--qf-navy)', fontWeight: 700 },
   savedDel: { border: 0, background: '#dbe7f3', padding: '3px 6px', cursor: 'pointer', fontSize: 11, color: '#c62828', fontWeight: 900 },
-  smartTotals: { display: 'flex', gap: 10, flexWrap: 'wrap', padding: '5px 14px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)', color: 'var(--qf-text-light)', fontSize: 10.5 },
+  smartTotals: { display: 'flex', gap: 8, flexWrap: 'wrap', padding: '3px 10px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)', color: 'var(--qf-text-light)', fontSize: 10.5 },
   page: { paddingBottom: 12, maxWidth: '100%', overflowX: 'hidden' },
   topHeader: { marginBottom: 6 },
   title: { fontFamily: 'Montserrat', fontSize: 22, fontWeight: 800, color: 'var(--qf-navy)', marginBottom: 2 },
@@ -1112,8 +1118,8 @@ const S = {
   pagRow: { display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', padding: '5px 14px 7px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
   pageInfo: { fontSize: 11, color: 'var(--qf-text-light)', fontWeight: 600 },
   loadMini: { fontSize: 11, color: '#185FA5', fontWeight: 700 },
-  th0: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 7, padding: '5px 4px' },
-  ths: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 7, padding: '5px 4px', cursor: 'pointer', userSelect: 'none' },
+  th0: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 6.5, padding: '5px 4px' },
+  ths: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 6.5, padding: '5px 4px', cursor: 'pointer', userSelect: 'none' },
   si: { fontSize: 7, opacity: 0.45, marginLeft: 1 },
   td: { padding: '3px 4px', verticalAlign: 'middle', lineHeight: 1.15 },
   opCode: { background: '#e8eef5', padding: '1px 4px', borderRadius: 3, fontSize: 9.5, fontWeight: 800, color: 'var(--qf-navy)' },
