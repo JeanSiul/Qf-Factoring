@@ -791,8 +791,8 @@ const TareasPage = () => {
         }
         .qf-tareas-grid .ag-floating-filter .ag-cell-label-container,
         .qf-tareas-grid .ag-floating-filter-body {
-          min-height: 9x;
-          line-height: 9px;
+          min-height: 7x;
+          line-height: 7px;
         }
         .qf-tareas-grid .ag-icon,
         .qf-tareas-grid .ag-header-icon {
@@ -802,7 +802,7 @@ const TareasPage = () => {
         .qf-tareas-grid .ag-floating-filter {
           background: #f8fafc;
           border-bottom: 1px solid var(--qf-border);
-          min-height: 12px;
+          min-height: 10px;
         }
         .qf-tareas-grid .ag-floating-filter-body {
           width: 100%;
@@ -824,7 +824,7 @@ const TareasPage = () => {
           box-shadow: 0 0 0 2px rgba(24,95,165,.14);
         }
         .qf-tareas-grid .ag-floating-filter-button {
-          margin-left: 4px;
+          margin-left: 6px;
         }
         .qf-tareas-grid .ag-floating-filter-button-button {
           min-width: 22px;
@@ -857,6 +857,13 @@ const TareasPage = () => {
         .qf-tareas-grid .ag-cell[col-id="_fin_sort"] {
           white-space: nowrap;
           overflow: visible;
+        }
+        .qf-tareas-grid .ag-icon-filter,
+        .qf-tareas-grid .ag-icon-search {
+          font-size: 14px;
+        }
+        .qf-tareas-grid .ag-icon-calendar {
+          font-size: 14px;
         }
       `}</style>
 
