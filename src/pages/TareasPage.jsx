@@ -809,9 +809,9 @@ const TareasPage = () => {
         }
         .qf-tareas-grid .ag-floating-filter-input,
         .qf-tareas-grid .ag-input-field-input {
-          min-height: 11px;
-          height: 11px;
-          font-size: 8px;
+          min-height: 7px;
+          height: 8px;
+          font-size: 10px;
           border-radius: 7px;
           border: 1px solid #9fb2c8 !important;
           background: #ffffff !important;
@@ -824,12 +824,12 @@ const TareasPage = () => {
           box-shadow: 0 0 0 2px rgba(24,95,165,.14);
         }
         .qf-tareas-grid .ag-floating-filter-button {
-          margin-left: 3px;
+          margin-left: 4px;
         }
         .qf-tareas-grid .ag-floating-filter-button-button {
-          min-width: 15px;
-          height: 15px;
-          width: 15px;
+          min-width: 22px;
+          height: 22px;
+          width: 22x;
           border-radius: 6px;
           border: 1px solid #9fb2c8;
           background: #e8eef5;
