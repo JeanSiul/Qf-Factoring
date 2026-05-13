@@ -3,7 +3,6 @@ import { apiCall, toArray } from '../utils/api'
 import { useToast } from '../hooks/useToast'
 import ToastContainer from '../components/ToastContainer'
 import { useAuth } from '../context/AuthContext'
-import { AgGridReact } from 'ag-grid-react'
 
 const CLAIM = 'TAREAS'
 const DEBOUNCE_MS = 450
@@ -37,24 +36,6 @@ const toDateInput = value => {
 }
 
 const toTimeInput = value => String(value || '').slice(0, 5)
-
-const toDateFilterValue = value => {
-  const iso = toDateInput(value)
-  if (!iso) return null
-  const [y, m, d] = iso.split('-').map(Number)
-  if (!y || !m || !d) return null
-  return new Date(y, m - 1, d)
-}
-
-const dateComparator = (filterDate, cellValue) => {
-  const cellDate = cellValue instanceof Date ? cellValue : toDateFilterValue(cellValue)
-  if (!cellDate) return -1
-  const f = new Date(filterDate.getFullYear(), filterDate.getMonth(), filterDate.getDate())
-  const c = new Date(cellDate.getFullYear(), cellDate.getMonth(), cellDate.getDate())
-  if (c < f) return -1
-  if (c > f) return 1
-  return 0
-}
 
 const today = () => new Date().toISOString().slice(0, 10)
 const nowTime = () => new Date().toTimeString().slice(0, 5)
@@ -91,6 +72,57 @@ const prioridadStyle = value => {
 }
 
 const norm = value => String(value ?? '').toLowerCase().trim()
+
+const operadoresFiltro = [
+  { value: 'contains', label: 'Contiene' },
+  { value: 'not_contains', label: 'No contiene' },
+  { value: 'equals', label: 'Igual' },
+  { value: 'not_equals', label: 'Distinto' },
+  { value: 'starts', label: 'Empieza con' },
+  { value: 'ends', label: 'Termina con' },
+  { value: 'blank', label: 'Vacío' },
+  { value: 'not_blank', label: 'No vacío' },
+]
+
+const columnasFiltro = [
+  { key: 'fecha_inicio', type: 'date' },
+  { key: 'fecha_fin', type: 'date' },
+  { key: 'tipo_tarea', type: 'select', options: tipos },
+  { key: 'titulo', type: 'text' },
+  { key: 'usuario_nombre', type: 'text' },
+  { key: 'duracion_minutos', type: 'number' },
+  { key: 'estado', type: 'select', options: estados },
+  { key: 'prioridad', type: 'select', options: prioridades },
+]
+
+const initialColumnFilters = columnasFiltro.reduce((acc, col) => {
+  acc[col.key] = { op: col.type === 'select' ? 'equals' : 'contains', value: '' }
+  return acc
+}, {})
+
+const getFilterValue = (item, key) => {
+  if (key === 'duracion_minutos') return String(calcMinutes(item))
+  if (key === 'fecha_inicio' || key === 'fecha_fin') return toDateInput(item?.[key])
+  return item?.[key] ?? ''
+}
+
+const matchColumnFilter = (rawValue, filter) => {
+  const op = filter?.op || 'contains'
+  const value = filter?.value ?? ''
+  const left = norm(rawValue)
+  const right = norm(value)
+
+  if (op === 'blank') return left === ''
+  if (op === 'not_blank') return left !== ''
+  if (!right) return true
+
+  if (op === 'not_contains') return !left.includes(right)
+  if (op === 'equals') return left === right
+  if (op === 'not_equals') return left !== right
+  if (op === 'starts') return left.startsWith(right)
+  if (op === 'ends') return left.endsWith(right)
+  return left.includes(right)
+}
 
 const emptyTask = user => ({
   tipo_tarea: 'Soporte',
@@ -292,7 +324,8 @@ const TareasPage = () => {
   const [compactMode, setCompactMode] = useState(true)
   const [sortField, setSortField] = useState('fecha_inicio')
   const [sortDir, setSortDir] = useState('desc')
-  const [gridApi, setGridApi] = useState(null)
+  const [columnFilters, setColumnFilters] = useState(initialColumnFilters)
+  const [openFilter, setOpenFilter] = useState(null)
 
   const cv = permisos?.[CLAIM] || '11111111111'
   const canList = cv[1] !== '0'
@@ -310,7 +343,7 @@ const TareasPage = () => {
     try {
       const qs = new URLSearchParams()
       qs.set('page', String(opts.page || page))
-      qs.set('pageSize', String(5000))
+      qs.set('pageSize', String(opts.pageSize || pageSize))
       qs.set('field', opts.campo ?? campo)
       if ((opts.busqueda ?? busqueda).trim()) qs.set('q', (opts.busqueda ?? busqueda).trim())
       if ((opts.tipo ?? tipo) !== 'all') qs.set('tipo_tarea', opts.tipo ?? tipo)
@@ -347,9 +380,35 @@ const TareasPage = () => {
     setEstado('all')
     setDesde('')
     setHasta('')
+    setColumnFilters(initialColumnFilters)
+    setOpenFilter(null)
     setPage(1)
     cargar({ page: 1, campo: 'all', busqueda: '', tipo: 'all', estado: 'all', desde: '', hasta: '' })
   }
+
+  const setColumnFilter = (key, patch) => {
+    setColumnFilters(prev => ({
+      ...prev,
+      [key]: { ...prev[key], ...patch },
+    }))
+    setPage(1)
+  }
+
+  const clearColumnFilter = key => {
+    setColumnFilters(prev => ({
+      ...prev,
+      [key]: { ...initialColumnFilters[key] },
+    }))
+    setOpenFilter(null)
+    setPage(1)
+  }
+
+  const columnFiltersActive = useMemo(() => (
+    Object.values(columnFilters).some(f => {
+      const op = f?.op || 'contains'
+      return ['blank', 'not_blank'].includes(op) || String(f?.value || '').trim()
+    })
+  ), [columnFilters])
 
   const handleSave = async payload => {
     const p = {
@@ -384,196 +443,115 @@ const TareasPage = () => {
     }
   }
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize))
-  const from = total === 0 ? 0 : 1
-  const to = Math.min(data.length, total)
+  const filteredData = useMemo(() => (
+    data.filter(row => columnasFiltro.every(col => matchColumnFilter(getFilterValue(row, col.key), columnFilters[col.key])))
+  ), [data, columnFilters])
+
+  const vistaTotal = filteredData.length
+  const totalPages = Math.max(1, Math.ceil(vistaTotal / pageSize))
+  const from = vistaTotal === 0 ? 0 : ((page - 1) * pageSize) + 1
+  const to = Math.min(page * pageSize, vistaTotal)
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
 
   const metrics = useMemo(() => {
-    const mins = data.reduce((s, r) => s + calcMinutes(r), 0)
+    const mins = filteredData.reduce((s, r) => s + calcMinutes(r), 0)
     return {
       horas: minToTime(mins),
-      soporte: data.filter(r => r.tipo_tarea === 'Soporte').length,
-      programacion: data.filter(r => r.tipo_tarea === 'Programación').length,
-      completadas: data.filter(r => r.estado === 'Completado').length,
-      pendientes: data.filter(r => ['Pendiente', 'En proceso'].includes(r.estado)).length,
+      soporte: filteredData.filter(r => r.tipo_tarea === 'Soporte').length,
+      programacion: filteredData.filter(r => r.tipo_tarea === 'Programación').length,
+      completadas: filteredData.filter(r => r.estado === 'Completado').length,
+      pendientes: filteredData.filter(r => ['Pendiente', 'En proceso'].includes(r.estado)).length,
     }
-  }, [data])
+  }, [filteredData])
 
-  const agRows = useMemo(() => data.map(r => ({
-    ...r,
-    _inicio_sort: toDateFilterValue(r.fecha_inicio),
-    _fin_sort: toDateFilterValue(r.fecha_fin),
-    _inicio_text: `${formatDate(r.fecha_inicio)} ${toTimeInput(r.hora_inicio)}`,
-    _fin_text: `${formatDate(r.fecha_fin)} ${toTimeInput(r.hora_fin)}`,
-    _duracion: calcMinutes(r),
-  })), [data])
-
-  const agDefaultColDef = useMemo(() => ({
-    sortable: true,
-    filter: true,
-    floatingFilter: true,
-    resizable: true,
-    minWidth: 90,
-    cellStyle: {
-      fontSize: compactMode ? '10.5px' : '12px',
-      color: 'var(--qf-navy)',
-      lineHeight: compactMode ? '10px' : '12px',
-    },
-    headerClass: 'qf-tareas-ag-header',
-    floatingFilterComponentParams: { suppressFilterButton: false },
-  }), [compactMode])
-
-  const agLocaleText = useMemo(() => ({
-    contains: 'Contiene',
-    notContains: 'No contiene',
-    equals: 'Igual',
-    notEqual: 'Distinto',
-    startsWith: 'Empieza con',
-    endsWith: 'Termina con',
-    blank: 'Vacío',
-    notBlank: 'No vacío',
-    before: 'Antes de',
-    after: 'Después de',
-    inRange: 'Entre',
-    inRangeStart: 'Desde',
-    inRangeEnd: 'Hasta',
-    lessThan: 'Menor que',
-    greaterThan: 'Mayor que',
-    filterOoo: 'Filtrar...',
-    applyFilter: 'Aplicar',
-    resetFilter: 'Restablecer',
-    clearFilter: 'Limpiar',
-    cancelFilter: 'Cancelar',
-    noRowsToShow: 'No se encontraron tareas',
-    loadingOoo: 'Cargando...',
-    selectAll: 'Seleccionar todo',
-    searchOoo: 'Buscar...',
-    blanks: 'Vacíos',
-    page: 'Página',
-    more: 'Más',
-    to: 'a',
-    of: 'de',
-    next: 'Siguiente',
-    last: 'Última',
-    first: 'Primera',
-    previous: 'Anterior',
-    pageSizeSelectorLabel: 'Filas',
-    ariaFilterInput: 'Entrada de filtro',
-  }), [])
-
-  const limpiarFiltrosTabla = () => {
-    if (!gridApi) return
-    gridApi.setFilterModel(null)
-    gridApi.applyColumnState({
-      defaultState: { sort: null },
-      state: [{ colId: '_inicio_sort', sort: 'desc' }],
-    })
+  const handleSort = f => {
+    if (sortField === f) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else {
+      setSortField(f)
+      setSortDir('asc')
+    }
   }
 
-  const agColumnDefs = useMemo(() => [
-    {
-      headerName: 'Inicio',
-      field: '_inicio_sort',
-      width: 150,
-      minWidth: 150,
-      sort: 'desc',
-      comparator: (a, b) => (a?.getTime?.() || 0) - (b?.getTime?.() || 0),
-      filterParams: {
-        comparator: dateComparator,
-        browserDatePicker: true,
-        inRangeInclusive: true,
-      },
-      cellRenderer: p => (
-        <div>
-          <span style={S.dateTimeInline}><code style={S.opCode}>{formatDate(p.data?.fecha_inicio)}</code><span style={S.timeMiniInline}>{toTimeInput(p.data?.hora_inicio)}</span></span>
+  const sortedData = useMemo(() => {
+    if (!sortField) return filteredData
+    return [...filteredData].sort((a, b) => {
+      let va = a[sortField]
+      let vb = b[sortField]
+      if (sortField === 'duracion_minutos') return sortDir === 'asc' ? calcMinutes(a) - calcMinutes(b) : calcMinutes(b) - calcMinutes(a)
+      if (sortField === 'fecha_inicio') {
+        va = `${a.fecha_inicio || ''} ${a.hora_inicio || ''}`
+        vb = `${b.fecha_inicio || ''} ${b.hora_inicio || ''}`
+      }
+      va = String(va || '').toLowerCase()
+      vb = String(vb || '').toLowerCase()
+      return va < vb ? (sortDir === 'asc' ? -1 : 1) : va > vb ? (sortDir === 'asc' ? 1 : -1) : 0
+    })
+  }, [filteredData, sortField, sortDir])
+
+  const si = f => sortField !== f ? ' ↕' : sortDir === 'asc' ? ' ▲' : ' ▼'
+  const paginatedData = useMemo(() => sortedData.slice((page - 1) * pageSize, page * pageSize), [sortedData, page, pageSize])
+
+  const FilterCell = ({ col, align = 'left' }) => {
+    const filter = columnFilters[col.key] || initialColumnFilters[col.key]
+    const active = ['blank', 'not_blank'].includes(filter.op) || String(filter.value || '').trim()
+    const showInput = !['blank', 'not_blank'].includes(filter.op)
+
+    return (
+      <th style={{ ...S.filterTh, textAlign: align }}>
+        <div style={{ ...S.colFilterWrap, justifyContent: align === 'center' ? 'center' : 'flex-start' }}>
+          {col.type === 'select' ? (
+            <select
+              className="filter-input"
+              value={filter.value}
+              onChange={e => setColumnFilter(col.key, { value: e.target.value })}
+              style={S.colSelect}
+            >
+              <option value="">Todos</option>
+              {(col.options || []).map(x => <option key={x} value={x}>{x}</option>)}
+            </select>
+          ) : showInput ? (
+            <input
+              className="filter-input"
+              type={col.type === 'date' ? 'date' : col.type === 'number' ? 'number' : 'text'}
+              value={filter.value}
+              onChange={e => setColumnFilter(col.key, { value: e.target.value })}
+              style={S.colInput}
+            />
+          ) : (
+            <span style={S.blankFilterLabel}>{filter.op === 'blank' ? 'Vacío' : 'No vacío'}</span>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setOpenFilter(openFilter === col.key ? null : col.key)}
+            style={{ ...S.filterIconBtn, color: active ? '#185FA5' : 'var(--qf-text-light)' }}
+            title="Opciones de filtro"
+          >
+            ≡
+          </button>
+
+          {openFilter === col.key && (
+            <div style={S.filterMenu}>
+              {operadoresFiltro.map(op => (
+                <button
+                  key={op.value}
+                  type="button"
+                  onClick={() => setColumnFilter(col.key, { op: op.value, value: ['blank', 'not_blank'].includes(op.value) ? '' : filter.value })}
+                  style={{ ...S.filterOption, ...(filter.op === op.value ? S.filterOptionActive : {}) }}
+                >
+                  {op.label}
+                </button>
+              ))}
+              <button type="button" onClick={() => clearColumnFilter(col.key)} style={S.filterClear}>Limpiar columna</button>
+            </div>
+          )}
         </div>
-      ),
-      filter: 'agDateColumnFilter',
-    },
-    {
-      headerName: 'Fin',
-      field: '_fin_sort',
-      width: 150,
-      minWidth: 150,
-      comparator: (a, b) => (a?.getTime?.() || 0) - (b?.getTime?.() || 0),
-      filterParams: {
-        comparator: dateComparator,
-        browserDatePicker: true,
-        inRangeInclusive: true,
-      },
-      cellRenderer: p => (
-        <div>
-          <span style={S.dateTimeInline}><code style={S.opCode}>{formatDate(p.data?.fecha_fin)}</code><span style={S.timeMiniInline}>{toTimeInput(p.data?.hora_fin)}</span></span>
-        </div>
-      ),
-      filter: 'agDateColumnFilter',
-    },
-    {
-      headerName: 'Tipo',
-      field: 'tipo_tarea',
-      width: 130,
-      cellRenderer: p => <span style={S.typePill}>{p.value || '-'}</span>,
-      filter: 'agTextColumnFilter',
-    },
-    {
-      headerName: 'Tarea',
-      field: 'titulo',
-      flex: 1,
-      minWidth: 240,
-      cellStyle: {
-        fontSize: compactMode ? '10.5px' : '12px',
-        color: 'var(--qf-navy)',
-        fontWeight: 700,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
-      },
-      filter: 'agTextColumnFilter',
-    },
-    {
-      headerName: 'Usuario',
-      field: 'usuario_nombre',
-      width: 145,
-      valueGetter: p => p.data?.usuario_nombre || p.data?.usuario_email || p.data?.usuario_id || '-',
-      filter: 'agTextColumnFilter',
-    },
-    {
-      headerName: 'Duración',
-      field: '_duracion',
-      width: 78,
-      cellRenderer: p => <span style={{ fontWeight: 800, color: '#2e7d32' }}>{minToTime(p.value)}</span>,
-      filter: 'agNumberColumnFilter',
-    },
-    {
-      headerName: 'Estado',
-      field: 'estado',
-      width: 130,
-      cellRenderer: p => <span className={`badge ${badgeClass(p.value)}`} style={{ fontSize: 6, padding: '1px 5px', lineHeight: 1.1 }}>{String(p.value || '-').toUpperCase()}</span>,
-      filter: 'agTextColumnFilter',
-    },
-    {
-      headerName: 'Prioridad',
-      field: 'prioridad',
-      width: 125,
-      cellRenderer: p => <span className={`badge ${prioridadStyle(p.value)}`} style={{ fontSize: 6, padding: '1px 5px', lineHeight: 1.1 }}>{String(p.value || '-').toUpperCase()}</span>,
-      filter: 'agTextColumnFilter',
-    },
-    {
-      headerName: 'Acc.',
-      field: 'acciones',
-      width: 115,
-      pinned: 'right',
-      sortable: false,
-      filter: false,
-      cellRenderer: p => (
-        <div style={{ display: 'flex', gap: 1, justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-          {canView && <button className="btn btn-secondary btn-sm" onClick={() => setModal({ type: 'detalle', data: p.data })} style={{ ...S.aBtn, padding:'0 4px', minHeight:16, fontSize:9 }}>Ver</button>}
-          {canEdit && <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'editar', data: p.data })} style={{ ...S.aBtn, padding:'0 4px', minHeight:16, fontSize:9 }}>Edit</button>}
-          {canDelete && <button className="btn btn-danger btn-sm" onClick={() => handleDelete(p.data)} style={{ ...S.aBtn, padding:'0 4px', minHeight:16, fontSize:9 }}>Del</button>}
-        </div>
-      ),
-    },
-  ], [compactMode, canView, canEdit, canDelete])
+      </th>
+    )
+  }
 
   if (!canList) {
     return (
@@ -590,97 +568,6 @@ const TareasPage = () => {
     <div className="fade-in" style={S.page}>
       <ToastContainer toasts={toasts} />
 
-      <style>{`
-        .qf-tareas-grid .ag-root-wrapper {
-          border: 0;
-          border-top: 1px solid var(--qf-border);
-          font-family: Montserrat, Arial, sans-serif;
-        }
-        .qf-tareas-grid .ag-header {
-          background: var(--qf-navy);
-          color: #fff;
-          border-bottom: 0;
-        }
-        .qf-tareas-grid .ag-header-cell,
-        .qf-tareas-grid .ag-header-group-cell {
-          background: var(--qf-navy);
-          color: #fff;
-          font-weight: 800;
-          text-transform: uppercase;
-          letter-spacing: .2px;
-          border-right: 0;
-        }
-        .qf-tareas-grid .ag-header-cell-text {
-          color: #fff;
-          font-size: 9px;
-        }
-        .qf-tareas-grid .ag-header-cell {
-          padding-left: 2px;
-          padding-right: 2px;
-        }
-        .qf-tareas-grid .ag-icon,
-        .qf-tareas-grid .ag-header-icon {
-          color: #fff;
-        }
-        .qf-tareas-grid .ag-floating-filter {
-          background: #f8fafc;
-          border-bottom: 1px solid var(--qf-border);
-          min-height: 20px;
-        }
-        .qf-tareas-grid .ag-floating-filter-body {
-          width: 100%;
-        }
-        .qf-tareas-grid .ag-floating-filter-input,
-        .qf-tareas-grid .ag-input-field-input {
-          min-height: 18px;
-          height: 18px;
-          font-size: 9px;
-          border-radius: 7px;
-          border: 1px solid #9fb2c8 !important;
-          background: #ffffff !important;
-          color: var(--qf-navy);
-          box-shadow: inset 0 0 0 1px rgba(24,95,165,.08);
-        }
-        .qf-tareas-grid .ag-floating-filter-input:focus,
-        .qf-tareas-grid .ag-input-field-input:focus {
-          border-color: #185FA5 !important;
-          box-shadow: 0 0 0 2px rgba(24,95,165,.14);
-        }
-        .qf-tareas-grid .ag-floating-filter-button {
-          margin-left: 3px;
-        }
-        .qf-tareas-grid .ag-floating-filter-button-button {
-          min-width: 18px;
-          height: 18px;
-          border-radius: 6px;
-          border: 1px solid #9fb2c8;
-          background: #e8eef5;
-        }
-        .qf-tareas-grid .ag-row {
-          border-bottom: 1px solid var(--qf-border);
-        }
-        .qf-tareas-grid .ag-row-hover {
-          background: #f8fafc;
-        }
-        .qf-tareas-grid .ag-paging-panel {
-          min-height: 24px;
-          font-size: 9px;
-          color: var(--qf-text-light);
-          border-top: 1px solid var(--qf-border);
-        }
-        .qf-tareas-grid .ag-cell {
-          display: flex;
-          align-items: center;
-          padding-top: 0 !important;
-          padding-bottom: 0 !important;
-        }
-        .qf-tareas-grid .ag-cell[col-id="_inicio_sort"],
-        .qf-tareas-grid .ag-cell[col-id="_fin_sort"] {
-          white-space: nowrap;
-          overflow: visible;
-        }
-      `}</style>
-
       <div style={S.topHeader}>
         <h1 style={S.title}>📝 Tareas</h1>
         <p style={S.subtitle}>Bitácora de tareas realizadas por usuario, con fechas, horas y reporte filtrable.</p>
@@ -695,7 +582,7 @@ const TareasPage = () => {
       <div style={S.kpiGrid}>
         {[
           { l: 'Total registros', v: total, c: 'var(--qf-navy)', b: '#2196f3' },
-          { l: 'Mostradas', v: data.length, c: '#185FA5', b: '#03a9f4' },
+          { l: 'Mostradas', v: vistaTotal, c: '#185FA5', b: '#03a9f4' },
           { l: 'Horas registradas', v: metrics.horas, c: '#2e7d32', b: '#4caf50' },
           { l: 'Soporte', v: metrics.soporte, c: '#e65100', b: '#ff9800' },
           { l: 'Programación', v: metrics.programacion, c: '#5e35b1', b: '#7e57c2' },
@@ -752,53 +639,91 @@ const TareasPage = () => {
           </div>
 
           <div style={S.pagRow}>
-            <span style={S.pill}>{from}-{to} de {total}</span>
-            <span style={S.pageInfo}>Filtra, ordena y pagina desde la tabla</span>
-            <button className="btn btn-secondary btn-sm" onClick={limpiarFiltrosTabla}>Limpiar filtros tabla</button>
-            <select className="filter-input" value={pageSize} onChange={e => setPageSize(Number(e.target.value))} style={{ width: 'auto', minWidth: 70, height: 28, fontSize: 11, padding: '0 4px' }}>
-              <option value={25}>25 filas</option>
-              <option value={50}>50 filas</option>
-              <option value={100}>100 filas</option>
-              <option value={200}>200 filas</option>
+            <span style={S.pill}>{from}-{to} de {vistaTotal}</span>
+            <select className="filter-input" value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }} style={{ width: 'auto', minWidth: 52, height: 28, fontSize: 11, padding: '0 4px' }}>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={200}>200</option>
             </select>
+
+            <button className="btn btn-secondary btn-sm" disabled={page <= 1 || loading} onClick={() => setPage(1)}>«</button>
+            <button className="btn btn-secondary btn-sm" disabled={page <= 1 || loading} onClick={() => setPage(p => Math.max(1, p - 1))}>‹</button>
+            <span style={S.pageInfo}>{page}/{totalPages}</span>
+            <button className="btn btn-secondary btn-sm" disabled={page >= totalPages || loading} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>›</button>
+            <button className="btn btn-secondary btn-sm" disabled={page >= totalPages || loading} onClick={() => setPage(totalPages)}>»</button>
             {loading && <span style={S.loadMini}>...</span>}
           </div>
         </div>
 
-        <div
-          className="ag-theme-quartz qf-tareas-grid"
-          style={{
-            width: '100%',
-            height: compactMode ? 'calc(100vh - 330px)' : 'calc(100vh - 390px)',
-            minHeight: 310,
-            '--ag-font-size': compactMode ? '10.5px' : '12px',
-            '--ag-header-height': compactMode ? '14px' : '16px',
-            '--ag-row-height': compactMode ? '14px' : '18px',
-            '--ag-list-item-height': '24px',
-            '--ag-header-column-resize-handle-height': '60%',
-            '--ag-wrapper-border-radius': '0px',
-          }}
-        >
+        <div style={{ overflow: 'auto', width: '100%', maxHeight: compactMode ? 'calc(100vh - 340px)' : 'calc(100vh - 400px)' }}>
           {loading && data.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner dark" /></div>
+          ) : filteredData.length === 0 ? (
+            <div className="empty-state"><div className="icon">📝</div><p>No se encontraron tareas</p></div>
           ) : (
-            <AgGridReact
-              rowData={agRows}
-              columnDefs={agColumnDefs}
-              defaultColDef={agDefaultColDef}
-              pagination
-              paginationPageSize={pageSize}
-              paginationPageSizeSelector={[25, 50, 100, 200]}
-              localeText={agLocaleText}
-              onGridReady={params => setGridApi(params.api)}
-              animateRows
-              suppressCellFocus
-              overlayNoRowsTemplate="<span style='padding:10px;color:#64748b;font-size:12px;'>No se encontraron tareas con los filtros aplicados</span>"
-            />
+            <table className="qf-table" style={{ width: '100%', tableLayout: 'auto', fontSize: compactMode ? 10.5 : 12 }}>
+              <thead>
+                <tr>
+                  <th style={S.ths} onClick={() => handleSort('fecha_inicio')}>Inicio<span style={S.si}>{si('fecha_inicio')}</span></th>
+                  <th style={S.ths} onClick={() => handleSort('fecha_fin')}>Fin<span style={S.si}>{si('fecha_fin')}</span></th>
+                  <th style={S.ths} onClick={() => handleSort('tipo_tarea')}>Tipo<span style={S.si}>{si('tipo_tarea')}</span></th>
+                  <th style={S.ths} onClick={() => handleSort('titulo')}>Tarea<span style={S.si}>{si('titulo')}</span></th>
+                  <th style={S.ths} onClick={() => handleSort('usuario_nombre')}>Usuario<span style={S.si}>{si('usuario_nombre')}</span></th>
+                  <th style={S.ths} onClick={() => handleSort('duracion_minutos')}>Duración<span style={S.si}>{si('duracion_minutos')}</span></th>
+                  <th style={S.ths} onClick={() => handleSort('estado')}>Estado<span style={S.si}>{si('estado')}</span></th>
+                  <th style={S.ths} onClick={() => handleSort('prioridad')}>Prioridad<span style={S.si}>{si('prioridad')}</span></th>
+                  <th style={{ ...S.th0, textAlign: 'center' }}>Acc.</th>
+                </tr>
+                <tr>
+                  <FilterCell col={columnasFiltro[0]} />
+                  <FilterCell col={columnasFiltro[1]} />
+                  <FilterCell col={columnasFiltro[2]} />
+                  <FilterCell col={columnasFiltro[3]} />
+                  <FilterCell col={columnasFiltro[4]} />
+                  <FilterCell col={columnasFiltro[5]} />
+                  <FilterCell col={columnasFiltro[6]} />
+                  <FilterCell col={columnasFiltro[7]} />
+                  <th style={{ ...S.filterTh, textAlign: 'center' }}>
+                    {columnFiltersActive && (
+                      <button className="btn btn-secondary btn-sm" onClick={limpiar} style={S.aBtn}>Limpiar</button>
+                    )}
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {paginatedData.map(r => (
+                  <tr key={r.id} style={compactMode ? { height: 32 } : undefined}>
+                    <td style={S.td}>
+                      <code style={S.opCode}>{formatDate(r.fecha_inicio)}</code>
+                      <div style={S.timeMini}>{toTimeInput(r.hora_inicio)}</div>
+                    </td>
+                    <td style={S.td}>
+                      <code style={S.opCode}>{formatDate(r.fecha_fin)}</code>
+                      <div style={S.timeMini}>{toTimeInput(r.hora_fin)}</div>
+                    </td>
+                    <td style={S.td}><span style={S.typePill}>{r.tipo_tarea || '-'}</span></td>
+                    <td style={{ ...S.td, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 700 }}>{r.titulo || '-'}</td>
+                    <td style={{ ...S.td, fontSize: 10 }}>{r.usuario_nombre || r.usuario_email || r.usuario_id || '-'}</td>
+                    <td style={{ ...S.td, fontWeight: 800, color: '#2e7d32', whiteSpace: 'nowrap' }}>{minToTime(calcMinutes(r))}</td>
+                    <td style={S.td}><span className={`badge ${badgeClass(r.estado)}`} style={{ fontSize: 8 }}>{String(r.estado || '-').toUpperCase()}</span></td>
+                    <td style={S.td}><span className={`badge ${prioridadStyle(r.prioridad)}`} style={{ fontSize: 8 }}>{String(r.prioridad || '-').toUpperCase()}</span></td>
+                    <td style={{ ...S.td, textAlign: 'center' }}>
+                      <div style={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
+                        {canView && <button className="btn btn-secondary btn-sm" onClick={() => setModal({ type: 'detalle', data: r })} style={S.aBtn}>Ver</button>}
+                        {canEdit && <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'editar', data: r })} style={S.aBtn}>Edit</button>}
+                        {canDelete && <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r)} style={S.aBtn}>Del</button>}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
         </div>
 
-        {!loading && <div style={S.footerCount}>{data.length} de {total} tareas cargadas</div>}
+        {!loading && <div style={S.footerCount}>{paginatedData.length} de {vistaTotal} tareas</div>}
       </div>
 
       {modal?.type === 'detalle' && <ModalDetalle item={modal.data} onClose={() => setModal(null)} />}
@@ -827,23 +752,31 @@ const S = {
   fieldSelect: { width: 'auto', minWidth: 120, height: 32, fontSize: 12 },
   dateInput: { width: 130, height: 32, fontSize: 12 },
   searchInput: { minWidth: 180, maxWidth: 340, height: 32, fontSize: 12 },
-  pagRow: { display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', padding: '5px 14px 7px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
+  pagRow: { display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', padding: '5px 14px 7px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
   pageInfo: { fontSize: 11, color: 'var(--qf-text-light)', fontWeight: 600 },
   loadMini: { fontSize: 11, color: '#185FA5', fontWeight: 700 },
-  th0: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 7, padding: '5px 4px' },
-  ths: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 7, padding: '5px 4px', cursor: 'pointer', userSelect: 'none' },
+  th0: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 9, padding: '5px 4px' },
+  ths: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 9, padding: '5px 4px', cursor: 'pointer', userSelect: 'none' },
   si: { fontSize: 7, opacity: 0.45, marginLeft: 1 },
+  filterTh: { position: 'sticky', top: 24, zIndex: 9, background: '#fff', borderBottom: '1px solid var(--qf-border)', padding: '4px', whiteSpace: 'nowrap' },
+  colFilterWrap: { display: 'flex', alignItems: 'center', gap: 4, position: 'relative' },
+  colInput: { width: '100%', minWidth: 62, height: 24, fontSize: 10, padding: '2px 4px' },
+  colSelect: { width: '100%', minWidth: 82, height: 24, fontSize: 10, padding: '2px 4px' },
+  filterIconBtn: { border: '0', background: 'transparent', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '2px 3px', transform: 'rotate(90deg)' },
+  filterMenu: { position: 'absolute', top: 26, right: 0, zIndex: 30, background: '#fff', border: '1px solid var(--qf-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.16)', minWidth: 150, padding: 5 },
+  filterOption: { display: 'block', width: '100%', border: 0, background: '#fff', textAlign: 'left', padding: '6px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', color: 'var(--qf-navy)' },
+  filterOptionActive: { background: '#e8f2ff', fontWeight: 800 },
+  filterClear: { display: 'block', width: '100%', border: 0, background: '#f8fafc', textAlign: 'left', padding: '6px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', color: '#c62828', marginTop: 4, fontWeight: 700 },
+  blankFilterLabel: { height: 24, minWidth: 62, display: 'inline-flex', alignItems: 'center', padding: '0 6px', border: '1px solid var(--qf-border)', borderRadius: 6, fontSize: 10, color: 'var(--qf-text-light)', background: '#f8fafc' },
   td: { padding: '3px 4px', verticalAlign: 'middle', lineHeight: 1.15 },
   opCode: { background: '#e8eef5', padding: '1px 4px', borderRadius: 3, fontSize: 9.5, fontWeight: 800, color: 'var(--qf-navy)' },
   typePill: { background: '#e8eef5', color: 'var(--qf-navy)', borderRadius: 3, padding: '1px 4px', fontSize: 9.5, fontWeight: 700, whiteSpace: 'nowrap' },
-  timeMini: { fontSize: 8, color: 'var(--qf-text-light)', marginTop: 2, fontWeight: 700 },
-  dateTimeInline: { display: 'inline-flex', alignItems: 'center', gap: 2, whiteSpace: 'nowrap' },
-  timeMiniInline: { fontSize: 8, color: 'var(--qf-text-light)', fontWeight: 700, whiteSpace: 'nowrap' },
-  aBtn: { fontSize: 8, padding: '1px 4px' },
+  timeMini: { fontSize: 9, color: 'var(--qf-text-light)', marginTop: 2, fontWeight: 700 },
+  aBtn: { fontSize: 9, padding: '1px 4px' },
   footerCount: { padding: '6px 14px', borderTop: '1px solid var(--qf-border)', fontSize: 10.5, color: 'var(--qf-text-light)', background: '#fff' },
   detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 },
   detailBox: { background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 8 },
-  detailLabel: { fontSize: 8, fontWeight: 700, color: 'var(--qf-text-light)', textTransform: 'uppercase' },
+  detailLabel: { fontSize: 9, fontWeight: 700, color: 'var(--qf-text-light)', textTransform: 'uppercase' },
   detailValue: { fontSize: 12, fontWeight: 600, color: 'var(--qf-navy)', wordBreak: 'break-word' },
   g3: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' },
   g4: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0 16px' },
