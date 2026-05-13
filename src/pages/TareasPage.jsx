@@ -746,7 +746,9 @@ const TareasPage = () => {
             <AgGridReact
               rowData={agRows}
               columnDefs={agColumnDefs}
-              rowHeight={20}
+              rowHeight={30}
+              headerHeight={40}
+              floatingFiltersHeight={30}
               defaultColDef={agDefaultColDef}
               pagination
               paginationPageSize={pageSize}
