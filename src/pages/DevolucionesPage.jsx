@@ -7,57 +7,9 @@ import { AgGridReact } from 'ag-grid-react'
 
 const CLAIM = 'OPEDEV'
 const DEBOUNCE_MS = 450
-const GRID_VIEW_KEY = 'qf_devoluciones_grid_view_v1'
-const SAVED_VIEWS_KEY = 'qf_devoluciones_saved_views_v1'
-
-const safeJsonParse = (v, f) => {
-  try { return v ? JSON.parse(v) : f } catch (_) { return f }
-}
-
-const csvEscape = value => {
-  const s = String(value ?? '')
-  return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
-}
-
-const downloadTextFile = (filename, content, mime = 'text/csv;charset=utf-8;') => {
-  const blob = new Blob([content], { type: mime })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
-}
-
-
-
-const exportExcel = rows => {
-  const headers = ['Nro Operación','Fecha','Banco','Cuenta Cargo','Cuenta Abono','Importe Cargado','Importe Abonado','Comisión','Estado']
-  const body = rows.map(r => `<tr><td>${r.numero_operacion || ''}</td><td>${formatDate(r.fecha_operacion)}</td><td>${r.banco_nombre || ''}</td><td>${r.cuenta_cargo || ''}</td><td>${r.cuenta_abono || ''}</td><td>${r.importe_cargado || 0}</td><td>${r.importe_abonado || 0}</td><td>${r.comision || 0}</td><td>${r.estado || ''}</td></tr>`).join('')
-  const html = `<html><body><table border="1"><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>${body}</table></body></html>`
-  downloadTextFile(`devoluciones_${new Date().toISOString().slice(0,10)}.xls`, html, 'application/vnd.ms-excel')
-}
-
-const exportPdf = rows => {
-  const html = `<html><head><style>body{font-family:Arial;padding:20px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #ccc;padding:4px}th{background:#0f2742;color:#fff}</style></head><body><h2>Reporte Devoluciones</h2><table><tr><th>Nro Op</th><th>Banco</th><th>Cargado</th><th>Abonado</th><th>Estado</th></tr>${rows.map(r=>`<tr><td>${r.numero_operacion||''}</td><td>${r.banco_nombre||''}</td><td>${money(r.importe_cargado)}</td><td>${money(r.importe_abonado)}</td><td>${r.estado||''}</td></tr>`).join('')}</table><script>window.onload=()=>window.print()</script></body></html>`
-  const w = window.open('', '_blank')
-  if (w) { w.document.write(html); w.document.close() }
-}
-
-const buildGroupSummary = (rows, field) => {
-  const map = new Map()
-  rows.forEach(r => {
-    const key = r[field] || 'Sin dato'
-    const curr = map.get(key) || { name: key, count: 0, cargado: 0, abonado: 0 }
-    curr.count += 1
-    curr.cargado += Number(r.importe_cargado || 0)
-    curr.abonado += Number(r.importe_abonado || 0)
-    map.set(key, curr)
-  })
-  return [...map.values()].sort((a,b)=>b.count-a.count)
-}
+const GRID_VIEW_KEY = 'qf_devoluciones_grid_view_v2'
+const SAVED_VIEWS_KEY = 'qf_devoluciones_saved_views_v2'
+const DASHBOARD_KEY = 'qf_devoluciones_dashboard_v2'
 
 
 const camposBusqueda = [
@@ -85,6 +37,77 @@ const getField = (obj, ...names) => { for (const n of names) { if (obj[n] !== un
 const getBancoNombre = (id, bancos) => { if (!id) return '-'; const b = bancos.find(x => String(getField(x, 'id', 'ID')) === String(id)); return b ? (getField(b, 'name', 'Name', 'NAME') || id) : id }
 const getMonedaNombre = (id, monedas) => { if (!id) return '-'; const m = monedas.find(x => String(getField(x, 'ID', 'id')) === String(id)); if (!m) return id; return getField(m, 'VALORTEXTO1', 'valortexto1') || getField(m, 'VALORTEXTO', 'valortexto') || getField(m, 'CODIGO', 'codigo') || id }
 const getMonedaCodigo = (id, monedas) => { if (!id) return 'PEN'; const m = monedas.find(x => String(getField(x, 'ID', 'id')) === String(id)); if (!m) return 'PEN'; return getField(m, 'VALORTEXTO', 'valortexto', 'ValorTexto') || 'PEN' }
+
+const normalize = value => String(value ?? '').toLowerCase().trim()
+
+const safeJsonParse = (value, fallback) => {
+  try {
+    return value ? JSON.parse(value) : fallback
+  } catch (_) {
+    return fallback
+  }
+}
+
+const downloadTextFile = (filename, content, mime = 'text/csv;charset=utf-8;') => {
+  const blob = new Blob([content], { type: mime })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+const csvEscape = value => {
+  const s = String(value ?? '')
+  return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+
+const pct = (value, total) => `${Math.round((Number(value || 0) / Math.max(Number(total || 0), 1)) * 100)}%`
+
+const groupDevLabel = (row, groupBy) => {
+  if (groupBy === 'estado') return row.estado || 'Sin estado'
+  if (groupBy === 'banco') return row.banco_nombre || 'Sin banco'
+  if (groupBy === 'moneda_cargo') return row.moneda_cargo_nombre || 'Sin moneda'
+  if (groupBy === 'moneda_abono') return row.moneda_abono_nombre || 'Sin moneda'
+  if (groupBy === 'fecha') return toDateInput(row.fecha_operacion) || 'Sin fecha'
+  return 'General'
+}
+
+const buildDevGroupSummary = (rows, groupBy) => {
+  const map = new Map()
+  rows.forEach(row => {
+    const key = groupDevLabel(row, groupBy)
+    const current = map.get(key) || { name: key, count: 0, cargado: 0, abonado: 0, comision: 0, pendientes: 0, procesadas: 0, errores: 0 }
+    current.count += 1
+    current.cargado += Number(row.importe_cargado || 0)
+    current.abonado += Number(row.importe_abonado || 0)
+    current.comision += Number(row.comision || 0)
+    const estado = normalize(row.estado)
+    if (estado.includes('pend') || estado.includes('proceso')) current.pendientes += 1
+    if (estado.includes('proces') || estado.includes('complet') || estado.includes('exitos')) current.procesadas += 1
+    if (estado.includes('error') || estado.includes('rechaz') || estado.includes('fall')) current.errores += 1
+    map.set(key, current)
+  })
+  return [...map.values()].sort((a, b) => b.count - a.count)
+}
+
+const exportDevHtmlTable = (filename, rows) => {
+  const headers = ['Nro. Operación', 'Fecha', 'Banco', 'Cuenta Cargo', 'Moneda Cargo', 'Cuenta Abono', 'Moneda Abono', 'Importe Cargado', 'Importe Abonado', 'Comisión', 'Referencia', 'Estado']
+  const htmlRows = rows.map(r => `<tr><td>${r.numero_operacion || ''}</td><td>${formatDate(r.fecha_operacion)}</td><td>${r.banco_nombre || ''}</td><td>${r.cuenta_cargo || ''}</td><td>${r.moneda_cargo_nombre || ''}</td><td>${r.cuenta_abono || ''}</td><td>${r.moneda_abono_nombre || ''}</td><td>${Number(r.importe_cargado || 0)}</td><td>${Number(r.importe_abonado || 0)}</td><td>${Number(r.comision || 0)}</td><td>${r.referencia || ''}</td><td>${r.estado || ''}</td></tr>`).join('')
+  const content = `<html><head><meta charset="utf-8" /></head><body><table border="1"><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${htmlRows}</tbody></table></body></html>`
+  downloadTextFile(filename, content, 'application/vnd.ms-excel;charset=utf-8;')
+}
+
+const printDevPdfReport = (rows, title = 'Reporte de Devoluciones QF') => {
+  const byEstado = buildDevGroupSummary(rows, 'estado')
+  const html = `<html><head><title>${title}</title><style>body{font-family:Arial,sans-serif;color:#0f2742;padding:18px}h1{font-size:18px;margin:0 0 8px}.meta{color:#64748b;font-size:11px;margin-bottom:12px}table{width:100%;border-collapse:collapse;font-size:10px}th{background:#0f2742;color:#fff;text-align:left;padding:5px}td{border:1px solid #d9e2ec;padding:4px}.kpis{display:flex;gap:8px;margin:12px 0}.kpi{border:1px solid #d9e2ec;border-radius:8px;padding:8px;min-width:110px}.kpi b{display:block;font-size:16px;color:#185FA5}</style></head><body><h1>${title}</h1><div class="meta">Generado: ${new Date().toLocaleString('es-PE')} · Registros: ${rows.length}</div><div class="kpis"><div class="kpi"><span>Total</span><b>${rows.length}</b></div><div class="kpi"><span>Cargado</span><b>${money(rows.reduce((s,r)=>s+Number(r.importe_cargado||0),0))}</b></div><div class="kpi"><span>Abonado</span><b>${money(rows.reduce((s,r)=>s+Number(r.importe_abonado||0),0))}</b></div><div class="kpi"><span>Comisión</span><b>${money(rows.reduce((s,r)=>s+Number(r.comision||0),0))}</b></div></div><h2 style="font-size:14px">Resumen por estado</h2><table><thead><tr><th>Estado</th><th>Cantidad</th><th>Cargado</th><th>Abonado</th><th>Comisión</th></tr></thead><tbody>${byEstado.map(g => `<tr><td>${g.name}</td><td>${g.count}</td><td>${money(g.cargado)}</td><td>${money(g.abonado)}</td><td>${money(g.comision)}</td></tr>`).join('')}</tbody></table><h2 style="font-size:14px">Detalle</h2><table><thead><tr><th>Nro.</th><th>Fecha</th><th>Banco</th><th>Cargado</th><th>Abonado</th><th>Estado</th></tr></thead><tbody>${rows.map(r => `<tr><td>${r.numero_operacion || ''}</td><td>${formatDate(r.fecha_operacion)}</td><td>${r.banco_nombre || ''}</td><td>${money(r.importe_cargado, r.moneda_cargo_codigo)}</td><td>${money(r.importe_abonado, r.moneda_abono_codigo)}</td><td>${r.estado || ''}</td></tr>`).join('')}</tbody></table><script>window.onload=()=>window.print()</script></body></html>`
+  const w = window.open('', '_blank')
+  if (w) { w.document.write(html); w.document.close() }
+}
+
 
 const ModalDetalle = ({ item, bancos, monedas, onClose }) => (
   <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -154,10 +177,11 @@ const DevolucionesPage = () => {
   const [quickPreset, setQuickPreset] = useState('all')
   const [viewName, setViewName] = useState('')
   const [savedViews, setSavedViews] = useState(() => safeJsonParse(localStorage.getItem(SAVED_VIEWS_KEY), []))
+  const [showColumnPanel, setShowColumnPanel] = useState(false)
   const [visibleCols, setVisibleCols] = useState({})
   const [displayedRows, setDisplayedRows] = useState([])
-  const [showDashboard, setShowDashboard] = useState(true)
   const [showSidePanel, setShowSidePanel] = useState(false)
+  const [showDashboard, setShowDashboard] = useState(() => safeJsonParse(localStorage.getItem(DASHBOARD_KEY), true))
   const [groupBy, setGroupBy] = useState('estado')
   const { toasts, show } = useToast()
   const [bancos, setBancos] = useState([])
@@ -185,50 +209,76 @@ const DevolucionesPage = () => {
   const totalPages = Math.max(1, Math.ceil(total / pageSize)), from = total === 0 ? 0 : ((page - 1) * pageSize) + 1, to = Math.min(page * pageSize, total)
   const metrics = useMemo(() => ({ totalCargado: data.reduce((s, r) => s + Number(r.importe_cargado || 0), 0), totalAbonado: data.reduce((s, r) => s + Number(r.importe_abonado || 0), 0), totalComision: data.reduce((s, r) => s + Number(r.comision || 0), 0), pendientes: data.filter(r => String(r.estado || '').toLowerCase().includes('pendiente')).length }), [data])
 
+  const quickFilteredData = useMemo(() => {
+    return data.filter(row => {
+      const estado = normalize(row.estado)
+      const bancoNombre = normalize(getBancoNombre(row.banco, bancos))
+      const monedaCargo = normalize(getMonedaNombre(row.moneda_cargo, monedas))
+      const monedaAbono = normalize(getMonedaNombre(row.moneda_abono, monedas))
 
-  const agRows = useMemo(() => data.map(r => ({
-    ...r,
-    banco_nombre: getBancoNombre(r.banco, bancos),
-    moneda_cargo_nombre: getMonedaNombre(r.moneda_cargo, monedas),
-    moneda_abono_nombre: getMonedaNombre(r.moneda_abono, monedas),
-  })), [data, bancos, monedas])
+      if (quickPreset === 'pending') return estado.includes('pend') || estado.includes('proceso')
+      if (quickPreset === 'processed') return estado.includes('proces') || estado.includes('complet') || estado.includes('exitos')
+      if (quickPreset === 'errors') return estado.includes('error') || estado.includes('rechaz') || estado.includes('fall')
+      if (quickPreset === 'withBank') return !!bancoNombre && bancoNombre !== '-'
+      if (quickPreset === 'soles') return monedaCargo.includes('pen') || monedaCargo.includes('sol') || monedaAbono.includes('pen') || monedaAbono.includes('sol')
+      if (quickPreset === 'dollars') return monedaCargo.includes('usd') || monedaCargo.includes('dol') || monedaAbono.includes('usd') || monedaAbono.includes('dol')
+      if (quickPreset === 'gerencia') return estado.includes('pend') || estado.includes('error') || estado.includes('rechaz') || Number(row.importe_cargado || 0) !== Number(row.importe_abonado || 0)
+      if (quickPreset === 'operaciones') return estado.includes('pend') || estado.includes('proceso')
+      if (quickPreset === 'auditoria') return Number(row.comision || 0) > 0 || Number(row.importe_cargado || 0) !== Number(row.importe_abonado || 0)
+      return true
+    })
+  }, [data, quickPreset, bancos, monedas])
+
+  const agRows = useMemo(() => quickFilteredData.map(row => ({
+    ...row,
+    banco_nombre: getBancoNombre(row.banco, bancos),
+    moneda_cargo_nombre: getMonedaNombre(row.moneda_cargo, monedas),
+    moneda_abono_nombre: getMonedaNombre(row.moneda_abono, monedas),
+    moneda_cargo_codigo: getMonedaCodigo(row.moneda_cargo, monedas),
+    moneda_abono_codigo: getMonedaCodigo(row.moneda_abono, monedas),
+  })), [quickFilteredData, bancos, monedas])
 
   useEffect(() => {
     setDisplayedRows(agRows)
   }, [agRows])
 
-  const applyPreset = preset => {
-    if (!gridApi) return
-    const allCols = ['numero_operacion','fecha_operacion','banco_nombre','cuenta_cargo','moneda_cargo_nombre','cuenta_abono','moneda_abono_nombre','importe_cargado','importe_abonado','comision','referencia','estado','acciones']
-
-    const presets = {
-      gerencia: ['numero_operacion','fecha_operacion','banco_nombre','importe_cargado','importe_abonado','estado','acciones'],
-      operaciones: ['numero_operacion','fecha_operacion','cuenta_cargo','cuenta_abono','importe_cargado','estado','acciones'],
-      auditoria: ['numero_operacion','fecha_operacion','banco_nombre','comision','referencia','estado','acciones'],
-      completo: allCols,
-    }
-
-    const visible = presets[preset] || allCols
-    gridApi.setColumnsVisible(allCols, false)
-    gridApi.setColumnsVisible(visible, true)
-  }
-
-  const exportCsv = () => {
-    const rows = displayedRows.length ? displayedRows : agRows
-    const headers = ['Nro Op','Fecha','Banco','Cuenta Cargo','Cuenta Abono','Cargado','Abonado','Comision','Estado']
-    const body = rows.map(r => [
-      r.numero_operacion,
-      formatDate(r.fecha_operacion),
-      r.banco_nombre,
-      r.cuenta_cargo,
-      r.cuenta_abono,
-      r.importe_cargado,
-      r.importe_abonado,
-      r.comision,
-      r.estado,
-    ].map(csvEscape).join(';'))
-    downloadTextFile(`devoluciones_${new Date().toISOString().slice(0,10)}.csv`, [headers.join(';'), ...body].join('\n'))
-  }
+  const agLocaleText = useMemo(() => ({
+    contains: 'Contiene',
+    notContains: 'No contiene',
+    equals: 'Igual',
+    notEqual: 'Distinto',
+    startsWith: 'Empieza con',
+    endsWith: 'Termina con',
+    blank: 'Vacío',
+    notBlank: 'No vacío',
+    before: 'Antes de',
+    after: 'Después de',
+    inRange: 'Entre',
+    inRangeStart: 'Desde',
+    inRangeEnd: 'Hasta',
+    lessThan: 'Menor que',
+    greaterThan: 'Mayor que',
+    filterOoo: 'Filtrar...',
+    applyFilter: 'Aplicar',
+    resetFilter: 'Restablecer',
+    clearFilter: 'Limpiar',
+    cancelFilter: 'Cancelar',
+    noRowsToShow: 'No se encontraron devoluciones',
+    loadingOoo: 'Cargando...',
+    selectAll: 'Seleccionar todo',
+    searchOoo: 'Buscar...',
+    blanks: 'Vacíos',
+    page: 'Página',
+    more: 'Más',
+    to: 'a',
+    of: 'de',
+    next: 'Siguiente',
+    last: 'Última',
+    first: 'Primera',
+    previous: 'Anterior',
+    pageSizeSelectorLabel: 'Filas',
+    ariaFilterInput: 'Entrada de filtro',
+  }), [])
 
   const agDefaultColDef = useMemo(() => ({
     sortable: true,
@@ -239,74 +289,323 @@ const DevolucionesPage = () => {
     cellStyle: {
       fontSize: compactMode ? '10.5px' : '12px',
       color: 'var(--qf-navy)',
+      lineHeight: compactMode ? '18px' : '22px',
     },
+    headerClass: 'qf-tareas-ag-header',
+    floatingFilterComponentParams: { suppressFilterButton: false },
   }), [compactMode])
 
+  const getDisplayedRows = () => {
+    if (!gridApi) return agRows
+    const rows = []
+    gridApi.forEachNodeAfterFilterAndSort(node => {
+      if (node?.data) rows.push(node.data)
+    })
+    return rows
+  }
+
+  const refreshDisplayedRows = api => {
+    if (!api) return
+    const rows = []
+    api.forEachNodeAfterFilterAndSort(node => {
+      if (node?.data) rows.push(node.data)
+    })
+    setDisplayedRows(rows)
+  }
+
+  const limpiarFiltrosTabla = () => {
+    if (!gridApi) return
+    setQuickText('')
+    gridApi.setFilterModel(null)
+    gridApi.setGridOption?.('quickFilterText', '')
+    gridApi.applyColumnState({
+      defaultState: { sort: null },
+      state: [{ colId: 'numero_operacion', sort: 'desc' }],
+    })
+    setTimeout(() => refreshDisplayedRows(gridApi), 60)
+  }
+
+  const saveCurrentView = name => {
+    if (!gridApi || !name.trim()) return
+    const view = {
+      id: Date.now(),
+      name: name.trim(),
+      quickText,
+      quickPreset,
+      pageSize,
+      groupBy,
+      showDashboard,
+      filterModel: gridApi.getFilterModel(),
+      columnState: gridApi.getColumnState(),
+      createdAt: new Date().toISOString(),
+    }
+    const next = [view, ...savedViews.filter(v => v.name !== view.name)].slice(0, 10)
+    setSavedViews(next)
+    localStorage.setItem(SAVED_VIEWS_KEY, JSON.stringify(next))
+    localStorage.setItem(GRID_VIEW_KEY, JSON.stringify(view))
+    setViewName('')
+    show('Vista guardada')
+  }
+
+  const applyView = view => {
+    if (!gridApi || !view) return
+    setQuickText(view.quickText || '')
+    setQuickPreset(view.quickPreset || 'all')
+    setGroupBy(view.groupBy || 'estado')
+    setShowDashboard(view.showDashboard ?? true)
+    setPageSize(Number(view.pageSize || 50))
+    setTimeout(() => {
+      gridApi.setFilterModel(view.filterModel || null)
+      if (view.columnState?.length) gridApi.applyColumnState({ state: view.columnState, applyOrder: true })
+      gridApi.setGridOption?.('quickFilterText', view.quickText || '')
+      refreshDisplayedRows(gridApi)
+    }, 60)
+  }
+
+  const deleteView = id => {
+    const next = savedViews.filter(v => v.id !== id)
+    setSavedViews(next)
+    localStorage.setItem(SAVED_VIEWS_KEY, JSON.stringify(next))
+  }
+
+  const resetGridView = () => {
+    if (!gridApi) return
+    setQuickText('')
+    setQuickPreset('all')
+    setGroupBy('estado')
+    setShowDashboard(true)
+    setPageSize(50)
+    gridApi.setFilterModel(null)
+    gridApi.resetColumnState()
+    gridApi.setGridOption?.('quickFilterText', '')
+    localStorage.removeItem(GRID_VIEW_KEY)
+    setTimeout(() => refreshDisplayedRows(gridApi), 60)
+  }
+
+  const exportCsv = () => {
+    const rows = getDisplayedRows()
+    const headers = ['Nro. Operación', 'Fecha', 'Banco', 'Cuenta Cargo', 'Moneda Cargo', 'Cuenta Abono', 'Moneda Abono', 'Importe Cargado', 'Importe Abonado', 'Comisión', 'Referencia', 'Estado']
+    const body = rows.map(r => [
+      r.numero_operacion,
+      formatDate(r.fecha_operacion),
+      r.banco_nombre,
+      r.cuenta_cargo,
+      r.moneda_cargo_nombre,
+      r.cuenta_abono,
+      r.moneda_abono_nombre,
+      r.importe_cargado,
+      r.importe_abonado,
+      r.comision,
+      r.referencia,
+      r.estado,
+    ].map(csvEscape).join(';'))
+    downloadTextFile(`devoluciones_${new Date().toISOString().slice(0, 10)}.csv`, [headers.join(';'), ...body].join('\n'))
+  }
+
+  const exportExcel = () => {
+    exportDevHtmlTable(`devoluciones_${new Date().toISOString().slice(0, 10)}.xls`, getDisplayedRows())
+  }
+
+  const exportPdf = () => {
+    printDevPdfReport(getDisplayedRows(), 'Reporte de Devoluciones QF')
+  }
+
+  const applyColumnPreset = preset => {
+    if (!gridApi) return
+    const allCols = ['numero_operacion', 'fecha_operacion', 'banco_nombre', 'cuenta_cargo', 'moneda_cargo_nombre', 'cuenta_abono', 'moneda_abono_nombre', 'importe_cargado', 'importe_abonado', 'comision', 'referencia', 'estado', 'acciones']
+    const presets = {
+      gerencia: ['numero_operacion', 'fecha_operacion', 'banco_nombre', 'importe_cargado', 'importe_abonado', 'estado', 'acciones'],
+      operaciones: ['numero_operacion', 'fecha_operacion', 'banco_nombre', 'cuenta_cargo', 'cuenta_abono', 'importe_cargado', 'estado', 'acciones'],
+      auditoria: ['numero_operacion', 'fecha_operacion', 'banco_nombre', 'importe_cargado', 'importe_abonado', 'comision', 'referencia', 'estado', 'acciones'],
+      completo: allCols,
+    }
+    const visible = presets[preset] || allCols
+    gridApi.setColumnsVisible(allCols, false)
+    gridApi.setColumnsVisible(visible, true)
+    setVisibleCols(Object.fromEntries(allCols.map(c => [c, visible.includes(c)])))
+  }
+
+  const toggleDashboard = () => {
+    setShowDashboard(v => {
+      localStorage.setItem(DASHBOARD_KEY, JSON.stringify(!v))
+      return !v
+    })
+  }
+
+  const toggleColumn = field => {
+    if (!gridApi) return
+    const current = visibleCols[field] !== false
+    gridApi.setColumnsVisible([field], !current)
+    setVisibleCols(prev => ({ ...prev, [field]: !current }))
+  }
+
   const agColumnDefs = useMemo(() => [
-    { headerName: 'Nro.Op.', field: 'numero_operacion', width: 120, cellRenderer: p => <code style={S.opCode}>{p.value || '-'}</code> },
-    { headerName: 'Fecha', field: 'fecha_operacion', width: 110, valueFormatter: p => formatDate(p.value) },
-    { headerName: 'Banco', field: 'banco_nombre', width: 150, cellRenderer: p => <span style={S.bankPill}>{p.value || '-'}</span> },
-    { headerName: 'Cta Cargo', field: 'cuenta_cargo', width: 160 },
-    { headerName: 'M Cargo', field: 'moneda_cargo_nombre', width: 90 },
-    { headerName: 'Cta Abono', field: 'cuenta_abono', width: 160 },
-    { headerName: 'M Abono', field: 'moneda_abono_nombre', width: 90 },
-    { headerName: 'Cargado', field: 'importe_cargado', width: 120, type: 'numericColumn', valueFormatter: p => money(p.value, getMonedaCodigo(p.data?.moneda_cargo, monedas)) },
-    { headerName: 'Abonado', field: 'importe_abonado', width: 120, type: 'numericColumn', valueFormatter: p => money(p.value, getMonedaCodigo(p.data?.moneda_abono, monedas)) },
-    { headerName: 'Comisión', field: 'comision', width: 110, type: 'numericColumn', valueFormatter: p => money(p.value, getMonedaCodigo(p.data?.moneda_cargo, monedas)) },
-    { headerName: 'Referencia', field: 'referencia', flex: 1, minWidth: 160 },
+    {
+      headerName: 'Nro.Op.',
+      field: 'numero_operacion',
+      width: 120,
+      sort: 'desc',
+      cellRenderer: p => <code style={S.opCode}>{p.value || '-'}</code>,
+      filter: 'agTextColumnFilter',
+    },
+    { headerName: 'Fecha', field: 'fecha_operacion', width: 110, valueFormatter: p => formatDate(p.value), filter: 'agDateColumnFilter' },
+    { headerName: 'Banco', field: 'banco_nombre', width: 150, cellRenderer: p => <span style={S.bankPill}>{p.value || '-'}</span>, filter: 'agTextColumnFilter' },
+    { headerName: 'Cta.cargo', field: 'cuenta_cargo', width: 150, filter: 'agTextColumnFilter' },
+    { headerName: 'M', field: 'moneda_cargo_nombre', width: 90, filter: 'agTextColumnFilter' },
+    { headerName: 'Cta.abono', field: 'cuenta_abono', width: 150, filter: 'agTextColumnFilter' },
+    { headerName: 'M', field: 'moneda_abono_nombre', width: 90, filter: 'agTextColumnFilter' },
+    {
+      headerName: 'Cargado',
+      field: 'importe_cargado',
+      width: 125,
+      type: 'numericColumn',
+      cellStyle: { fontWeight: 800, color: '#c62828', textAlign: 'right' },
+      valueFormatter: p => money(p.value, p.data?.moneda_cargo_codigo),
+      filter: 'agNumberColumnFilter',
+    },
+    {
+      headerName: 'Abonado',
+      field: 'importe_abonado',
+      width: 125,
+      type: 'numericColumn',
+      cellStyle: { fontWeight: 800, color: '#2e7d32', textAlign: 'right' },
+      valueFormatter: p => money(p.value, p.data?.moneda_abono_codigo),
+      filter: 'agNumberColumnFilter',
+    },
+    {
+      headerName: 'Com.',
+      field: 'comision',
+      width: 105,
+      type: 'numericColumn',
+      valueFormatter: p => money(p.value, p.data?.moneda_cargo_codigo),
+      filter: 'agNumberColumnFilter',
+    },
+    { headerName: 'Referencia', field: 'referencia', flex: 1, minWidth: 160, filter: 'agTextColumnFilter' },
     {
       headerName: 'Estado',
       field: 'estado',
-      width: 110,
-      cellRenderer: p => <span className={`badge ${badgeClass(p.value)}`} style={{ fontSize: 8 }}>{String(p.value || '-').toUpperCase()}</span>
+      width: 120,
+      cellRenderer: p => <span className={`badge ${badgeClass(p.value)}`} style={{ fontSize: 8 }}>{String(p.value || '-').toUpperCase()}</span>,
+      filter: 'agTextColumnFilter',
     },
     {
       headerName: 'Acc.',
       field: 'acciones',
-      width: 120,
+      width: 115,
       pinned: 'right',
       sortable: false,
       filter: false,
       cellRenderer: p => (
-        <div style={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
+        <div style={{ display: 'flex', gap: 2, justifyContent: 'center', alignItems: 'center', height: '100%' }}>
           {canView && <button className="btn btn-secondary btn-sm" onClick={() => setModal({ type: 'detalle', data: p.data })} style={S.aBtn}>Ver</button>}
           {canEdit && <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'editar', data: p.data })} style={S.aBtn}>Edit</button>}
           {canDelete && <button className="btn btn-danger btn-sm" onClick={() => handleDelete(p.data)} style={S.aBtn}>Del</button>}
         </div>
-      )
-    }
-  ], [compactMode, monedas, canView, canEdit, canDelete])
+      ),
+    },
+  ], [compactMode, canView, canEdit, canDelete])
+
+  const liveRows = displayedRows.length ? displayedRows : agRows
+  const groupSummary = useMemo(() => buildDevGroupSummary(liveRows, groupBy), [liveRows, groupBy])
+  const estadoSummary = useMemo(() => buildDevGroupSummary(liveRows, 'estado'), [liveRows])
+  const bancoSummary = useMemo(() => buildDevGroupSummary(liveRows, 'banco'), [liveRows])
+  const monedaSummary = useMemo(() => buildDevGroupSummary(liveRows, 'moneda_cargo'), [liveRows])
 
   if (!canList) return <div className="fade-in" style={S.page}><div style={S.topHeader}><h1 style={S.title}>↩ Devoluciones</h1><p style={S.subtitle}>No tienes permisos para ver esta lista</p></div></div>
 
   return (
     <div className="fade-in" style={S.page}>
+      <ToastContainer toasts={toasts} />
       <style>{`
         .qf-tareas-grid .ag-root-wrapper {
           border: 0;
           border-top: 1px solid var(--qf-border);
+          font-family: Montserrat, Arial, sans-serif;
         }
         .qf-tareas-grid .ag-header {
           background: var(--qf-navy);
+          color: #fff;
+          border-bottom: 0;
+        }
+        .qf-tareas-grid .ag-header-cell,
+        .qf-tareas-grid .ag-header-group-cell {
+          background: var(--qf-navy);
+          color: #fff;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: .2px;
+          border-right: 0;
         }
         .qf-tareas-grid .ag-header-cell-text {
           color: #fff;
           font-size: 8.5px;
-          font-weight: 800;
-          text-transform: uppercase;
+        }
+        .qf-tareas-grid .ag-header-cell {
+          padding-left: 2px;
+          padding-right: 2px;
+          line-height: 1;
+        }
+        .qf-tareas-grid .ag-icon,
+        .qf-tareas-grid .ag-header-icon {
+          color: #fff;
+          font-size: 15px;
         }
         .qf-tareas-grid .ag-floating-filter {
           background: #f8fafc;
+          border-bottom: 1px solid var(--qf-border);
+          min-height: 10px;
         }
+        .qf-tareas-grid .ag-floating-filter-body {
+          width: 100%;
+        }
+        .qf-tareas-grid .ag-floating-filter-input,
         .qf-tareas-grid .ag-input-field-input {
-          font-size: 9px;
-          min-height: 20px;
+          min-height: 2px;
+          height: 6px;
+          padding: 0 2px;
+          font-size: 8px;
+          border-radius: 7px;
+          border: 1px solid #9fb2c8 !important;
+          background: #ffffff !important;
+          color: var(--qf-navy);
+          box-shadow: inset 0 0 0 1px rgba(24,95,165,.08);
+        }
+        .qf-tareas-grid .ag-floating-filter-button {
+          margin-left: 6px;
+        }
+        .qf-tareas-grid .ag-floating-filter-button-button {
+          min-width: 22px;
+          height: 22px;
+          width: 22px;
+          border-radius: 6px;
+          border: 1px solid #9fb2c8;
+          background: #e8eef5;
+        }
+        .qf-tareas-grid .ag-row {
+          border-bottom: 1px solid var(--qf-border);
         }
         .qf-tareas-grid .ag-row-hover {
           background: #f8fafc;
         }
+        .qf-tareas-grid .ag-paging-panel {
+          min-height: 24px;
+          font-size: 8px;
+          color: var(--qf-text-light);
+          border-top: 1px solid var(--qf-border);
+        }
+        .qf-tareas-grid .ag-cell {
+          display: flex;
+          align-items: center;
+          padding-top: 0 !important;
+          padding-bottom: 0 !important;
+          line-height: 1 !important;
+        }
+        .qf-tareas-grid .ag-icon-filter,
+        .qf-tareas-grid .ag-icon-search,
+        .qf-tareas-grid .ag-icon-calendar {
+          font-size: 14px;
+        }
       `}</style>
-      <ToastContainer toasts={toasts} />
       <div style={S.topHeader}><h1 style={S.title}>↩ Devoluciones</h1><p style={S.subtitle}>Gestión de devoluciones bancarias</p></div>
       <div style={S.actionBar}><button className="btn btn-secondary btn-sm" onClick={() => setCompactMode(v => !v)}>{compactMode ? 'Vista cómoda' : 'Vista compacta'}</button></div>
       <div style={S.kpiGrid}>{[{ l: 'Total registros', v: total, c: 'var(--qf-navy)', b: '#2196f3' },{ l: 'Mostradas', v: data.length, c: '#185FA5', b: '#03a9f4' },{ l: 'Total cargado', v: money(metrics.totalCargado), c: '#c62828', b: '#f44336' },{ l: 'Total abonado', v: money(metrics.totalAbonado), c: '#2e7d32', b: '#4caf50' },{ l: 'Comisiones', v: money(metrics.totalComision), c: '#e65100', b: '#ff9800' },{ l: 'Pendientes', v: metrics.pendientes, c: '#5e35b1', b: '#7e57c2' }].map(s => <div key={s.l} style={{ ...S.kpiCard, borderTop: `3px solid ${s.b}` }}><div style={S.kpiLabel}>{s.l}</div><div style={{ ...S.kpiValue, color: s.c }}>{s.v}</div></div>)}</div>
@@ -314,183 +613,223 @@ const DevolucionesPage = () => {
       <div className="page-card" style={S.card}>
         <div style={S.stickyTools}>
           <div style={S.cardTitleWrap}><h2 style={S.cardTitle}>Lista de Devoluciones</h2>{canCreate && <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })} style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ color: '#4CAF50', fontWeight: 800, fontSize: 16 }}>+</span> Nuevo Registro</button>}</div>
-          <div style={S.filtersRow}>
-            <select className="filter-input" value={campo} onChange={e => setCampo(e.target.value)} style={S.fieldSelect}>{camposBusqueda.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
-            <div style={{ position: 'relative', flex: 1, maxWidth: 360 }}><span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5', pointerEvents: 'none' }}>🔍</span><input className="filter-input" placeholder={campo === 'all' ? 'Buscar...' : `Buscar por ${camposBusqueda.find(f => f.value === campo)?.label || ''}...`} value={busqueda} onChange={e => setBusqueda(e.target.value)} style={{ ...S.searchInput, paddingLeft: 32, width: '100%' }} /></div>
-            <button className="btn btn-secondary btn-sm" onClick={limpiar}>Limpiar</button>
-          </div>
           <div style={S.pagRow}>
             <span style={S.pill}>{from}-{to} de {total}</span>
-            <select className="filter-input" value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }} style={{ width: 'auto', minWidth: 52, height: 28, fontSize: 11, padding: '0 4px' }}><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option><option value={200}>200</option></select>
-            <button className="btn btn-secondary btn-sm" disabled={page <= 1 || loading} onClick={() => setPage(1)}>«</button>
-            <button className="btn btn-secondary btn-sm" disabled={page <= 1 || loading} onClick={() => setPage(p => Math.max(1, p - 1))}>‹</button>
-            <span style={S.pageInfo}>{page}/{totalPages}</span>
-            <button className="btn btn-secondary btn-sm" disabled={page >= totalPages || loading} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>›</button>
-            <button className="btn btn-secondary btn-sm" disabled={page >= totalPages || loading} onClick={() => setPage(totalPages)}>»</button>
+            <span style={S.pageInfo}>Filtra, ordena y pagina desde la tabla</span>
+            <button className="btn btn-secondary btn-sm" onClick={limpiarFiltrosTabla}>Limpiar filtros tabla</button>
+            <select className="filter-input" value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }} style={{ width: 'auto', minWidth: 70, height: 28, fontSize: 11, padding: '0 4px' }}>
+              <option value={25}>25 filas</option>
+              <option value={50}>50 filas</option>
+              <option value={100}>100 filas</option>
+              <option value={200}>200 filas</option>
+            </select>
             {loading && <span style={S.loadMini}>...</span>}
           </div>
-        </div>
 
-        
-        <div style={S.erpTools}>
-          <div style={S.erpGroup}>
-            <button className="btn btn-secondary btn-sm" onClick={() => setShowSidePanel(v => !v)}>Panel</button>
-            <button className="btn btn-secondary btn-sm" onClick={() => setShowDashboard(v => !v)}>{showDashboard ? 'Ocultar BI' : 'Ver BI'}</button>
+          <div style={S.erpTools}>
+            <div style={S.erpGroup}>
+              <div style={S.erpSearchWrap}>
+                <span style={S.erpSearchIcon}>🔍</span>
+                <input
+                  className="filter-input"
+                  value={quickText}
+                  onChange={e => setQuickText(e.target.value)}
+                  placeholder="Búsqueda global..."
+                  style={S.erpSearch}
+                />
+              </div>
+              <select className="filter-input" value={quickPreset} onChange={e => setQuickPreset(e.target.value)} style={S.erpSelect}>
+                <option value="all">Vista: Todos</option>
+                <option value="pending">Pendientes / En proceso</option>
+                <option value="processed">Procesadas</option>
+                <option value="errors">Errores / Rechazadas</option>
+                <option value="withBank">Con banco</option>
+                <option value="soles">Soles</option>
+                <option value="dollars">Dólares</option>
+                <option value="gerencia">Vista Gerencia</option>
+                <option value="operaciones">Vista Operaciones</option>
+                <option value="auditoria">Vista Auditoría</option>
+              </select>
+              <button className="btn btn-secondary btn-sm" onClick={exportCsv}>CSV</button>
+              <button className="btn btn-secondary btn-sm" onClick={exportExcel}>Excel</button>
+              <button className="btn btn-secondary btn-sm" onClick={exportPdf}>PDF</button>
+            </div>
 
-            <select className="filter-input" value={groupBy} onChange={e => setGroupBy(e.target.value)} style={{ width: 150, height: 26, fontSize: 10 }}>
-              <option value="estado">Agrupar Estado</option>
-              <option value="banco_nombre">Agrupar Banco</option>
-              <option value="moneda_cargo_nombre">Agrupar Moneda</option>
-            </select>
-
-            <div style={{ position: 'relative', minWidth: 280 }}>
-              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: '#8a9bb5' }}>🔍</span>
+            <div style={S.erpGroup}>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowSidePanel(v => !v)}>Panel</button>
+              <button className="btn btn-secondary btn-sm" onClick={toggleDashboard}>{showDashboard ? 'Ocultar BI' : 'Ver BI'}</button>
+              <select className="filter-input" value={groupBy} onChange={e => setGroupBy(e.target.value)} style={S.erpSelectSmall}>
+                <option value="estado">Agrupar: Estado</option>
+                <option value="banco">Agrupar: Banco</option>
+                <option value="moneda_cargo">Agrupar: Moneda cargo</option>
+                <option value="moneda_abono">Agrupar: Moneda abono</option>
+                <option value="fecha">Agrupar: Fecha</option>
+              </select>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowColumnPanel(v => !v)}>Columnas</button>
               <input
                 className="filter-input"
-                placeholder="Búsqueda global..."
-                value={quickText}
-                onChange={e => setQuickText(e.target.value)}
-                style={{ ...S.searchInput, width: '100%', paddingLeft: 30 }}
+                value={viewName}
+                onChange={e => setViewName(e.target.value)}
+                placeholder="Nombre de vista"
+                style={S.viewInput}
               />
-            </div>
-
-            <select className="filter-input" value={quickPreset} onChange={e => setQuickPreset(e.target.value)} style={S.fieldSelect}>
-              <option value="all">Todos</option>
-              <option value="pendientes">Pendientes</option>
-              <option value="procesados">Procesados</option>
-              <option value="errores">Errores</option>
-            </select>
-
-            <button className="btn btn-secondary btn-sm" onClick={exportCsv}>CSV</button>
-            <button className="btn btn-secondary btn-sm" onClick={() => exportExcel(displayedRows.length ? displayedRows : agRows)}>Excel</button>
-            <button className="btn btn-secondary btn-sm" onClick={() => exportPdf(displayedRows.length ? displayedRows : agRows)}>PDF</button>
-          </div>
-
-          <div style={S.erpGroup}>
-            <input
-              className="filter-input"
-              placeholder="Guardar vista"
-              value={viewName}
-              onChange={e => setViewName(e.target.value)}
-              style={{ width: 140, height: 26, fontSize: 10 }}
-            />
-
-            <button
-              className="btn btn-primary btn-sm"
-              onClick={() => {
-                if (!gridApi || !viewName.trim()) return
-                const view = {
-                  id: Date.now(),
-                  name: viewName.trim(),
-                  filterModel: gridApi.getFilterModel(),
-                  columnState: gridApi.getColumnState(),
-                  quickText,
-                }
-                const next = [view, ...savedViews].slice(0, 10)
-                setSavedViews(next)
-                localStorage.setItem(SAVED_VIEWS_KEY, JSON.stringify(next))
-                setViewName('')
-              }}
-            >
-              Guardar vista
-            </button>
-          </div>
-        </div>
-
-        {savedViews.length > 0 && (
-          <div style={S.savedViews}>
-            {savedViews.map(v => (
-              <button
-                key={v.id}
-                className="btn btn-secondary btn-sm"
-                onClick={() => {
-                  if (!gridApi) return
-                  gridApi.setFilterModel(v.filterModel || null)
-                  if (v.columnState?.length) gridApi.applyColumnState({ state: v.columnState, applyOrder: true })
-                  setQuickText(v.quickText || '')
-                }}
-              >
-                {v.name}
-              </button>
-            ))}
-          </div>
-        )}
-
-
-        {showSidePanel && (
-          <div style={S.sidePanel}>
-            <div style={S.sideSection}>
-              <div style={S.sideTitle}>Presets ERP</div>
-              <button className="btn btn-secondary btn-sm" onClick={() => applyPreset('gerencia')}>Gerencia</button>
-              <button className="btn btn-secondary btn-sm" onClick={() => applyPreset('operaciones')}>Operaciones</button>
-              <button className="btn btn-secondary btn-sm" onClick={() => applyPreset('auditoria')}>Auditoría</button>
-              <button className="btn btn-secondary btn-sm" onClick={() => applyPreset('completo')}>Completo</button>
-            </div>
-
-            <div style={S.sideSection}>
-              <div style={S.sideTitle}>Totales dinámicos</div>
-              <div style={S.groupMini}><span>Filtrados</span><b>{displayedRows.length}</b></div>
-              <div style={S.groupMini}><span>Cargado</span><b>{money(displayedRows.reduce((s,r)=>s+Number(r.importe_cargado||0),0))}</b></div>
-              <div style={S.groupMini}><span>Abonado</span><b>{money(displayedRows.reduce((s,r)=>s+Number(r.importe_abonado||0),0))}</b></div>
+              <button className="btn btn-primary btn-sm" onClick={() => saveCurrentView(viewName)}>Guardar vista</button>
+              <button className="btn btn-secondary btn-sm" onClick={resetGridView}>Reset</button>
             </div>
           </div>
-        )}
 
-        {showDashboard && (
-          <div style={S.dashboard}>
-            {buildGroupSummary(displayedRows.length ? displayedRows : agRows, groupBy).slice(0,6).map(g => (
-              <div key={g.name} style={S.dashPanel}>
-                <div style={S.sideTitle}>{g.name}</div>
-                <div style={S.kpiValue}>{g.count}</div>
-                <div style={{ fontSize: 10, color: '#64748b' }}>Cargado: {money(g.cargado)}</div>
-                <div style={{ fontSize: 10, color: '#64748b' }}>Abonado: {money(g.abonado)}</div>
+          {showColumnPanel && (
+            <div style={S.columnPanel}>
+              {[
+                ['numero_operacion', 'Nro.Op.'],
+                ['fecha_operacion', 'Fecha'],
+                ['banco_nombre', 'Banco'],
+                ['cuenta_cargo', 'Cta.cargo'],
+                ['moneda_cargo_nombre', 'M Cargo'],
+                ['cuenta_abono', 'Cta.abono'],
+                ['moneda_abono_nombre', 'M Abono'],
+                ['importe_cargado', 'Cargado'],
+                ['importe_abonado', 'Abonado'],
+                ['comision', 'Comisión'],
+                ['referencia', 'Referencia'],
+                ['estado', 'Estado'],
+                ['acciones', 'Acciones'],
+              ].map(([field, label]) => (
+                <label key={field} style={S.columnCheck}>
+                  <input type="checkbox" checked={visibleCols[field] !== false} onChange={() => toggleColumn(field)} />
+                  {label}
+                </label>
+              ))}
+            </div>
+          )}
+
+          {savedViews.length > 0 && (
+            <div style={S.savedViews}>
+              <span style={S.savedTitle}>Vistas guardadas:</span>
+              {savedViews.map(v => (
+                <span key={v.id} style={S.savedChip}>
+                  <button type="button" onClick={() => applyView(v)} style={S.savedBtn}>{v.name}</button>
+                  <button type="button" onClick={() => deleteView(v.id)} style={S.savedDel}>×</button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div style={S.smartTotals}>
+            <span><b>{liveRows.length}</b> filtradas</span>
+            <span><b>{money(liveRows.reduce((s, r) => s + Number(r.importe_cargado || 0), 0))}</b> cargado</span>
+            <span><b>{money(liveRows.reduce((s, r) => s + Number(r.importe_abonado || 0), 0))}</b> abonado</span>
+            <span><b>{money(liveRows.reduce((s, r) => s + Number(r.comision || 0), 0))}</b> comisión</span>
+            <span><b>{liveRows.filter(r => normalize(r.estado).includes('pend')).length}</b> pendientes</span>
+            <span><b>{liveRows.filter(r => normalize(r.estado).includes('error') || normalize(r.estado).includes('rechaz')).length}</b> errores</span>
+          </div>
+
+          {showSidePanel && (
+            <div style={S.sidePanel}>
+              <div style={S.sideSection}>
+                <div style={S.sideTitle}>Vistas rápidas</div>
+                <button className="btn btn-secondary btn-sm" onClick={() => { setQuickPreset('gerencia'); applyColumnPreset('gerencia') }}>Gerencia</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => { setQuickPreset('operaciones'); applyColumnPreset('operaciones') }}>Operaciones</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => { setQuickPreset('auditoria'); applyColumnPreset('auditoria') }}>Auditoría</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => { setQuickPreset('all'); applyColumnPreset('completo') }}>Completo</button>
               </div>
-            ))}
-          </div>
-        )}
+              <div style={S.sideSection}>
+                <div style={S.sideTitle}>Exportación</div>
+                <button className="btn btn-secondary btn-sm" onClick={exportCsv}>CSV filtrado</button>
+                <button className="btn btn-secondary btn-sm" onClick={exportExcel}>Excel filtrado</button>
+                <button className="btn btn-secondary btn-sm" onClick={exportPdf}>PDF / imprimir</button>
+              </div>
+              <div style={S.sideSection}>
+                <div style={S.sideTitle}>Agrupación actual</div>
+                {groupSummary.slice(0, 6).map(g => (
+                  <div key={g.name} style={S.groupMini}><span>{g.name}</span><b>{g.count}</b></div>
+                ))}
+              </div>
+            </div>
+          )}
 
+          {showDashboard && (
+            <div style={S.dashboard}>
+              <div style={S.dashPanel}>
+                <div style={S.sideTitle}>Dashboard por estado</div>
+                {estadoSummary.slice(0, 5).map(g => (
+                  <div key={g.name} style={S.barRow}><span style={S.barLabel}>{g.name}</span><div style={S.barTrack}><div style={{ ...S.barFill, width: pct(g.count, liveRows.length) }} /></div><b style={S.barValue}>{g.count}</b></div>
+                ))}
+              </div>
+              <div style={S.dashPanel}>
+                <div style={S.sideTitle}>Dashboard por banco</div>
+                {bancoSummary.slice(0, 5).map(g => (
+                  <div key={g.name} style={S.barRow}><span style={S.barLabel}>{g.name}</span><div style={S.barTrack}><div style={{ ...S.barFill, width: pct(g.count, liveRows.length) }} /></div><b style={S.barValue}>{g.count}</b></div>
+                ))}
+              </div>
+              <div style={S.dashPanel}>
+                <div style={S.sideTitle}>Moneda cargo</div>
+                {monedaSummary.slice(0, 5).map(g => (
+                  <div key={g.name} style={S.barRow}><span style={S.barLabel}>{g.name}</span><div style={S.barTrack}><div style={{ ...S.barFill, width: pct(g.count, liveRows.length) }} /></div><b style={S.barValue}>{g.count}</b></div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         <div
           className="ag-theme-quartz qf-tareas-grid"
           style={{
             width: '100%',
-            height: compactMode ? 'calc(100vh - 320px)' : 'calc(100vh - 380px)',
-            minHeight: 420,
+            height: compactMode ? 'calc(100vh - 330px)' : 'calc(100vh - 390px)',
+            minHeight: 310,
             '--ag-font-size': compactMode ? '10.5px' : '12px',
-            '--ag-row-height': compactMode ? '28px' : '34px',
+            '--ag-header-height': compactMode ? '35px' : '35px',
+            '--ag-row-height': compactMode ? '25px' : '32px',
+            '--ag-list-item-height': '22px',
+            '--ag-header-column-resize-handle-height': '60%',
+            '--ag-wrapper-border-radius': '0px',
           }}
         >
-          <AgGridReact
-            rowData={agRows.filter(r => {
-              if (quickPreset === 'pendientes') return String(r.estado || '').toLowerCase().includes('pendiente')
-              if (quickPreset === 'procesados') return String(r.estado || '').toLowerCase().includes('proces')
-              if (quickPreset === 'errores') return String(r.estado || '').toLowerCase().includes('error')
-              return true
-            })}
-            columnDefs={agColumnDefs}
-            defaultColDef={agDefaultColDef}
-            quickFilterText={quickText}
-            pagination
-            paginationPageSize={pageSize}
-            animateRows
-            suppressCellFocus
-            onGridReady={params => {
-              setGridApi(params.api)
-              gridColumnApiRef.current = params.columnApi
-            }}
-            onFilterChanged={params => {
-              const rows = []
-              params.api.forEachNodeAfterFilterAndSort(node => node?.data && rows.push(node.data))
-              setDisplayedRows(rows)
-            }}
-            onSortChanged={params => {
-              const rows = []
-              params.api.forEachNodeAfterFilterAndSort(node => node?.data && rows.push(node.data))
-              setDisplayedRows(rows)
-            }}
-          />
+          {loading && data.length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner dark" /></div>
+          ) : (
+            <AgGridReact
+              rowData={agRows}
+              columnDefs={agColumnDefs}
+              headerHeight={35}
+              floatingFiltersHeight={30}
+              rowHeight={compactMode ? 25 : 32}
+              defaultColDef={agDefaultColDef}
+              pagination
+              paginationPageSize={pageSize}
+              paginationPageSizeSelector={[25, 50, 100, 200]}
+              localeText={agLocaleText}
+              onGridReady={params => {
+                setGridApi(params.api)
+                gridColumnApiRef.current = params.columnApi
+                setVisibleCols(Object.fromEntries(params.api.getColumns().map(c => [c.getColId(), c.isVisible()])))
+                const lastView = safeJsonParse(localStorage.getItem(GRID_VIEW_KEY), null)
+                setTimeout(() => {
+                  if (lastView) {
+                    setQuickText(lastView.quickText || '')
+                    setQuickPreset(lastView.quickPreset || 'all')
+                    setGroupBy(lastView.groupBy || 'estado')
+                    setShowDashboard(lastView.showDashboard ?? true)
+                    setPageSize(Number(lastView.pageSize || 50))
+                    params.api.setFilterModel(lastView.filterModel || null)
+                    if (lastView.columnState?.length) params.api.applyColumnState({ state: lastView.columnState, applyOrder: true })
+                    params.api.setGridOption?.('quickFilterText', lastView.quickText || '')
+                  }
+                  refreshDisplayedRows(params.api)
+                }, 80)
+              }}
+              quickFilterText={quickText}
+              animateRows
+              suppressCellFocus
+              onFilterChanged={params => refreshDisplayedRows(params.api)}
+              onSortChanged={params => refreshDisplayedRows(params.api)}
+              onColumnVisible={params => setVisibleCols(Object.fromEntries(params.api.getColumns().map(c => [c.getColId(), c.isVisible()])))}
+              overlayNoRowsTemplate="<span style='padding:10px;color:#64748b;font-size:12px;'>No se encontraron devoluciones</span>"
+            />
+          )}
         </div>
-        {!loading && <div style={S.footerCount}>{data.length} de {total} devoluciones</div>}
+        {!loading && <div style={S.footerCount}>{data.length} de {total} devoluciones cargadas</div>}
       </div>
 
       {modal?.type === 'detalle' && <ModalDetalle item={modal.data} bancos={bancos} monedas={monedas} onClose={() => setModal(null)} />}
@@ -515,6 +854,35 @@ const S = {
   cardTitleWrap: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 14px 6px' },
   cardTitle: { margin: 0, fontSize: 16, fontFamily: 'Montserrat', color: 'var(--qf-navy)' },
   pill: { fontSize: 10, fontWeight: 700, color: 'var(--qf-navy)', background: '#e8eef5', borderRadius: 999, padding: '3px 8px' },
+
+  erpTools: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap', padding: '3px 10px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
+  erpGroup: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  erpSearchWrap: { position: 'relative', width: 210 },
+  erpSearchIcon: { position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5', pointerEvents: 'none', zIndex: 1 },
+  erpSearch: { width: '100%', height: 24, fontSize: 10, paddingLeft: 30 },
+  erpSelect: { minWidth: 150, height: 24, fontSize: 9.5, padding: '0 22px 0 8px' },
+  erpSelectSmall: { minWidth: 130, height: 24, fontSize: 9.5, padding: '0 20px 0 7px' },
+  viewInput: { width: 140, height: 24, fontSize: 10 },
+  columnPanel: { display: 'flex', gap: 8, flexWrap: 'wrap', padding: '6px 14px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
+  columnCheck: { fontSize: 10.5, color: 'var(--qf-navy)', display: 'inline-flex', alignItems: 'center', gap: 4, background: '#fff', border: '1px solid var(--qf-border)', borderRadius: 999, padding: '3px 8px' },
+  savedViews: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '5px 14px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
+  savedTitle: { fontSize: 10, color: 'var(--qf-text-light)', fontWeight: 700 },
+  savedChip: { display: 'inline-flex', alignItems: 'center', border: '1px solid #9fb2c8', borderRadius: 999, overflow: 'hidden', background: '#e8eef5' },
+  savedBtn: { border: 0, background: 'transparent', padding: '3px 7px', cursor: 'pointer', fontSize: 10.5, color: 'var(--qf-navy)', fontWeight: 700 },
+  savedDel: { border: 0, background: '#dbe7f3', padding: '3px 6px', cursor: 'pointer', fontSize: 11, color: '#c62828', fontWeight: 900 },
+  smartTotals: { display: 'flex', gap: 8, flexWrap: 'wrap', padding: '3px 10px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)', color: 'var(--qf-text-light)', fontSize: 10.5 },
+  sidePanel: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 8, padding: '8px 10px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
+  sideSection: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 8 },
+  sideTitle: { width: '100%', fontSize: 9.5, fontWeight: 800, color: 'var(--qf-navy)', textTransform: 'uppercase', letterSpacing: 0.3 },
+  groupMini: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, minWidth: 120, background: '#fff', border: '1px solid var(--qf-border)', borderRadius: 999, padding: '2px 8px', fontSize: 10, color: 'var(--qf-navy)' },
+  dashboard: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8, padding: '8px 10px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
+  dashPanel: { background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 8 },
+  barRow: { display: 'grid', gridTemplateColumns: '80px 1fr 28px', alignItems: 'center', gap: 6, marginTop: 5 },
+  barLabel: { fontSize: 9.5, color: 'var(--qf-text-light)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  barTrack: { height: 6, background: '#e8eef5', borderRadius: 999, overflow: 'hidden' },
+  barFill: { height: '100%', background: '#185FA5', borderRadius: 999 },
+  barValue: { fontSize: 10, color: 'var(--qf-navy)', textAlign: 'right' },
+
   filtersRow: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '0 14px 6px' },
   fieldSelect: { width: 'auto', minWidth: 120, height: 32, fontSize: 12 },
   searchInput: { minWidth: 180, maxWidth: 340, height: 32, fontSize: 12 },
@@ -529,17 +897,6 @@ const S = {
   bankPill: { background: '#e8eef5', color: 'var(--qf-navy)', borderRadius: 3, padding: '1px 4px', fontSize: 9.5, fontWeight: 700, whiteSpace: 'nowrap' },
   aBtn: { fontSize: 9, padding: '1px 4px' },
   footerCount: { padding: '6px 14px', borderTop: '1px solid var(--qf-border)', fontSize: 10.5, color: 'var(--qf-text-light)', background: '#fff' },
-  erpTools: { display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', padding: '6px 12px', borderTop: '1px solid var(--qf-border)', background: '#fff' },
-  erpGroup: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' },
-  savedViews: { display: 'flex', gap: 6, flexWrap: 'wrap', padding: '6px 12px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
-
-  sidePanel: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8, padding: '8px 12px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
-  sideSection: { background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 8, display: 'flex', flexWrap: 'wrap', gap: 6 },
-  sideTitle: { width: '100%', fontSize: 9.5, fontWeight: 800, color: 'var(--qf-navy)', textTransform: 'uppercase' },
-  dashboard: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, padding: '8px 12px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
-  dashPanel: { background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 10 },
-  groupMini: { display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: 10, background: '#fff', padding: '4px 8px', borderRadius: 6, border: '1px solid #d9e2ec' },
-
   detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 },
   detailBox: { background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 8 },
   detailLabel: { fontSize: 9, fontWeight: 700, color: 'var(--qf-text-light)', textTransform: 'uppercase' },
