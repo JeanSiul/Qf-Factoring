@@ -29,15 +29,18 @@ const money = (value, currency = 'PEN') => {
   const cur = String(currency || '').toUpperCase() === 'USD' || String(currency || '').toLowerCase().includes('dol') ? 'USD' : 'PEN'
   return new Intl.NumberFormat('es-PE', { style: 'currency', currency: cur, minimumFractionDigits: 2 }).format(Number(value || 0))
 }
-const formatDate = value => { if (!value) return '-'; const d = new Date(value); if (Number.isNaN(d.getTime())) return String(value).slice(0, 10); return d.toLocaleDateString('es-PE') }
-const toDateInput = value => { if (!value) return ''; const d = new Date(value); if (Number.isNaN(d.getTime())) return String(value).slice(0, 10); return d.toISOString().slice(0, 10) }
 const dateKey = value => {
   if (!value) return ''
   const raw = String(value).trim()
+
+  // ISO / MySQL: 2026-05-13, 2026-05-13T10:00:00, 2026-05-13 10:00:00
   const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/)
   if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`
+
+  // Formato peruano: 13/05/2026 o 13/5/2026
   const pe = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)
   if (pe) return `${pe[3]}-${String(pe[2]).padStart(2, '0')}-${String(pe[1]).padStart(2, '0')}`
+
   const d = new Date(raw)
   if (Number.isNaN(d.getTime())) return raw.slice(0, 10)
   const y = d.getFullYear()
@@ -45,6 +48,14 @@ const dateKey = value => {
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
 }
+
+const formatDate = value => {
+  const k = dateKey(value)
+  if (!k) return '-'
+  const [y, m, d] = k.split('-')
+  return `${d}/${m}/${y}`
+}
+const toDateInput = value => dateKey(value)
 const badgeClass = status => { const s = String(status || '').toLowerCase(); if (s.includes('pendiente') || s.includes('proceso')) return 'warning'; if (s.includes('completado') || s.includes('exitoso') || s.includes('procesado')) return 'active'; if (s.includes('error') || s.includes('rechazado') || s.includes('fallido')) return 'inactive'; return 'warning' }
 
 const getField = (obj, ...names) => { for (const n of names) { if (obj[n] !== undefined) return obj[n]; if (obj[n.toLowerCase()] !== undefined) return obj[n.toLowerCase()]; if (obj[n.toUpperCase()] !== undefined) return obj[n.toUpperCase()] } return undefined }
@@ -224,18 +235,17 @@ const DevolucionesPage = () => {
   const metrics = useMemo(() => ({ totalCargado: data.reduce((s, r) => s + Number(r.importe_cargado || 0), 0), totalAbonado: data.reduce((s, r) => s + Number(r.importe_abonado || 0), 0), totalComision: data.reduce((s, r) => s + Number(r.comision || 0), 0), pendientes: data.filter(r => String(r.estado || '').toLowerCase().includes('pendiente')).length }), [data])
 
   const quickFilteredData = useMemo(() => {
-    const fechasValidas = data.map(r => dateKey(r.fecha_operacion)).filter(Boolean).sort()
-    const refIso = fechasValidas[fechasValidas.length - 1] || dateKey(new Date())
-    const refDate = new Date(`${refIso}T12:00:00`)
+    const now = new Date()
+    const todayIso = dateKey(now)
 
-    const todayIso = refIso
-
-    const weekStart = new Date(refDate)
-    weekStart.setDate(refDate.getDate() - 6)
+    const weekStart = new Date(now)
+    weekStart.setDate(now.getDate() - 6)
     const weekIso = dateKey(weekStart)
 
-    const monthIso = dateKey(new Date(refDate.getFullYear(), refDate.getMonth(), 1))
-    const nextMonthIso = dateKey(new Date(refDate.getFullYear(), refDate.getMonth() + 1, 1))
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+    const monthIso = dateKey(monthStart)
+    const nextMonthIso = dateKey(nextMonthStart)
 
     return data.filter(row => {
       const fecha = dateKey(row.fecha_operacion)
@@ -492,9 +502,7 @@ const DevolucionesPage = () => {
       field: 'importe_cargado',
       width: 125,
       type: 'numericColumn',
-      cellStyle: { fontWeight: 800, color: '#c62828' },
-      cellClass: 'qf-right-cell',
-      headerClass: 'qf-right-header',
+      cellStyle: { fontWeight: 800, color: '#c62828', textAlign: 'center' },
       valueFormatter: p => money(p.value, p.data?.moneda_cargo_codigo),
       filter: 'agNumberColumnFilter',
     },
@@ -503,9 +511,7 @@ const DevolucionesPage = () => {
       field: 'importe_abonado',
       width: 125,
       type: 'numericColumn',
-      cellStyle: { fontWeight: 800, color: '#2e7d32' },
-      cellClass: 'qf-right-cell',
-      headerClass: 'qf-right-header',
+      cellStyle: { fontWeight: 800, color: '#2e7d32', textAlign: 'center' },
       valueFormatter: p => money(p.value, p.data?.moneda_abono_codigo),
       filter: 'agNumberColumnFilter',
     },
@@ -514,9 +520,7 @@ const DevolucionesPage = () => {
       field: 'comision',
       width: 105,
       type: 'numericColumn',
-      cellStyle: { fontWeight: 800, color: '#2e7d32' },
-      cellClass: 'qf-right-cell',
-      headerClass: 'qf-right-header',
+      cellStyle: { fontWeight: 800, color: '#2e7d32', textAlign: 'center' },
       valueFormatter: p => money(p.value, p.data?.moneda_cargo_codigo),
       filter: 'agNumberColumnFilter',
     },
@@ -524,7 +528,7 @@ const DevolucionesPage = () => {
       headerName: 'Referencia', 
       field: 'referencia', 
       flex: 1, 
-      cellStyle: { fontWeight: 600, color: 'var(--qf-navy)' },
+      cellStyle: { fontWeight: 800, color: '#2e7d32', textAlign: 'right' },
       minWidth: 160, 
       filter: 'agTextColumnFilter' },
     {
@@ -656,10 +660,6 @@ const DevolucionesPage = () => {
         }
         .qf-tareas-grid .qf-right-header .ag-header-cell-label {
           justify-content: flex-end;
-        }
-        .qf-tareas-grid .qf-right-cell {
-          justify-content: flex-end;
-          text-align: right;
         }
       `}</style>
       <div style={S.topHeader}><h1 style={S.title}>↩ Devoluciones</h1><p style={S.subtitle}>Gestión de devoluciones bancarias</p></div>
