@@ -639,7 +639,7 @@ const DevolucionesPage = () => {
         .qf-tareas-grid .ag-input-field-input {
           min-height: 2px;
           height: 6px;
-          padding: 0 2px !important;
+          padding: 0 2px 0 16px !important;
           font-size: 8px;
           border-radius: 7px;
           border: 1px solid #9fb2c8 !important;
@@ -654,9 +654,9 @@ const DevolucionesPage = () => {
           content: '🔍';
           position: absolute;
           left: 5px;
-          top: 50%;
+          top: 43%;
           transform: translateY(-50%);
-          font-size: 11px;
+          font-size: 10px;
           line-height: 1;
           z-index: 3;
           pointer-events: none;
@@ -680,16 +680,7 @@ const DevolucionesPage = () => {
           color: #185FA5 !important;
           font-size: 13px !important;
         }
-        .qf-tareas-grid .ag-floating-filter-button-button .ag-icon {
-          display: none !important;
-        }
-        .qf-tareas-grid .ag-floating-filter-button-button::before {
-          content: '🔍';
-          font-size: 12px;
-          line-height: 1;
-          filter: saturate(1.55);
-        }
-        .qf-tareas-grid .ag-row {
+.qf-tareas-grid .ag-row {
           border-bottom: 1px solid var(--qf-border);
         }
         .qf-tareas-grid .ag-row-hover {
@@ -811,14 +802,17 @@ const DevolucionesPage = () => {
               />
               <button className="btn btn-primary btn-sm" onClick={() => saveCurrentView(viewName)}>Guardar vista</button>
               {savedViews.length > 0 && (
-                <div style={S.savedViewsInline}>
-                  {savedViews.map(v => (
+                <>
+                  <span style={S.savedTitle}>Vistas guardadas:</span>
+                  <div style={S.savedViewsInline}>
+                    {savedViews.map(v => (
                     <span key={v.id} style={S.savedChip}>
                       <button type="button" onClick={() => applyView(v)} style={S.savedBtn}>{v.name}</button>
                       <button type="button" onClick={() => deleteView(v.id)} style={S.savedDel}>×</button>
                     </span>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                </>
               )}
               <button className="btn btn-secondary btn-sm" onClick={resetGridView}>Reset</button>
             </div>
@@ -847,18 +841,6 @@ const DevolucionesPage = () => {
                   <input type="checkbox" checked={visibleCols[field] !== false} onChange={() => toggleColumn(field)} />
                   {label}
                 </label>
-              ))}
-            </div>
-          )}
-
-          {savedViews.length > 0 && (
-            <div style={S.savedViews}>
-              <span style={S.savedTitle}>Vistas guardadas:</span>
-              {savedViews.map(v => (
-                <span key={v.id} style={S.savedChip}>
-                  <button type="button" onClick={() => applyView(v)} style={S.savedBtn}>{v.name}</button>
-                  <button type="button" onClick={() => deleteView(v.id)} style={S.savedDel}>×</button>
-                </span>
               ))}
             </div>
           )}
@@ -1020,7 +1002,7 @@ const S = {
   columnCheck: { fontSize: 10.5, color: 'var(--qf-navy)', display: 'inline-flex', alignItems: 'center', gap: 4, background: '#fff', border: '1px solid var(--qf-border)', borderRadius: 999, padding: '3px 8px' },
   savedViews: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '5px 14px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
   savedViewsInline: { display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' },
-  savedTitle: { fontSize: 10, color: 'var(--qf-text-light)', fontWeight: 700 },
+  savedTitle: { fontSize: 10, color: 'var(--qf-text-light)', fontWeight: 800, whiteSpace: 'nowrap' },
   savedChip: { display: 'inline-flex', alignItems: 'center', border: '1px solid #9fb2c8', borderRadius: 999, overflow: 'hidden', background: '#e8eef5' },
   savedBtn: { border: 0, background: 'transparent', padding: '3px 7px', cursor: 'pointer', fontSize: 10.5, color: 'var(--qf-navy)', fontWeight: 700 },
   savedDel: { border: 0, background: '#dbe7f3', padding: '3px 6px', cursor: 'pointer', fontSize: 11, color: '#c62828', fontWeight: 900 },
