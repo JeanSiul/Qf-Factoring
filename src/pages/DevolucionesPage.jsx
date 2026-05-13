@@ -664,6 +664,11 @@ const DevolucionesPage = () => {
         .qf-tareas-grid .qf-right-header .ag-header-cell-label {
           justify-content: flex-end;
         }
+        .qf-tareas-grid .qf-right-cell {
+          justify-content: flex-end !important;
+          text-align: right !important;
+          padding-right: 4px !important;
+        }
       `}</style>
       <div style={S.topHeader}><h1 style={S.title}>↩ Devoluciones</h1><p style={S.subtitle}>Gestión de devoluciones bancarias</p></div>
       <div style={S.actionBar}><button className="btn btn-secondary btn-sm" onClick={() => setCompactMode(v => !v)}>{compactMode ? 'Vista cómoda' : 'Vista compacta'}</button></div>
