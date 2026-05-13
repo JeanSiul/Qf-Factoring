@@ -998,12 +998,12 @@ const TareasPage = () => {
             height: compactMode ? 'calc(100vh - 330px)' : 'calc(100vh - 390px)',
             minHeight: 310,
             '--ag-font-size': compactMode ? '10.5px' : '12px',
-            '--ag-header-height': compactMode ? '7px' : '9px',
-            '--ag-row-height': compactMode ? '7px' : '9px',
+            '--ag-header-height': compactMode ? '9px' : '12px',
+            '--ag-row-height': compactMode ? '9px' : '12px',
             '--ag-list-item-height': '14px',
             '--ag-header-column-resize-handle-height': '60%',
             '--ag-wrapper-border-radius': '0px',
-            '--ag-grid-size': '3px'
+            '--ag-grid-size': '2px'
           }}
         >
           {loading && data.length === 0 ? (
