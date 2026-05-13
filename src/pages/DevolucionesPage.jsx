@@ -732,21 +732,11 @@ const DevolucionesPage = () => {
           background-image: none !important;
           padding-left: 4px !important;
         }
-        .qf-tareas-grid .ag-header-row-column-filter .ag-header-cell:nth-child(2) .ag-icon-search,
-        .qf-tareas-grid .ag-header-row-column-filter .ag-header-cell:nth-child(2) .ag-icon-filter {
-          display: none !important;
-        }
         /* qf-date-filter-clean */
         .qf-tareas-grid .ag-header-cell[col-id="fecha_operacion"] .ag-input-field-input,
         .qf-tareas-grid .ag-floating-filter[col-id="fecha_operacion"] .ag-input-field-input {
           background-image: none !important;
           padding-left: 4px !important;
-        }
-        .qf-tareas-grid .ag-header-cell[col-id="fecha_operacion"] .ag-icon-search,
-        .qf-tareas-grid .ag-header-cell[col-id="fecha_operacion"] .ag-icon-filter,
-        .qf-tareas-grid .ag-floating-filter[col-id="fecha_operacion"] .ag-icon-search,
-        .qf-tareas-grid .ag-floating-filter[col-id="fecha_operacion"] .ag-icon-filter {
-          display: none !important;
         }
       `}</style>
       <div style={S.topHeader}><h1 style={S.title}>↩ Devoluciones</h1><p style={S.subtitle}>Gestión de devoluciones bancarias</p></div>
@@ -801,15 +791,6 @@ const DevolucionesPage = () => {
 
             <button className="btn btn-secondary btn-sm" onClick={limpiarFiltrosTabla}>Limpiar filtros tabla</button>
             <button className="btn btn-secondary btn-sm" onClick={resetGridView} style={S.resetInlineBtn}>Reset</button>
-
-            <div style={S.rightActions}>
-              {canCreate && (
-                <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span style={{ color: '#4CAF50', fontWeight: 800, fontSize: 16 }}>+</span> Nuevo Registro
-                </button>
-              )}
-            </div>
-
             {loading && <span style={S.loadMini}>...</span>}
           </div>
 
@@ -849,6 +830,13 @@ const DevolucionesPage = () => {
 
 
             </div>
+            {canCreate && (
+              <div style={S.newRecordWrap}>
+                <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ color: '#4CAF50', fontWeight: 800, fontSize: 16 }}>+</span> Nuevo Registro
+                </button>
+              </div>
+            )}
           </div>
 
           {showColumnPanel && (
@@ -885,6 +873,11 @@ const DevolucionesPage = () => {
             <span><b>{money(liveRows.reduce((s, r) => s + Number(r.comision || 0), 0))}</b> comisión</span>
             <span><b>{liveRows.filter(r => normalize(r.estado).includes('pend')).length}</b> pendientes</span>
             <span><b>{liveRows.filter(r => normalize(r.estado).includes('error') || normalize(r.estado).includes('rechaz')).length}</b> errores</span>
+            <div style={S.exportTotalsGroup}>
+              <button className="btn btn-secondary btn-sm" style={S.exportBtn} onClick={exportCsv}>CSV</button>
+              <button className="btn btn-secondary btn-sm" style={S.exportBtn} onClick={exportExcel}>Excel</button>
+              <button className="btn btn-secondary btn-sm" style={S.exportBtn} onClick={exportPdf}>PDF</button>
+            </div>
           </div>
 
           {showSidePanel && (
@@ -910,12 +903,6 @@ const DevolucionesPage = () => {
               </div>
             </div>
           )}
-
-          <div style={S.exportRow}>
-            <button className="btn btn-secondary btn-sm" style={S.exportBtn} onClick={exportCsv}>CSV</button>
-            <button className="btn btn-secondary btn-sm" style={S.exportBtn} onClick={exportExcel}>Excel</button>
-            <button className="btn btn-secondary btn-sm" style={S.exportBtn} onClick={exportPdf}>PDF</button>
-          </div>
 
           {showDashboard && (
             <div style={S.dashboard}>
@@ -1030,9 +1017,9 @@ const S = {
   pageMini: { fontSize: 10, fontWeight: 800, color: 'var(--qf-navy)', minWidth: 72, textAlign: 'center' },
   pageNavBtn: { minWidth: 22, height: 22, padding: '0 6px', borderRadius: 999, fontWeight: 900 },
   resetInlineBtn: { minWidth: 54, height: 24, padding: '0 8px', textTransform: 'uppercase', fontSize: 10, fontWeight: 800 },
-  newRecordWrap: { marginLeft: 'auto', display: 'flex', justifyContent: 'flex-end', flexShrink: 0, minWidth: 150 },
+  newRecordWrap: { marginLeft: 'auto', display: 'flex', justifyContent: 'flex-end', flexShrink: 0, minWidth: 160 },
   floatActionBtn: { height: 21, padding: '0 4px', fontSize: 8, borderRadius: 6, whiteSpace: 'nowrap', minWidth: 70, display: 'block', margin: '0 auto', textAlign: 'center' },
-  exportTopGroup: { display: 'flex', gap: 6, alignItems: 'center', marginLeft: 8 },
+  exportTotalsGroup: { marginLeft: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6, flexShrink: 0 },
   exportBtn: { height: 24, padding: '0 10px', fontSize: 10, borderRadius: 8, fontWeight: 700 },
 
   erpTools: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'nowrap', padding: '2px 10px', background: '#fff', borderTop: '1px solid var(--qf-border)', width: '100%' },
@@ -1051,7 +1038,7 @@ const S = {
   savedChip: { display: 'inline-flex', alignItems: 'center', border: '1px solid #9fb2c8', borderRadius: 999, overflow: 'hidden', background: '#e8eef5' },
   savedBtn: { border: 0, background: 'transparent', padding: '3px 7px', cursor: 'pointer', fontSize: 10.5, color: 'var(--qf-navy)', fontWeight: 700 },
   savedDel: { border: 0, background: '#dbe7f3', padding: '3px 6px', cursor: 'pointer', fontSize: 11, color: '#c62828', fontWeight: 900 },
-  smartTotals: { display: 'flex', gap: 8, flexWrap: 'wrap', padding: '3px 10px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)', color: 'var(--qf-text-light)', fontSize: 10.5 },
+  smartTotals: { display: 'flex', gap: 8, flexWrap: 'nowrap', alignItems: 'center', padding: '3px 10px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)', color: 'var(--qf-text-light)', fontSize: 10.5, width: '100%' },
   sidePanel: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 8, padding: '8px 10px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
   sideSection: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 8 },
   sideTitle: { width: '100%', fontSize: 9.5, fontWeight: 800, color: 'var(--qf-navy)', textTransform: 'uppercase', letterSpacing: 0.3 },
