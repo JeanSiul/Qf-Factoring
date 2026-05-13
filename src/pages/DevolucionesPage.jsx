@@ -732,12 +732,26 @@ const DevolucionesPage = () => {
           background-image: none !important;
           padding-left: 4px !important;
         }
-        /* qf-date-filter-clean */
+
+        /* Fecha sin lupa interna, conserva boton de filtro */
         .qf-tareas-grid .ag-header-cell[col-id="fecha_operacion"] .ag-input-field-input,
-        .qf-tareas-grid .ag-floating-filter[col-id="fecha_operacion"] .ag-input-field-input {
+        .qf-tareas-grid .ag-floating-filter[col-id="fecha_operacion"] .ag-input-field-input,
+        .qf-tareas-grid .ag-header-cell[col-id="fecha_operacion"] input,
+        .qf-tareas-grid .ag-floating-filter[col-id="fecha_operacion"] input,
+        .qf-tareas-grid .ag-header-row-column-filter .ag-header-cell:nth-child(2) .ag-input-field-input,
+        .qf-tareas-grid .ag-header-row-column-filter .ag-header-cell:nth-child(2) input {
           background-image: none !important;
+          background: #ffffff !important;
           padding-left: 4px !important;
         }
+        .qf-tareas-grid .ag-header-cell[col-id="fecha_operacion"] .ag-input-wrapper::before,
+        .qf-tareas-grid .ag-floating-filter[col-id="fecha_operacion"] .ag-input-wrapper::before,
+        .qf-tareas-grid .ag-header-cell[col-id="fecha_operacion"] .ag-input-field::before,
+        .qf-tareas-grid .ag-floating-filter[col-id="fecha_operacion"] .ag-input-field::before {
+          display: none !important;
+          content: '' !important;
+        }
+
       `}</style>
       <div style={S.topHeader}><h1 style={S.title}>↩ Devoluciones</h1><p style={S.subtitle}>Gestión de devoluciones bancarias</p></div>
       <div style={S.kpiGrid}>{[{ l: 'Total registros', v: total, c: 'var(--qf-navy)', b: '#2196f3' },{ l: 'Mostradas', v: data.length, c: '#185FA5', b: '#03a9f4' },{ l: 'Total cargado', v: money(metrics.totalCargado), c: '#c62828', b: '#f44336' },{ l: 'Total abonado', v: money(metrics.totalAbonado), c: '#2e7d32', b: '#4caf50' },{ l: 'Comisiones', v: money(metrics.totalComision), c: '#e65100', b: '#ff9800' },{ l: 'Pendientes', v: metrics.pendientes, c: '#5e35b1', b: '#7e57c2' }].map(s => <div key={s.l} style={{ ...S.kpiCard, borderTop: `3px solid ${s.b}` }}><div style={S.kpiLabel}>{s.l}</div><div style={{ ...S.kpiValue, color: s.c }}>{s.v}</div></div>)}</div>
@@ -791,6 +805,14 @@ const DevolucionesPage = () => {
 
             <button className="btn btn-secondary btn-sm" onClick={limpiarFiltrosTabla}>Limpiar filtros tabla</button>
             <button className="btn btn-secondary btn-sm" onClick={resetGridView} style={S.resetInlineBtn}>Reset</button>
+
+            {canCreate && (
+              <div style={S.newRecordWrap}>
+                <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ color: '#4CAF50', fontWeight: 800, fontSize: 16 }}>+</span> Nuevo Registro
+                </button>
+              </div>
+            )}
             {loading && <span style={S.loadMini}>...</span>}
           </div>
 
@@ -830,13 +852,7 @@ const DevolucionesPage = () => {
 
 
             </div>
-            {canCreate && (
-              <div style={S.newRecordWrap}>
-                <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span style={{ color: '#4CAF50', fontWeight: 800, fontSize: 16 }}>+</span> Nuevo Registro
-                </button>
-              </div>
-            )}
+            
           </div>
 
           {showColumnPanel && (
@@ -1054,7 +1070,7 @@ const S = {
   filtersRow: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '0 14px 6px' },
   fieldSelect: { width: 'auto', minWidth: 120, height: 32, fontSize: 12 },
   searchInput: { minWidth: 180, maxWidth: 340, height: 32, fontSize: 12 },
-  pagRow: { display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', padding: '3px 10px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
+  pagRow: { display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'nowrap', padding: '3px 10px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)', width: '100%' },
   pageInfo: { fontSize: 11, color: 'var(--qf-text-light)', fontWeight: 600 },
   loadMini: { fontSize: 11, color: '#185FA5', fontWeight: 700 },
   th0: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 9, padding: '5px 4px' },
