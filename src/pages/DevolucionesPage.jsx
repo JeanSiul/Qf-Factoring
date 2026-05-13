@@ -224,14 +224,18 @@ const DevolucionesPage = () => {
   const metrics = useMemo(() => ({ totalCargado: data.reduce((s, r) => s + Number(r.importe_cargado || 0), 0), totalAbonado: data.reduce((s, r) => s + Number(r.importe_abonado || 0), 0), totalComision: data.reduce((s, r) => s + Number(r.comision || 0), 0), pendientes: data.filter(r => String(r.estado || '').toLowerCase().includes('pendiente')).length }), [data])
 
   const quickFilteredData = useMemo(() => {
-    const now = new Date()
-    const todayIso = dateKey(now)
+    const fechasValidas = data.map(r => dateKey(r.fecha_operacion)).filter(Boolean).sort()
+    const refIso = fechasValidas[fechasValidas.length - 1] || dateKey(new Date())
+    const refDate = new Date(`${refIso}T12:00:00`)
 
-    const weekStart = new Date(now)
-    weekStart.setDate(now.getDate() - 6)
+    const todayIso = refIso
+
+    const weekStart = new Date(refDate)
+    weekStart.setDate(refDate.getDate() - 6)
     const weekIso = dateKey(weekStart)
 
-    const monthIso = dateKey(new Date(now.getFullYear(), now.getMonth(), 1))
+    const monthIso = dateKey(new Date(refDate.getFullYear(), refDate.getMonth(), 1))
+    const nextMonthIso = dateKey(new Date(refDate.getFullYear(), refDate.getMonth() + 1, 1))
 
     return data.filter(row => {
       const fecha = dateKey(row.fecha_operacion)
@@ -242,7 +246,7 @@ const DevolucionesPage = () => {
 
       if (quickPreset === 'today') return fecha === todayIso
       if (quickPreset === 'week') return fecha >= weekIso && fecha <= todayIso
-      if (quickPreset === 'month') return fecha >= monthIso && fecha <= todayIso
+      if (quickPreset === 'month') return fecha >= monthIso && fecha < nextMonthIso
       if (quickPreset === 'pending') return estado.includes('pend') || estado.includes('proceso')
       if (quickPreset === 'processed') return estado.includes('proces') || estado.includes('complet') || estado.includes('exitos')
       if (quickPreset === 'errors') return estado.includes('error') || estado.includes('rechaz') || estado.includes('fall')
@@ -488,7 +492,9 @@ const DevolucionesPage = () => {
       field: 'importe_cargado',
       width: 125,
       type: 'numericColumn',
-      cellStyle: { fontWeight: 800, color: '#c62828', textAlign: 'center' },
+      cellStyle: { fontWeight: 800, color: '#c62828' },
+      cellClass: 'qf-right-cell',
+      headerClass: 'qf-right-header',
       valueFormatter: p => money(p.value, p.data?.moneda_cargo_codigo),
       filter: 'agNumberColumnFilter',
     },
@@ -497,7 +503,9 @@ const DevolucionesPage = () => {
       field: 'importe_abonado',
       width: 125,
       type: 'numericColumn',
-      cellStyle: { fontWeight: 800, color: '#2e7d32', textAlign: 'center' },
+      cellStyle: { fontWeight: 800, color: '#2e7d32' },
+      cellClass: 'qf-right-cell',
+      headerClass: 'qf-right-header',
       valueFormatter: p => money(p.value, p.data?.moneda_abono_codigo),
       filter: 'agNumberColumnFilter',
     },
@@ -506,7 +514,9 @@ const DevolucionesPage = () => {
       field: 'comision',
       width: 105,
       type: 'numericColumn',
-      cellStyle: { fontWeight: 800, color: '#2e7d32', textAlign: 'center' },
+      cellStyle: { fontWeight: 800, color: '#2e7d32' },
+      cellClass: 'qf-right-cell',
+      headerClass: 'qf-right-header',
       valueFormatter: p => money(p.value, p.data?.moneda_cargo_codigo),
       filter: 'agNumberColumnFilter',
     },
@@ -514,7 +524,7 @@ const DevolucionesPage = () => {
       headerName: 'Referencia', 
       field: 'referencia', 
       flex: 1, 
-      cellStyle: { fontWeight: 800, color: '#2e7d32', textAlign: 'right' },
+      cellStyle: { fontWeight: 600, color: 'var(--qf-navy)' },
       minWidth: 160, 
       filter: 'agTextColumnFilter' },
     {
@@ -646,6 +656,10 @@ const DevolucionesPage = () => {
         }
         .qf-tareas-grid .qf-right-header .ag-header-cell-label {
           justify-content: flex-end;
+        }
+        .qf-tareas-grid .qf-right-cell {
+          justify-content: flex-end;
+          text-align: right;
         }
       `}</style>
       <div style={S.topHeader}><h1 style={S.title}>↩ Devoluciones</h1><p style={S.subtitle}>Gestión de devoluciones bancarias</p></div>
