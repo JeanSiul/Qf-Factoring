@@ -9,6 +9,7 @@ const CLAIM = 'TAREAS'
 const DEBOUNCE_MS = 450
 const STORAGE_KEY = 'qf_tareas_grid_view_v6'
 const SAVED_VIEWS_KEY = 'qf_tareas_saved_views_v6'
+const DASHBOARD_KEY = 'qf_tareas_dashboard_v9'
 
 const camposBusqueda = [
   { value: 'all', label: 'Todos' },
@@ -117,6 +118,44 @@ const downloadTextFile = (filename, content, mime = 'text/csv;charset=utf-8;') =
 const csvEscape = value => {
   const s = String(value ?? '')
   return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+
+const pct = (value, total) => `${Math.round((Number(value || 0) / Math.max(Number(total || 0), 1)) * 100)}%`
+
+const groupLabel = (row, groupBy) => {
+  if (groupBy === 'usuario') return row.usuario_nombre || row.usuario_email || row.usuario_id || 'Sin usuario'
+  if (groupBy === 'tipo') return row.tipo_tarea || 'Sin tipo'
+  if (groupBy === 'estado') return row.estado || 'Sin estado'
+  if (groupBy === 'prioridad') return row.prioridad || 'Sin prioridad'
+  if (groupBy === 'fecha') return toDateInput(row.fecha_inicio) || 'Sin fecha'
+  return 'General'
+}
+
+const buildGroupSummary = (rows, groupBy) => {
+  const map = new Map()
+  rows.forEach(row => {
+    const key = groupLabel(row, groupBy)
+    const current = map.get(key) || { name: key, count: 0, minutos: 0, pendientes: 0, completadas: 0 }
+    current.count += 1
+    current.minutos += calcMinutes(row)
+    if (['Pendiente', 'En proceso'].includes(row.estado)) current.pendientes += 1
+    if (row.estado === 'Completado') current.completadas += 1
+    map.set(key, current)
+  })
+  return [...map.values()].sort((a, b) => b.count - a.count)
+}
+
+const exportHtmlTable = (filename, rows) => {
+  const headers = ['Inicio', 'Hora inicio', 'Fin', 'Hora fin', 'Tipo', 'Tarea', 'Usuario', 'Duración', 'Estado', 'Prioridad', 'Descripción', 'Observaciones']
+  const htmlRows = rows.map(r => `<tr><td>${toDateInput(r.fecha_inicio)}</td><td>${toTimeInput(r.hora_inicio)}</td><td>${toDateInput(r.fecha_fin)}</td><td>${toTimeInput(r.hora_fin)}</td><td>${r.tipo_tarea || ''}</td><td>${r.titulo || ''}</td><td>${r.usuario_nombre || r.usuario_email || r.usuario_id || ''}</td><td>${minToTime(calcMinutes(r))}</td><td>${r.estado || ''}</td><td>${r.prioridad || ''}</td><td>${r.descripcion || ''}</td><td>${r.observaciones || ''}</td></tr>`).join('')
+  const content = `<html><head><meta charset="utf-8" /></head><body><table border="1"><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${htmlRows}</tbody></table></body></html>`
+  downloadTextFile(filename, content, 'application/vnd.ms-excel;charset=utf-8;')
+}
+
+const printPdfReport = (rows, title = 'Reporte de Tareas') => {
+  const html = `<html><head><title>${title}</title><style>body{font-family:Arial,sans-serif;color:#0f2742;padding:18px}h1{font-size:18px;margin:0 0 8px}.meta{color:#64748b;font-size:11px;margin-bottom:12px}table{width:100%;border-collapse:collapse;font-size:10px}th{background:#0f2742;color:#fff;text-align:left;padding:5px}td{border:1px solid #d9e2ec;padding:4px}.kpis{display:flex;gap:8px;margin:12px 0}.kpi{border:1px solid #d9e2ec;border-radius:8px;padding:8px;min-width:110px}.kpi b{display:block;font-size:16px;color:#185FA5}</style></head><body><h1>${title}</h1><div class="meta">Generado: ${new Date().toLocaleString('es-PE')} · Registros: ${rows.length}</div><div class="kpis"><div class="kpi"><span>Total</span><b>${rows.length}</b></div><div class="kpi"><span>Horas</span><b>${minToTime(rows.reduce((s, r) => s + calcMinutes(r), 0))}</b></div><div class="kpi"><span>Pendientes</span><b>${rows.filter(r => ['Pendiente', 'En proceso'].includes(r.estado)).length}</b></div><div class="kpi"><span>Completadas</span><b>${rows.filter(r => r.estado === 'Completado').length}</b></div></div><table><thead><tr><th>Inicio</th><th>Tipo</th><th>Tarea</th><th>Usuario</th><th>Duración</th><th>Estado</th><th>Prioridad</th></tr></thead><tbody>${rows.map(r => `<tr><td>${formatDate(r.fecha_inicio)} ${toTimeInput(r.hora_inicio)}</td><td>${r.tipo_tarea || ''}</td><td>${r.titulo || ''}</td><td>${r.usuario_nombre || r.usuario_email || r.usuario_id || ''}</td><td>${minToTime(calcMinutes(r))}</td><td>${r.estado || ''}</td><td>${r.prioridad || ''}</td></tr>`).join('')}</tbody></table><script>window.onload=()=>window.print()</script></body></html>`
+  const w = window.open('', '_blank')
+  if (w) { w.document.write(html); w.document.close() }
 }
 
 
@@ -329,6 +368,10 @@ const TareasPage = () => {
   const [showColumnPanel, setShowColumnPanel] = useState(false)
   const [visibleCols, setVisibleCols] = useState({})
   const [filteredStats, setFilteredStats] = useState({ rows: 0, minutos: 0, pendientes: 0, completadas: 0, soporte: 0, programacion: 0 })
+  const [displayedRows, setDisplayedRows] = useState([])
+  const [showSidePanel, setShowSidePanel] = useState(false)
+  const [showDashboard, setShowDashboard] = useState(() => safeJsonParse(localStorage.getItem(DASHBOARD_KEY), true))
+  const [groupBy, setGroupBy] = useState('estado')
 
   const cv = permisos?.[CLAIM] || '11111111111'
   const canList = cv[1] !== '0'
@@ -455,6 +498,9 @@ const TareasPage = () => {
       if (quickPreset === 'done') return estadoNorm.includes('complet')
       if (quickPreset === 'support') return tipoNorm.includes('soporte')
       if (quickPreset === 'programming') return tipoNorm.includes('program')
+      if (quickPreset === 'gerencia') return estadoNorm.includes('pend') || estadoNorm.includes('proceso') || norm(r.prioridad).includes('alta') || norm(r.prioridad).includes('crítica') || norm(r.prioridad).includes('critica')
+      if (quickPreset === 'soporte_vista') return tipoNorm.includes('soporte') && fecha >= weekIso
+      if (quickPreset === 'programacion_vista') return tipoNorm.includes('program') && !estadoNorm.includes('cancel')
       if (quickPreset === 'high') return norm(r.prioridad).includes('alta') || norm(r.prioridad).includes('crítica') || norm(r.prioridad).includes('critica')
       return true
     })
@@ -468,6 +514,18 @@ const TareasPage = () => {
     _fin_text: `${formatDate(r.fecha_fin)} ${toTimeInput(r.hora_fin)}`,
     _duracion: calcMinutes(r),
   })), [quickFilteredData])
+
+  useEffect(() => {
+    setDisplayedRows(agRows)
+    setFilteredStats({
+      rows: agRows.length,
+      minutos: agRows.reduce((s, r) => s + calcMinutes(r), 0),
+      pendientes: agRows.filter(r => ['Pendiente', 'En proceso'].includes(r.estado)).length,
+      completadas: agRows.filter(r => r.estado === 'Completado').length,
+      soporte: agRows.filter(r => r.tipo_tarea === 'Soporte').length,
+      programacion: agRows.filter(r => r.tipo_tarea === 'Programación').length,
+    })
+  }, [agRows])
 
   const agDefaultColDef = useMemo(() => ({
     sortable: true,
@@ -550,6 +608,7 @@ const TareasPage = () => {
       if (node?.data) rows.push(node.data)
     })
 
+    setDisplayedRows(rows)
     setFilteredStats({
       rows: rows.length,
       minutos: rows.reduce((s, r) => s + calcMinutes(r), 0),
@@ -568,6 +627,8 @@ const TareasPage = () => {
       quickText,
       quickPreset,
       pageSize,
+      groupBy,
+      showDashboard,
       filterModel: gridApi.getFilterModel(),
       columnState: gridApi.getColumnState(),
       createdAt: new Date().toISOString(),
@@ -584,6 +645,8 @@ const TareasPage = () => {
     if (!gridApi || !view) return
     setQuickText(view.quickText || '')
     setQuickPreset(view.quickPreset || 'all')
+    setGroupBy(view.groupBy || 'estado')
+    setShowDashboard(view.showDashboard ?? true)
     setPageSize(Number(view.pageSize || 50))
     setTimeout(() => {
       gridApi.setFilterModel(view.filterModel || null)
@@ -603,6 +666,8 @@ const TareasPage = () => {
     if (!gridApi) return
     setQuickText('')
     setQuickPreset('all')
+    setGroupBy('estado')
+    setShowDashboard(true)
     setPageSize(50)
     gridApi.setFilterModel(null)
     gridApi.resetColumnState()
@@ -631,6 +696,36 @@ const TareasPage = () => {
     ].map(csvEscape).join(';'))
 
     downloadTextFile(`tareas_${today()}.csv`, [headers.join(';'), ...body].join('\n'))
+  }
+
+  const exportExcel = () => {
+    exportHtmlTable(`tareas_${today()}.xls`, getDisplayedRows())
+  }
+
+  const exportPdf = () => {
+    printPdfReport(getDisplayedRows(), 'Reporte de Tareas QF')
+  }
+
+  const applyColumnPreset = preset => {
+    if (!gridApi) return
+    const allCols = ['_inicio_sort', '_fin_sort', 'tipo_tarea', 'titulo', 'usuario_nombre', '_duracion', 'estado', 'prioridad', 'acciones']
+    const presets = {
+      gerencia: ['_inicio_sort', 'tipo_tarea', 'titulo', 'usuario_nombre', '_duracion', 'estado', 'prioridad', 'acciones'],
+      soporte: ['_inicio_sort', 'titulo', 'usuario_nombre', 'estado', 'prioridad', 'acciones'],
+      programacion: ['_inicio_sort', '_fin_sort', 'titulo', 'usuario_nombre', '_duracion', 'estado', 'acciones'],
+      completo: allCols,
+    }
+    const visible = presets[preset] || allCols
+    gridApi.setColumnsVisible(allCols, false)
+    gridApi.setColumnsVisible(visible, true)
+    setVisibleCols(Object.fromEntries(allCols.map(c => [c, visible.includes(c)])))
+  }
+
+  const toggleDashboard = () => {
+    setShowDashboard(v => {
+      localStorage.setItem(DASHBOARD_KEY, JSON.stringify(!v))
+      return !v
+    })
   }
 
   const toggleColumn = field => {
@@ -744,6 +839,12 @@ const TareasPage = () => {
       ),
     },
   ], [compactMode, canView, canEdit, canDelete])
+
+  const liveRows = displayedRows.length ? displayedRows : agRows
+  const groupSummary = useMemo(() => buildGroupSummary(liveRows, groupBy), [liveRows, groupBy])
+  const estadoSummary = useMemo(() => buildGroupSummary(liveRows, 'estado'), [liveRows])
+  const tipoSummary = useMemo(() => buildGroupSummary(liveRows, 'tipo'), [liveRows])
+  const prioridadSummary = useMemo(() => buildGroupSummary(liveRows, 'prioridad'), [liveRows])
 
   if (!canList) {
     return (
@@ -940,11 +1041,25 @@ const TareasPage = () => {
                 <option value="support">Soporte</option>
                 <option value="programming">Programación</option>
                 <option value="high">Alta prioridad</option>
+                <option value="gerencia">Vista Gerencia</option>
+                <option value="soporte_vista">Vista Soporte</option>
+                <option value="programacion_vista">Vista Programación</option>
               </select>
-              <button className="btn btn-secondary btn-sm" onClick={exportCsv}>Exportar CSV</button>
+              <button className="btn btn-secondary btn-sm" onClick={exportCsv}>CSV</button>
+              <button className="btn btn-secondary btn-sm" onClick={exportExcel}>Excel</button>
+              <button className="btn btn-secondary btn-sm" onClick={exportPdf}>PDF</button>
             </div>
 
             <div style={S.erpGroup}>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowSidePanel(v => !v)}>Panel</button>
+              <button className="btn btn-secondary btn-sm" onClick={toggleDashboard}>{showDashboard ? 'Ocultar BI' : 'Ver BI'}</button>
+              <select className="filter-input" value={groupBy} onChange={e => setGroupBy(e.target.value)} style={S.erpSelectSmall}>
+                <option value="estado">Agrupar: Estado</option>
+                <option value="tipo">Agrupar: Tipo</option>
+                <option value="usuario">Agrupar: Usuario</option>
+                <option value="prioridad">Agrupar: Prioridad</option>
+                <option value="fecha">Agrupar: Fecha</option>
+              </select>
               <button className="btn btn-secondary btn-sm" onClick={() => setShowColumnPanel(v => !v)}>Columnas</button>
               <input
                 className="filter-input"
@@ -999,6 +1114,53 @@ const TareasPage = () => {
             <span><b>{filteredStats.soporte}</b> soporte</span>
             <span><b>{filteredStats.programacion}</b> programación</span>
           </div>
+          {showSidePanel && (
+            <div style={S.sidePanel}>
+              <div style={S.sideSection}>
+                <div style={S.sideTitle}>Vistas rápidas</div>
+                <button className="btn btn-secondary btn-sm" onClick={() => { setQuickPreset('gerencia'); applyColumnPreset('gerencia') }}>Gerencia</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => { setQuickPreset('soporte_vista'); applyColumnPreset('soporte') }}>Soporte</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => { setQuickPreset('programacion_vista'); applyColumnPreset('programacion') }}>Programación</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => { setQuickPreset('all'); applyColumnPreset('completo') }}>Completo</button>
+              </div>
+              <div style={S.sideSection}>
+                <div style={S.sideTitle}>Exportación</div>
+                <button className="btn btn-secondary btn-sm" onClick={exportCsv}>CSV filtrado</button>
+                <button className="btn btn-secondary btn-sm" onClick={exportExcel}>Excel filtrado</button>
+                <button className="btn btn-secondary btn-sm" onClick={exportPdf}>PDF / imprimir</button>
+              </div>
+              <div style={S.sideSection}>
+                <div style={S.sideTitle}>Agrupación actual</div>
+                {groupSummary.slice(0, 6).map(g => (
+                  <div key={g.name} style={S.groupMini}><span>{g.name}</span><b>{g.count}</b></div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {showDashboard && (
+            <div style={S.dashboard}>
+              <div style={S.dashPanel}>
+                <div style={S.sideTitle}>Dashboard por estado</div>
+                {estadoSummary.slice(0, 5).map(g => (
+                  <div key={g.name} style={S.barRow}><span style={S.barLabel}>{g.name}</span><div style={S.barTrack}><div style={{ ...S.barFill, width: pct(g.count, liveRows.length) }} /></div><b style={S.barValue}>{g.count}</b></div>
+                ))}
+              </div>
+              <div style={S.dashPanel}>
+                <div style={S.sideTitle}>Dashboard por tipo</div>
+                {tipoSummary.slice(0, 5).map(g => (
+                  <div key={g.name} style={S.barRow}><span style={S.barLabel}>{g.name}</span><div style={S.barTrack}><div style={{ ...S.barFill, width: pct(g.count, liveRows.length) }} /></div><b style={S.barValue}>{g.count}</b></div>
+                ))}
+              </div>
+              <div style={S.dashPanel}>
+                <div style={S.sideTitle}>Prioridad</div>
+                {prioridadSummary.slice(0, 5).map(g => (
+                  <div key={g.name} style={S.barRow}><span style={S.barLabel}>{g.name}</span><div style={S.barTrack}><div style={{ ...S.barFill, width: pct(g.count, liveRows.length) }} /></div><b style={S.barValue}>{g.count}</b></div>
+                ))}
+              </div>
+            </div>
+          )}
+
         </div>
 
         <div
@@ -1038,6 +1200,8 @@ const TareasPage = () => {
                   if (lastView) {
                     setQuickText(lastView.quickText || '')
                     setQuickPreset(lastView.quickPreset || 'all')
+                    setGroupBy(lastView.groupBy || 'estado')
+                    setShowDashboard(lastView.showDashboard ?? true)
                     setPageSize(Number(lastView.pageSize || 50))
                     params.api.setFilterModel(lastView.filterModel || null)
                     if (lastView.columnState?.length) params.api.applyColumnState({ state: lastView.columnState, applyOrder: true })
@@ -1074,6 +1238,7 @@ const S = {
   erpSearchIcon: { position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5', pointerEvents: 'none', zIndex: 1 },
   erpSearch: { width: '100%', height: 24, fontSize: 10, paddingLeft: 30 },
   erpSelect: { minWidth: 150, height: 24, fontSize: 9.5, padding: '0 22px 0 8px' },
+  erpSelectSmall: { minWidth: 130, height: 24, fontSize: 9.5, padding: '0 20px 0 7px' },
   viewInput: { width: 140, height: 24, fontSize: 10 },
   columnPanel: { display: 'flex', gap: 8, flexWrap: 'wrap', padding: '6px 14px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
   columnCheck: { fontSize: 10.5, color: 'var(--qf-navy)', display: 'inline-flex', alignItems: 'center', gap: 4, background: '#fff', border: '1px solid var(--qf-border)', borderRadius: 999, padding: '3px 8px' },
@@ -1083,6 +1248,17 @@ const S = {
   savedBtn: { border: 0, background: 'transparent', padding: '3px 7px', cursor: 'pointer', fontSize: 10.5, color: 'var(--qf-navy)', fontWeight: 700 },
   savedDel: { border: 0, background: '#dbe7f3', padding: '3px 6px', cursor: 'pointer', fontSize: 11, color: '#c62828', fontWeight: 900 },
   smartTotals: { display: 'flex', gap: 8, flexWrap: 'wrap', padding: '3px 10px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)', color: 'var(--qf-text-light)', fontSize: 10.5 },
+  sidePanel: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 8, padding: '8px 10px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
+  sideSection: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 8 },
+  sideTitle: { width: '100%', fontSize: 9.5, fontWeight: 800, color: 'var(--qf-navy)', textTransform: 'uppercase', letterSpacing: 0.3 },
+  groupMini: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, minWidth: 120, background: '#fff', border: '1px solid var(--qf-border)', borderRadius: 999, padding: '2px 8px', fontSize: 10, color: 'var(--qf-navy)' },
+  dashboard: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8, padding: '8px 10px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
+  dashPanel: { background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 8 },
+  barRow: { display: 'grid', gridTemplateColumns: '80px 1fr 28px', alignItems: 'center', gap: 6, marginTop: 5 },
+  barLabel: { fontSize: 9.5, color: 'var(--qf-text-light)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  barTrack: { height: 6, background: '#e8eef5', borderRadius: 999, overflow: 'hidden' },
+  barFill: { height: '100%', background: '#185FA5', borderRadius: 999 },
+  barValue: { fontSize: 10, color: 'var(--qf-navy)', textAlign: 'right' },
   page: { paddingBottom: 12, maxWidth: '100%', overflowX: 'hidden' },
   topHeader: { marginBottom: 6 },
   title: { fontFamily: 'Montserrat', fontSize: 22, fontWeight: 800, color: 'var(--qf-navy)', marginBottom: 2 },
