@@ -432,7 +432,7 @@ const DevolucionesPage = () => {
     setQuickText('')
     setQuickPreset('all')
     setGroupBy('estado')
-    setShowDashboard(true)
+    setShowDashboard(false)
     setShowSidePanel(false)
     setShowColumnPanel(false)
     setPageSize(50)
@@ -639,7 +639,7 @@ const DevolucionesPage = () => {
         .qf-tareas-grid .ag-input-field-input {
           min-height: 2px;
           height: 6px;
-          padding: 0 2px 0 16px !important;
+          padding: 0 2px 0 18px !important;
           font-size: 8px;
           border-radius: 7px;
           border: 1px solid #9fb2c8 !important;
@@ -772,11 +772,14 @@ const DevolucionesPage = () => {
               <option value={200}>200 filas</option>
             </select>
 
-            {canCreate && (
-              <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })} style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
-                <span style={{ color: '#4CAF50', fontWeight: 800, fontSize: 16 }}>+</span> Nuevo Registro
-              </button>
-            )}
+            <div style={S.rightActions}>
+              {canCreate && (
+                <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'nuevo' })} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ color: '#4CAF50', fontWeight: 800, fontSize: 16 }}>+</span> Nuevo Registro
+                </button>
+              )}
+              <button className="btn btn-secondary btn-sm" onClick={resetGridView}>Reset</button>
+            </div>
 
             {loading && <span style={S.loadMini}>...</span>}
           </div>
@@ -814,7 +817,7 @@ const DevolucionesPage = () => {
                   </div>
                 </>
               )}
-              <button className="btn btn-secondary btn-sm" onClick={resetGridView}>Reset</button>
+
             </div>
           </div>
 
@@ -989,6 +992,7 @@ const S = {
   topPagination: { display: 'flex', alignItems: 'center', gap: 3, background: '#e8eef5', borderRadius: 999, padding: '2px 5px', border: '1px solid #c9d7e6' },
   pageMini: { fontSize: 10, fontWeight: 800, color: 'var(--qf-navy)', minWidth: 72, textAlign: 'center' },
   pageNavBtn: { minWidth: 22, height: 22, padding: '0 6px', borderRadius: 999, fontWeight: 900 },
+  rightActions: { marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 3 },
 
   erpTools: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap', padding: '2px 10px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
   erpGroup: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
