@@ -1090,8 +1090,8 @@ const DevolucionesPage = () => {
           className="ag-theme-quartz qf-tareas-grid"
           style={{
             width: '100%',
-            // Alto del grid recomendado: más registros visibles manteniendo scroll interno.
-            height: compactMode ? 'calc(100vh - 250px)' : 'calc(100vh - 305px)',
+            // Alto del grid: reducido aprox. 2 líneas adicionales para encajar mejor en pantalla.
+            height: compactMode ? 'calc(100vh - 300px)' : 'calc(100vh - 355px)',
             minHeight: 310,
             '--ag-font-size': compactMode ? '10.5px' : '12px',
             '--ag-header-height': compactMode ? '35px' : '35px',
