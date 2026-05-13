@@ -1,11 +1,36 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { apiCall, toArray } from '../utils/api'
 import { useToast } from '../hooks/useToast'
 import ToastContainer from '../components/ToastContainer'
 import { useAuth } from '../context/AuthContext'
+import { AgGridReact } from 'ag-grid-react'
 
 const CLAIM = 'OPEDEV'
 const DEBOUNCE_MS = 450
+const GRID_VIEW_KEY = 'qf_devoluciones_grid_view_v1'
+const SAVED_VIEWS_KEY = 'qf_devoluciones_saved_views_v1'
+
+const safeJsonParse = (v, f) => {
+  try { return v ? JSON.parse(v) : f } catch (_) { return f }
+}
+
+const csvEscape = value => {
+  const s = String(value ?? '')
+  return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+
+const downloadTextFile = (filename, content, mime = 'text/csv;charset=utf-8;') => {
+  const blob = new Blob([content], { type: mime })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
 
 const camposBusqueda = [
   { value: 'all', label: 'Todos' },
@@ -95,6 +120,14 @@ const DevolucionesPage = () => {
   const [compactMode, setCompactMode] = useState(true)
   const [sortField, setSortField] = useState(null)
   const [sortDir, setSortDir] = useState('asc')
+  const [gridApi, setGridApi] = useState(null)
+  const gridColumnApiRef = useRef(null)
+  const [quickText, setQuickText] = useState('')
+  const [quickPreset, setQuickPreset] = useState('all')
+  const [viewName, setViewName] = useState('')
+  const [savedViews, setSavedViews] = useState(() => safeJsonParse(localStorage.getItem(SAVED_VIEWS_KEY), []))
+  const [visibleCols, setVisibleCols] = useState({})
+  const [displayedRows, setDisplayedRows] = useState([])
   const { toasts, show } = useToast()
   const [bancos, setBancos] = useState([])
   const [monedas, setMonedas] = useState([])
@@ -107,7 +140,7 @@ const DevolucionesPage = () => {
   const cargar = async (opts = {}) => {
     setLoading(true)
     try {
-      const qs = new URLSearchParams(); qs.set('page', String(opts.page || page)); qs.set('pageSize', String(opts.pageSize || pageSize)); qs.set('field', opts.campo ?? campo); if ((opts.busqueda ?? busqueda).trim()) qs.set('q', (opts.busqueda ?? busqueda).trim())
+      const qs = new URLSearchParams(); qs.set('page', String(opts.page || page)); qs.set('pageSize', String(5000)); qs.set('field', opts.campo ?? campo); if ((opts.busqueda ?? busqueda).trim()) qs.set('q', (opts.busqueda ?? busqueda).trim())
       const res = await apiCall(`/qf/devoluciones/listar?${qs}`); const rows = Array.isArray(res) ? res : (res?.data || res?.items || []); setData(toArray(rows)); setTotal(Number(res?.total ?? rows.length))
     } catch (e) { show('Error: ' + e.message, 'error') } finally { setLoading(false) }
   }
@@ -121,25 +154,111 @@ const DevolucionesPage = () => {
   const totalPages = Math.max(1, Math.ceil(total / pageSize)), from = total === 0 ? 0 : ((page - 1) * pageSize) + 1, to = Math.min(page * pageSize, total)
   const metrics = useMemo(() => ({ totalCargado: data.reduce((s, r) => s + Number(r.importe_cargado || 0), 0), totalAbonado: data.reduce((s, r) => s + Number(r.importe_abonado || 0), 0), totalComision: data.reduce((s, r) => s + Number(r.comision || 0), 0), pendientes: data.filter(r => String(r.estado || '').toLowerCase().includes('pendiente')).length }), [data])
 
-  const handleSort = f => { if (sortField === f) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField(f); setSortDir('asc') } }
-  const sortedData = useMemo(() => {
-    if (!sortField) return data
-    return [...data].sort((a, b) => {
-      let va = a[sortField], vb = b[sortField]
-      if (['importe_cargado', 'importe_abonado', 'comision'].includes(sortField)) return sortDir === 'asc' ? Number(va || 0) - Number(vb || 0) : Number(vb || 0) - Number(va || 0)
-      if (sortField === 'banco_nombre') { va = getBancoNombre(a.banco, bancos); vb = getBancoNombre(b.banco, bancos) }
-      if (sortField === 'moneda_cargo_nombre') { va = getMonedaNombre(a.moneda_cargo, monedas); vb = getMonedaNombre(b.moneda_cargo, monedas) }
-      if (sortField === 'moneda_abono_nombre') { va = getMonedaNombre(a.moneda_abono, monedas); vb = getMonedaNombre(b.moneda_abono, monedas) }
-      va = String(va || '').toLowerCase(); vb = String(vb || '').toLowerCase()
-      return va < vb ? (sortDir === 'asc' ? -1 : 1) : va > vb ? (sortDir === 'asc' ? 1 : -1) : 0
-    })
-  }, [data, sortField, sortDir, bancos, monedas])
-  const si = f => sortField !== f ? ' ↕' : sortDir === 'asc' ? ' ▲' : ' ▼'
+
+  const agRows = useMemo(() => data.map(r => ({
+    ...r,
+    banco_nombre: getBancoNombre(r.banco, bancos),
+    moneda_cargo_nombre: getMonedaNombre(r.moneda_cargo, monedas),
+    moneda_abono_nombre: getMonedaNombre(r.moneda_abono, monedas),
+  })), [data, bancos, monedas])
+
+  useEffect(() => {
+    setDisplayedRows(agRows)
+  }, [agRows])
+
+  const exportCsv = () => {
+    const rows = displayedRows.length ? displayedRows : agRows
+    const headers = ['Nro Op','Fecha','Banco','Cuenta Cargo','Cuenta Abono','Cargado','Abonado','Comision','Estado']
+    const body = rows.map(r => [
+      r.numero_operacion,
+      formatDate(r.fecha_operacion),
+      r.banco_nombre,
+      r.cuenta_cargo,
+      r.cuenta_abono,
+      r.importe_cargado,
+      r.importe_abonado,
+      r.comision,
+      r.estado,
+    ].map(csvEscape).join(';'))
+    downloadTextFile(`devoluciones_${new Date().toISOString().slice(0,10)}.csv`, [headers.join(';'), ...body].join('\n'))
+  }
+
+  const agDefaultColDef = useMemo(() => ({
+    sortable: true,
+    filter: true,
+    floatingFilter: true,
+    resizable: true,
+    minWidth: 90,
+    cellStyle: {
+      fontSize: compactMode ? '10.5px' : '12px',
+      color: 'var(--qf-navy)',
+    },
+  }), [compactMode])
+
+  const agColumnDefs = useMemo(() => [
+    { headerName: 'Nro.Op.', field: 'numero_operacion', width: 120, cellRenderer: p => <code style={S.opCode}>{p.value || '-'}</code> },
+    { headerName: 'Fecha', field: 'fecha_operacion', width: 110, valueFormatter: p => formatDate(p.value) },
+    { headerName: 'Banco', field: 'banco_nombre', width: 150, cellRenderer: p => <span style={S.bankPill}>{p.value || '-'}</span> },
+    { headerName: 'Cta Cargo', field: 'cuenta_cargo', width: 160 },
+    { headerName: 'M Cargo', field: 'moneda_cargo_nombre', width: 90 },
+    { headerName: 'Cta Abono', field: 'cuenta_abono', width: 160 },
+    { headerName: 'M Abono', field: 'moneda_abono_nombre', width: 90 },
+    { headerName: 'Cargado', field: 'importe_cargado', width: 120, type: 'numericColumn', valueFormatter: p => money(p.value, getMonedaCodigo(p.data?.moneda_cargo, monedas)) },
+    { headerName: 'Abonado', field: 'importe_abonado', width: 120, type: 'numericColumn', valueFormatter: p => money(p.value, getMonedaCodigo(p.data?.moneda_abono, monedas)) },
+    { headerName: 'Comisión', field: 'comision', width: 110, type: 'numericColumn', valueFormatter: p => money(p.value, getMonedaCodigo(p.data?.moneda_cargo, monedas)) },
+    { headerName: 'Referencia', field: 'referencia', flex: 1, minWidth: 160 },
+    {
+      headerName: 'Estado',
+      field: 'estado',
+      width: 110,
+      cellRenderer: p => <span className={`badge ${badgeClass(p.value)}`} style={{ fontSize: 8 }}>{String(p.value || '-').toUpperCase()}</span>
+    },
+    {
+      headerName: 'Acc.',
+      field: 'acciones',
+      width: 120,
+      pinned: 'right',
+      sortable: false,
+      filter: false,
+      cellRenderer: p => (
+        <div style={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
+          {canView && <button className="btn btn-secondary btn-sm" onClick={() => setModal({ type: 'detalle', data: p.data })} style={S.aBtn}>Ver</button>}
+          {canEdit && <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'editar', data: p.data })} style={S.aBtn}>Edit</button>}
+          {canDelete && <button className="btn btn-danger btn-sm" onClick={() => handleDelete(p.data)} style={S.aBtn}>Del</button>}
+        </div>
+      )
+    }
+  ], [compactMode, monedas, canView, canEdit, canDelete])
 
   if (!canList) return <div className="fade-in" style={S.page}><div style={S.topHeader}><h1 style={S.title}>↩ Devoluciones</h1><p style={S.subtitle}>No tienes permisos para ver esta lista</p></div></div>
 
   return (
     <div className="fade-in" style={S.page}>
+      <style>{`
+        .qf-tareas-grid .ag-root-wrapper {
+          border: 0;
+          border-top: 1px solid var(--qf-border);
+        }
+        .qf-tareas-grid .ag-header {
+          background: var(--qf-navy);
+        }
+        .qf-tareas-grid .ag-header-cell-text {
+          color: #fff;
+          font-size: 8.5px;
+          font-weight: 800;
+          text-transform: uppercase;
+        }
+        .qf-tareas-grid .ag-floating-filter {
+          background: #f8fafc;
+        }
+        .qf-tareas-grid .ag-input-field-input {
+          font-size: 9px;
+          min-height: 20px;
+        }
+        .qf-tareas-grid .ag-row-hover {
+          background: #f8fafc;
+        }
+      `}</style>
       <ToastContainer toasts={toasts} />
       <div style={S.topHeader}><h1 style={S.title}>↩ Devoluciones</h1><p style={S.subtitle}>Gestión de devoluciones bancarias</p></div>
       <div style={S.actionBar}><button className="btn btn-secondary btn-sm" onClick={() => setCompactMode(v => !v)}>{compactMode ? 'Vista cómoda' : 'Vista compacta'}</button></div>
@@ -165,48 +284,119 @@ const DevolucionesPage = () => {
           </div>
         </div>
 
-        <div style={{ overflow: 'auto', width: '100%', maxHeight: compactMode ? 'calc(100vh - 340px)' : 'calc(100vh - 400px)' }}>
-          {loading && data.length === 0 ? <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner dark" /></div> : data.length === 0 ? <div className="empty-state"><div className="icon">↩</div><p>No se encontraron devoluciones</p></div> : (
-            <table className="qf-table" style={{ width: '100%', tableLayout: 'auto', fontSize: compactMode ? 10.5 : 12 }}>
-              <thead><tr>
-                <th style={S.ths} onClick={() => handleSort('numero_operacion')}>Nro.Op.<span style={S.si}>{si('numero_operacion')}</span></th>
-                <th style={S.ths} onClick={() => handleSort('fecha_operacion')}>Fecha<span style={S.si}>{si('fecha_operacion')}</span></th>
-                <th style={S.ths} onClick={() => handleSort('banco_nombre')}>Banco<span style={S.si}>{si('banco_nombre')}</span></th>
-                <th style={S.ths} onClick={() => handleSort('cuenta_cargo')}>Cta.cargo<span style={S.si}>{si('cuenta_cargo')}</span></th>
-                <th style={S.ths} onClick={() => handleSort('moneda_cargo_nombre')}>M<span style={S.si}>{si('moneda_cargo_nombre')}</span></th>
-                <th style={S.ths} onClick={() => handleSort('cuenta_abono')}>Cta.abono<span style={S.si}>{si('cuenta_abono')}</span></th>
-                <th style={S.ths} onClick={() => handleSort('moneda_abono_nombre')}>M<span style={S.si}>{si('moneda_abono_nombre')}</span></th>
-                <th style={{ ...S.ths, textAlign: 'right' }} onClick={() => handleSort('importe_cargado')}>Cargado<span style={S.si}>{si('importe_cargado')}</span></th>
-                <th style={{ ...S.ths, textAlign: 'right' }} onClick={() => handleSort('importe_abonado')}>Abonado<span style={S.si}>{si('importe_abonado')}</span></th>
-                <th style={{ ...S.ths, textAlign: 'right' }} onClick={() => handleSort('comision')}>Com.<span style={S.si}>{si('comision')}</span></th>
-                <th style={S.ths} onClick={() => handleSort('referencia')}>Referencia<span style={S.si}>{si('referencia')}</span></th>
-                <th style={S.ths} onClick={() => handleSort('estado')}>Estado<span style={S.si}>{si('estado')}</span></th>
-                <th style={{ ...S.th0, textAlign: 'center' }}>Acc.</th>
-              </tr></thead>
-              <tbody>{sortedData.map(r => {
-                const mCC = getMonedaCodigo(r.moneda_cargo, monedas), mAC = getMonedaCodigo(r.moneda_abono, monedas)
-                return (
-                  <tr key={r.id} style={compactMode ? { height: 32 } : undefined}>
-                    <td style={S.td}><code style={S.opCode}>{r.numero_operacion || '-'}</code></td>
-                    <td style={{ ...S.td, fontSize: 10 }}>{formatDate(r.fecha_operacion)}</td>
-                    <td style={S.td}><span style={S.bankPill}>{getBancoNombre(r.banco, bancos)}</span></td>
-                    <td style={{ ...S.td, fontSize: 10 }}>{r.cuenta_cargo || '-'}</td>
-                    <td style={{ ...S.td, fontSize: 10 }}>{getMonedaNombre(r.moneda_cargo, monedas)}</td>
-                    <td style={{ ...S.td, fontSize: 10 }}>{r.cuenta_abono || '-'}</td>
-                    <td style={{ ...S.td, fontSize: 10 }}>{getMonedaNombre(r.moneda_abono, monedas)}</td>
-                    <td style={{ ...S.td, fontWeight: 800, color: '#c62828', whiteSpace: 'nowrap', textAlign: 'right', fontSize: 10.5 }}>{money(r.importe_cargado, mCC)}</td>
-                    <td style={{ ...S.td, fontWeight: 800, color: '#2e7d32', whiteSpace: 'nowrap', textAlign: 'right', fontSize: 10.5 }}>{money(r.importe_abonado, mAC)}</td>
-                    <td style={{ ...S.td, whiteSpace: 'nowrap', textAlign: 'right', fontSize: 10.5 }}>{money(r.comision, mCC)}</td>
-                    <td style={{ ...S.td, maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10 }}>{r.referencia || '-'}</td>
-                    <td style={S.td}><span className={`badge ${badgeClass(r.estado)}`} style={{ fontSize: 8 }}>{String(r.estado || '-').toUpperCase()}</span></td>
-                    <td style={{ ...S.td, textAlign: 'center' }}><div style={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
-                      {canView && <button className="btn btn-secondary btn-sm" onClick={() => setModal({ type: 'detalle', data: r })} style={S.aBtn}>Ver</button>}
-                      {canEdit && <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'editar', data: r })} style={S.aBtn}>Edit</button>}
-                      {canDelete && <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r)} style={S.aBtn}>Del</button>}
-                    </div></td>
-                  </tr>)})}</tbody>
-            </table>
-          )}
+        
+        <div style={S.erpTools}>
+          <div style={S.erpGroup}>
+            <div style={{ position: 'relative', minWidth: 280 }}>
+              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: '#8a9bb5' }}>🔍</span>
+              <input
+                className="filter-input"
+                placeholder="Búsqueda global..."
+                value={quickText}
+                onChange={e => setQuickText(e.target.value)}
+                style={{ ...S.searchInput, width: '100%', paddingLeft: 30 }}
+              />
+            </div>
+
+            <select className="filter-input" value={quickPreset} onChange={e => setQuickPreset(e.target.value)} style={S.fieldSelect}>
+              <option value="all">Todos</option>
+              <option value="pendientes">Pendientes</option>
+              <option value="procesados">Procesados</option>
+              <option value="errores">Errores</option>
+            </select>
+
+            <button className="btn btn-secondary btn-sm" onClick={exportCsv}>CSV</button>
+          </div>
+
+          <div style={S.erpGroup}>
+            <input
+              className="filter-input"
+              placeholder="Guardar vista"
+              value={viewName}
+              onChange={e => setViewName(e.target.value)}
+              style={{ width: 140, height: 26, fontSize: 10 }}
+            />
+
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => {
+                if (!gridApi || !viewName.trim()) return
+                const view = {
+                  id: Date.now(),
+                  name: viewName.trim(),
+                  filterModel: gridApi.getFilterModel(),
+                  columnState: gridApi.getColumnState(),
+                  quickText,
+                }
+                const next = [view, ...savedViews].slice(0, 10)
+                setSavedViews(next)
+                localStorage.setItem(SAVED_VIEWS_KEY, JSON.stringify(next))
+                setViewName('')
+              }}
+            >
+              Guardar vista
+            </button>
+          </div>
+        </div>
+
+        {savedViews.length > 0 && (
+          <div style={S.savedViews}>
+            {savedViews.map(v => (
+              <button
+                key={v.id}
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  if (!gridApi) return
+                  gridApi.setFilterModel(v.filterModel || null)
+                  if (v.columnState?.length) gridApi.applyColumnState({ state: v.columnState, applyOrder: true })
+                  setQuickText(v.quickText || '')
+                }}
+              >
+                {v.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div
+          className="ag-theme-quartz qf-tareas-grid"
+          style={{
+            width: '100%',
+            height: compactMode ? 'calc(100vh - 320px)' : 'calc(100vh - 380px)',
+            minHeight: 420,
+            '--ag-font-size': compactMode ? '10.5px' : '12px',
+            '--ag-row-height': compactMode ? '28px' : '34px',
+          }}
+        >
+          <AgGridReact
+            rowData={agRows.filter(r => {
+              if (quickPreset === 'pendientes') return String(r.estado || '').toLowerCase().includes('pendiente')
+              if (quickPreset === 'procesados') return String(r.estado || '').toLowerCase().includes('proces')
+              if (quickPreset === 'errores') return String(r.estado || '').toLowerCase().includes('error')
+              return true
+            })}
+            columnDefs={agColumnDefs}
+            defaultColDef={agDefaultColDef}
+            quickFilterText={quickText}
+            pagination
+            paginationPageSize={pageSize}
+            animateRows
+            suppressCellFocus
+            onGridReady={params => {
+              setGridApi(params.api)
+              gridColumnApiRef.current = params.columnApi
+            }}
+            onFilterChanged={params => {
+              const rows = []
+              params.api.forEachNodeAfterFilterAndSort(node => node?.data && rows.push(node.data))
+              setDisplayedRows(rows)
+            }}
+            onSortChanged={params => {
+              const rows = []
+              params.api.forEachNodeAfterFilterAndSort(node => node?.data && rows.push(node.data))
+              setDisplayedRows(rows)
+            }}
+          />
         </div>
         {!loading && <div style={S.footerCount}>{data.length} de {total} devoluciones</div>}
       </div>
@@ -247,6 +437,9 @@ const S = {
   bankPill: { background: '#e8eef5', color: 'var(--qf-navy)', borderRadius: 3, padding: '1px 4px', fontSize: 9.5, fontWeight: 700, whiteSpace: 'nowrap' },
   aBtn: { fontSize: 9, padding: '1px 4px' },
   footerCount: { padding: '6px 14px', borderTop: '1px solid var(--qf-border)', fontSize: 10.5, color: 'var(--qf-text-light)', background: '#fff' },
+  erpTools: { display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', padding: '6px 12px', borderTop: '1px solid var(--qf-border)', background: '#fff' },
+  erpGroup: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' },
+  savedViews: { display: 'flex', gap: 6, flexWrap: 'wrap', padding: '6px 12px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
   detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 },
   detailBox: { background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 8 },
   detailLabel: { fontSize: 9, fontWeight: 700, color: 'var(--qf-text-light)', textTransform: 'uppercase' },
