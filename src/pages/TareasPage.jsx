@@ -1011,6 +1011,9 @@ const TareasPage = () => {
             <AgGridReact
               rowData={agRows}
               columnDefs={agColumnDefs}
+              headerHeight={30} // Altura del header de columnas
+              floatingFiltersHeight={40}
+              rowHeight={30}                // 60px por fila (default: 42px en Quartz)
               defaultColDef={agDefaultColDef}
               pagination
               paginationPageSize={pageSize}
