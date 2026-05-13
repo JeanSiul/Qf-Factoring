@@ -653,6 +653,11 @@ const DevolucionesPage = () => {
           padding-bottom: 0 !important;
           line-height: 1 !important;
         }
+        .qf-tareas-grid .qf-right-cell {
+          justify-content: flex-end !important;
+          text-align: right !important;
+          padding-right: 4px !important;
+        }
         .qf-tareas-grid .ag-icon-filter,
         .qf-tareas-grid .ag-icon-search,
         .qf-tareas-grid .ag-icon-calendar {
@@ -663,11 +668,6 @@ const DevolucionesPage = () => {
         }
         .qf-tareas-grid .qf-right-header .ag-header-cell-label {
           justify-content: flex-end;
-        }
-        .qf-tareas-grid .qf-right-cell {
-          justify-content: flex-end !important;
-          text-align: right !important;
-          padding-right: 4px !important;
         }
       `}</style>
       <div style={S.topHeader}><h1 style={S.title}>↩ Devoluciones</h1><p style={S.subtitle}>Gestión de devoluciones bancarias</p></div>
