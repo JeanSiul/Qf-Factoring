@@ -571,7 +571,15 @@ const DevolucionesPage = () => {
       width: 115,
       pinned: 'right',
       sortable: false,
-      filter: false,
+      filter: 'agTextColumnFilter',
+      suppressMenu: true,
+      floatingFilter: true,
+      floatingFilterComponent: () => (
+        <button className="btn btn-secondary btn-sm" style={S.floatActionBtn} onClick={() => setCompactMode(v => !v)}>
+          {compactMode ? 'Vista cómoda' : 'Vista compacta'}
+        </button>
+      ),
+      floatingFilterComponentParams: { suppressFilterButton: true },
       cellRenderer: p => (
         <div style={{ display: 'flex', gap: 2, justifyContent: 'center', alignItems: 'center', height: '100%' }}>
           {canView && <button className="btn btn-secondary btn-sm" onClick={() => setModal({ type: 'detalle', data: p.data })} style={S.aBtn}>Ver</button>}
@@ -639,18 +647,22 @@ const DevolucionesPage = () => {
         .qf-tareas-grid .ag-input-field-input {
           min-height: 2px;
           height: 6px;
-          padding: 0 2px 0 18px !important;
+          padding: 0 2px 0 16px !important;
           font-size: 8px;
           border-radius: 7px;
           border: 1px solid #9fb2c8 !important;
-          background: #ffffff !important;
+          background-color: #ffffff !important;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23185FA5' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cline x1='16.5' y1='16.5' x2='21' y2='21'/%3E%3C/svg%3E") !important;
+          background-repeat: no-repeat !important;
+          background-position: 4px calc(100% - 3px) !important;
+          background-size: 9px 9px !important;
           color: var(--qf-navy);
           box-shadow: inset 0 0 0 1px rgba(24,95,165,.08);
         }
         .qf-tareas-grid .ag-floating-filter-body {
           position: relative;
         }
-        .qf-tareas-grid .ag-floating-filter-body::before {
+        .qf-tareas-grid .ag-floating-filter-body-REMOVED::before {
           content: '🔍';
           position: absolute;
           left: 5px;
@@ -717,7 +729,6 @@ const DevolucionesPage = () => {
         }
       `}</style>
       <div style={S.topHeader}><h1 style={S.title}>↩ Devoluciones</h1><p style={S.subtitle}>Gestión de devoluciones bancarias</p></div>
-      <div style={S.actionBar}><button className="btn btn-secondary btn-sm" onClick={() => setCompactMode(v => !v)}>{compactMode ? 'Vista cómoda' : 'Vista compacta'}</button></div>
       <div style={S.kpiGrid}>{[{ l: 'Total registros', v: total, c: 'var(--qf-navy)', b: '#2196f3' },{ l: 'Mostradas', v: data.length, c: '#185FA5', b: '#03a9f4' },{ l: 'Total cargado', v: money(metrics.totalCargado), c: '#c62828', b: '#f44336' },{ l: 'Total abonado', v: money(metrics.totalAbonado), c: '#2e7d32', b: '#4caf50' },{ l: 'Comisiones', v: money(metrics.totalComision), c: '#e65100', b: '#ff9800' },{ l: 'Pendientes', v: metrics.pendientes, c: '#5e35b1', b: '#7e57c2' }].map(s => <div key={s.l} style={{ ...S.kpiCard, borderTop: `3px solid ${s.b}` }}><div style={S.kpiLabel}>{s.l}</div><div style={{ ...S.kpiValue, color: s.c }}>{s.v}</div></div>)}</div>
 
       <div className="page-card" style={S.card}>
@@ -778,7 +789,6 @@ const DevolucionesPage = () => {
                   <span style={{ color: '#4CAF50', fontWeight: 800, fontSize: 16 }}>+</span> Nuevo Registro
                 </button>
               )}
-              <button className="btn btn-secondary btn-sm" onClick={resetGridView}>Reset</button>
             </div>
 
             {loading && <span style={S.loadMini}>...</span>}
@@ -817,6 +827,7 @@ const DevolucionesPage = () => {
                   </div>
                 </>
               )}
+              <button className="btn btn-secondary btn-sm" onClick={resetGridView} style={S.resetInlineBtn}>Reset</button>
 
             </div>
           </div>
@@ -992,7 +1003,8 @@ const S = {
   topPagination: { display: 'flex', alignItems: 'center', gap: 3, background: '#e8eef5', borderRadius: 999, padding: '2px 5px', border: '1px solid #c9d7e6' },
   pageMini: { fontSize: 10, fontWeight: 800, color: 'var(--qf-navy)', minWidth: 72, textAlign: 'center' },
   pageNavBtn: { minWidth: 22, height: 22, padding: '0 6px', borderRadius: 999, fontWeight: 900 },
-  rightActions: { marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 3 },
+  resetInlineBtn: { marginLeft: 'auto', minWidth: 54, height: 24, padding: '0 8px', textTransform: 'uppercase', fontSize: 10, fontWeight: 800 },
+  floatActionBtn: { width: '100%', height: 22, padding: '0 4px', fontSize: 8.5, borderRadius: 6, whiteSpace: 'nowrap' },
 
   erpTools: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap', padding: '2px 10px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
   erpGroup: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
