@@ -417,7 +417,7 @@ const TareasPage = () => {
     cellStyle: {
       fontSize: compactMode ? '10.5px' : '12px',
       color: 'var(--qf-navy)',
-      lineHeight: compactMode ? '10px' : '12px',
+      lineHeight: compactMode ? '14px' : '16px',
     },
     headerClass: 'qf-tareas-ag-header',
     floatingFilterComponentParams: { suppressFilterButton: false },
@@ -540,7 +540,7 @@ const TareasPage = () => {
     {
       headerName: 'Duración',
       field: '_duracion',
-      width: 78,
+      width: 115,
       cellRenderer: p => <span style={{ fontWeight: 800, color: '#2e7d32' }}>{minToTime(p.value)}</span>,
       filter: 'agNumberColumnFilter',
     },
@@ -548,14 +548,14 @@ const TareasPage = () => {
       headerName: 'Estado',
       field: 'estado',
       width: 130,
-      cellRenderer: p => <span className={`badge ${badgeClass(p.value)}`} style={{ fontSize: 6, padding: '1px 5px', lineHeight: 1.1 }}>{String(p.value || '-').toUpperCase()}</span>,
+      cellRenderer: p => <span className={`badge ${badgeClass(p.value)}`} style={{ fontSize: 7 }}>{String(p.value || '-').toUpperCase()}</span>,
       filter: 'agTextColumnFilter',
     },
     {
       headerName: 'Prioridad',
       field: 'prioridad',
       width: 125,
-      cellRenderer: p => <span className={`badge ${prioridadStyle(p.value)}`} style={{ fontSize: 6, padding: '1px 5px', lineHeight: 1.1 }}>{String(p.value || '-').toUpperCase()}</span>,
+      cellRenderer: p => <span className={`badge ${prioridadStyle(p.value)}`} style={{ fontSize: 7 }}>{String(p.value || '-').toUpperCase()}</span>,
       filter: 'agTextColumnFilter',
     },
     {
@@ -566,10 +566,10 @@ const TareasPage = () => {
       sortable: false,
       filter: false,
       cellRenderer: p => (
-        <div style={{ display: 'flex', gap: 1, justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-          {canView && <button className="btn btn-secondary btn-sm" onClick={() => setModal({ type: 'detalle', data: p.data })} style={{ ...S.aBtn, padding:'0 4px', minHeight:16, fontSize:9 }}>Ver</button>}
-          {canEdit && <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'editar', data: p.data })} style={{ ...S.aBtn, padding:'0 4px', minHeight:16, fontSize:9 }}>Edit</button>}
-          {canDelete && <button className="btn btn-danger btn-sm" onClick={() => handleDelete(p.data)} style={{ ...S.aBtn, padding:'0 4px', minHeight:16, fontSize:9 }}>Del</button>}
+        <div style={{ display: 'flex', gap: 2, justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+          {canView && <button className="btn btn-secondary btn-sm" onClick={() => setModal({ type: 'detalle', data: p.data })} style={S.aBtn}>Ver</button>}
+          {canEdit && <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'editar', data: p.data })} style={S.aBtn}>Edit</button>}
+          {canDelete && <button className="btn btn-danger btn-sm" onClick={() => handleDelete(p.data)} style={S.aBtn}>Del</button>}
         </div>
       ),
     },
@@ -612,7 +612,7 @@ const TareasPage = () => {
         }
         .qf-tareas-grid .ag-header-cell-text {
           color: #fff;
-          font-size: 9px;
+          font-size: 7px;
         }
         .qf-tareas-grid .ag-header-cell {
           padding-left: 2px;
@@ -671,8 +671,6 @@ const TareasPage = () => {
         .qf-tareas-grid .ag-cell {
           display: flex;
           align-items: center;
-          padding-top: 0 !important;
-          padding-bottom: 0 !important;
         }
         .qf-tareas-grid .ag-cell[col-id="_inicio_sort"],
         .qf-tareas-grid .ag-cell[col-id="_fin_sort"] {
@@ -772,8 +770,8 @@ const TareasPage = () => {
             height: compactMode ? 'calc(100vh - 330px)' : 'calc(100vh - 390px)',
             minHeight: 310,
             '--ag-font-size': compactMode ? '10.5px' : '12px',
-            '--ag-header-height': compactMode ? '14px' : '16px',
-            '--ag-row-height': compactMode ? '14px' : '18px',
+            '--ag-header-height': compactMode ? '18px' : '21px',
+            '--ag-row-height': compactMode ? '24px' : '28px',
             '--ag-list-item-height': '24px',
             '--ag-header-column-resize-handle-height': '60%',
             '--ag-wrapper-border-radius': '0px',
@@ -830,8 +828,8 @@ const S = {
   pagRow: { display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', padding: '5px 14px 7px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
   pageInfo: { fontSize: 11, color: 'var(--qf-text-light)', fontWeight: 600 },
   loadMini: { fontSize: 11, color: '#185FA5', fontWeight: 700 },
-  th0: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 7, padding: '5px 4px' },
-  ths: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 7, padding: '5px 4px', cursor: 'pointer', userSelect: 'none' },
+  th0: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 8, padding: '5px 4px' },
+  ths: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 8, padding: '5px 4px', cursor: 'pointer', userSelect: 'none' },
   si: { fontSize: 7, opacity: 0.45, marginLeft: 1 },
   td: { padding: '3px 4px', verticalAlign: 'middle', lineHeight: 1.15 },
   opCode: { background: '#e8eef5', padding: '1px 4px', borderRadius: 3, fontSize: 9.5, fontWeight: 800, color: 'var(--qf-navy)' },
