@@ -791,13 +791,13 @@ const TareasPage = () => {
         }
         .qf-tareas-grid .ag-floating-filter .ag-cell-label-container,
         .qf-tareas-grid .ag-floating-filter-body {
-          min-height: 11px;
-          line-height: 11px;
+          min-height: 9x;
+          line-height: 9px;
         }
         .qf-tareas-grid .ag-icon,
         .qf-tareas-grid .ag-header-icon {
           color: #fff;
-          font-size: 12px;
+          font-size: 15px;
         }
         .qf-tareas-grid .ag-floating-filter {
           background: #f8fafc;
@@ -1014,8 +1014,8 @@ const TareasPage = () => {
               rowData={agRows}
               columnDefs={agColumnDefs}
               headerHeight={35} // Altura del header de columnas
-              floatingFiltersHeight={35}
-              rowHeight={30}                // 60px por fila (default: 42px en Quartz)
+              floatingFiltersHeight={30}
+              rowHeight={25}                // 60px por fila (default: 42px en Quartz)
               defaultColDef={agDefaultColDef}
               pagination
               paginationPageSize={pageSize}
