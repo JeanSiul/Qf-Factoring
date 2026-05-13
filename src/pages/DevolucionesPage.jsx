@@ -31,6 +31,20 @@ const money = (value, currency = 'PEN') => {
 }
 const formatDate = value => { if (!value) return '-'; const d = new Date(value); if (Number.isNaN(d.getTime())) return String(value).slice(0, 10); return d.toLocaleDateString('es-PE') }
 const toDateInput = value => { if (!value) return ''; const d = new Date(value); if (Number.isNaN(d.getTime())) return String(value).slice(0, 10); return d.toISOString().slice(0, 10) }
+const dateKey = value => {
+  if (!value) return ''
+  const raw = String(value).trim()
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`
+  const pe = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+  if (pe) return `${pe[3]}-${String(pe[2]).padStart(2, '0')}-${String(pe[1]).padStart(2, '0')}`
+  const d = new Date(raw)
+  if (Number.isNaN(d.getTime())) return raw.slice(0, 10)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
 const badgeClass = status => { const s = String(status || '').toLowerCase(); if (s.includes('pendiente') || s.includes('proceso')) return 'warning'; if (s.includes('completado') || s.includes('exitoso') || s.includes('procesado')) return 'active'; if (s.includes('error') || s.includes('rechazado') || s.includes('fallido')) return 'inactive'; return 'warning' }
 
 const getField = (obj, ...names) => { for (const n of names) { if (obj[n] !== undefined) return obj[n]; if (obj[n.toLowerCase()] !== undefined) return obj[n.toLowerCase()]; if (obj[n.toUpperCase()] !== undefined) return obj[n.toUpperCase()] } return undefined }
@@ -211,16 +225,16 @@ const DevolucionesPage = () => {
 
   const quickFilteredData = useMemo(() => {
     const now = new Date()
-    const todayIso = now.toISOString().slice(0, 10)
+    const todayIso = dateKey(now)
 
     const weekStart = new Date(now)
     weekStart.setDate(now.getDate() - 6)
-    const weekIso = weekStart.toISOString().slice(0, 10)
+    const weekIso = dateKey(weekStart)
 
-    const monthIso = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
+    const monthIso = dateKey(new Date(now.getFullYear(), now.getMonth(), 1))
 
     return data.filter(row => {
-      const fecha = toDateInput(row.fecha_operacion)
+      const fecha = dateKey(row.fecha_operacion)
       const estado = normalize(row.estado)
       const bancoNombre = normalize(getBancoNombre(row.banco, bancos))
       const monedaCargo = normalize(getMonedaNombre(row.moneda_cargo, monedas))
@@ -425,7 +439,7 @@ const DevolucionesPage = () => {
 
   const applyColumnPreset = preset => {
     if (!gridApi) return
-    const allCols = ['numero_operacion', 'fecha_operacion', 'banco_nombre', 'cuenta_cargo', 'moneda_cargo_nombre', 'cuenta_abono', 'moneda_abono_nombre', 'importe_cargado', 'importe_abonado', 'comision', 'referencia', 'estado', 'acciones']
+    const allCols = ['numero_operacion', 'fecha_operacion', 'numero_operacion_pdf', 'created_at', 'banco_nombre', 'cuenta_cargo', 'moneda_cargo_nombre', 'cuenta_abono', 'moneda_abono_nombre', 'importe_cargado', 'importe_abonado', 'comision', 'referencia', 'estado', 'acciones']
     const presets = {
       gerencia: ['numero_operacion', 'fecha_operacion', 'banco_nombre', 'importe_cargado', 'importe_abonado', 'estado', 'acciones'],
       operaciones: ['numero_operacion', 'fecha_operacion', 'banco_nombre', 'cuenta_cargo', 'cuenta_abono', 'importe_cargado', 'estado', 'acciones'],
@@ -461,7 +475,9 @@ const DevolucionesPage = () => {
       cellRenderer: p => <code style={S.opCode}>{p.value || '-'}</code>,
       filter: 'agTextColumnFilter',
     },
-    { headerName: 'Fecha', field: 'fecha_operacion', width: 110, valueFormatter: p => formatDate(p.value), filter: 'agDateColumnFilter' },
+    { headerName: 'Fecha', field: 'fecha_operacion', width: 150, valueFormatter: p => formatDate(p.value), filter: 'agDateColumnFilter', headerClass: 'qf-center-header' },
+    { headerName: 'Nro. Op. PDF', field: 'numero_operacion_pdf', width: 140, filter: 'agTextColumnFilter', hide: true, headerClass: 'qf-center-header' },
+    { headerName: 'Creado', field: 'created_at', width: 150, valueFormatter: p => formatDate(p.value), filter: 'agDateColumnFilter', hide: true, headerClass: 'qf-center-header' },
     { headerName: 'Banco', field: 'banco_nombre', width: 150, cellRenderer: p => <span style={S.bankPill}>{p.value || '-'}</span>, filter: 'agTextColumnFilter' },
     { headerName: 'Cta.cargo', field: 'cuenta_cargo', width: 150, filter: 'agTextColumnFilter' },
     { headerName: 'M', field: 'moneda_cargo_nombre', width: 90, filter: 'agTextColumnFilter' },
@@ -618,6 +634,12 @@ const DevolucionesPage = () => {
         .qf-tareas-grid .ag-icon-calendar {
           font-size: 14px;
         }
+        .qf-tareas-grid .qf-center-header .ag-header-cell-label {
+          justify-content: center;
+        }
+        .qf-tareas-grid .qf-right-header .ag-header-cell-label {
+          justify-content: flex-end;
+        }
       `}</style>
       <div style={S.topHeader}><h1 style={S.title}>↩ Devoluciones</h1><p style={S.subtitle}>Gestión de devoluciones bancarias</p></div>
       <div style={S.actionBar}><button className="btn btn-secondary btn-sm" onClick={() => setCompactMode(v => !v)}>{compactMode ? 'Vista cómoda' : 'Vista compacta'}</button></div>
@@ -705,6 +727,8 @@ const DevolucionesPage = () => {
               {[
                 ['numero_operacion', 'Nro.Op.'],
                 ['fecha_operacion', 'Fecha'],
+                ['numero_operacion_pdf', 'Nro. Op. PDF'],
+                ['created_at', 'Creado'],
                 ['banco_nombre', 'Banco'],
                 ['cuenta_cargo', 'Cta.cargo'],
                 ['moneda_cargo_nombre', 'M Cargo'],
@@ -825,6 +849,7 @@ const DevolucionesPage = () => {
               onGridReady={params => {
                 setGridApi(params.api)
                 gridColumnApiRef.current = params.columnApi
+                params.api.setColumnsVisible(['numero_operacion_pdf', 'created_at'], false)
                 setVisibleCols(Object.fromEntries(params.api.getColumns().map(c => [c.getColId(), c.isVisible()])))
                 const lastView = safeJsonParse(localStorage.getItem(GRID_VIEW_KEY), null)
                 setTimeout(() => {
