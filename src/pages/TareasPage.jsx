@@ -478,7 +478,7 @@ const TareasPage = () => {
     cellStyle: {
       fontSize: compactMode ? '10.5px' : '12px',
       color: 'var(--qf-navy)',
-      lineHeight: compactMode ? '9px' : '11px',
+      lineHeight: compactMode ? '7px' : '9px',
     },
     headerClass: 'qf-tareas-ag-header',
     floatingFilterComponentParams: { suppressFilterButton: false },
@@ -791,8 +791,8 @@ const TareasPage = () => {
         }
         .qf-tareas-grid .ag-floating-filter .ag-cell-label-container,
         .qf-tareas-grid .ag-floating-filter-body {
-          min-height: 15px;
-          line-height: 15px;
+          min-height: 11px;
+          line-height: 11px;
         }
         .qf-tareas-grid .ag-icon,
         .qf-tareas-grid .ag-header-icon {
@@ -801,15 +801,15 @@ const TareasPage = () => {
         .qf-tareas-grid .ag-floating-filter {
           background: #f8fafc;
           border-bottom: 1px solid var(--qf-border);
-          min-height: 16px;
+          min-height: 12px;
         }
         .qf-tareas-grid .ag-floating-filter-body {
           width: 100%;
         }
         .qf-tareas-grid .ag-floating-filter-input,
         .qf-tareas-grid .ag-input-field-input {
-          min-height: 15px;
-          height: 15px;
+          min-height: 11px;
+          height: 11px;
           font-size: 8px;
           border-radius: 7px;
           border: 1px solid #9fb2c8 !important;
@@ -827,7 +827,7 @@ const TareasPage = () => {
         }
         .qf-tareas-grid .ag-floating-filter-button-button {
           min-width: 15px;
-          height: 15px;
+          height: 11px;
           border-radius: 6px;
           border: 1px solid #9fb2c8;
           background: #e8eef5;
@@ -849,6 +849,7 @@ const TareasPage = () => {
           align-items: center;
           padding-top: 0 !important;
           padding-bottom: 0 !important;
+          line-height: 1 !important;
         }
         .qf-tareas-grid .ag-cell[col-id="_inicio_sort"],
         .qf-tareas-grid .ag-cell[col-id="_fin_sort"] {
@@ -894,39 +895,6 @@ const TareasPage = () => {
               </button>
             )}
           </div>
-
-          <div style={S.filtersRow}>
-            <select className="filter-input" value={campo} onChange={e => setCampo(e.target.value)} style={S.fieldSelect}>
-              {camposBusqueda.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-
-            <div style={{ position: 'relative', flex: 1, maxWidth: 360 }}>
-              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5', pointerEvents: 'none' }}>🔍</span>
-              <input
-                className="filter-input"
-                placeholder={campo === 'all' ? 'Buscar...' : `Buscar por ${camposBusqueda.find(f => f.value === campo)?.label || ''}...`}
-                value={busqueda}
-                onChange={e => setBusqueda(e.target.value)}
-                style={{ ...S.searchInput, paddingLeft: 32, width: '100%' }}
-              />
-            </div>
-
-            <select className="filter-input" value={tipo} onChange={e => setTipo(e.target.value)} style={S.fieldSelect}>
-              <option value="all">Tipo: Todos</option>
-              {tipos.map(x => <option key={x} value={x}>{x}</option>)}
-            </select>
-
-            <select className="filter-input" value={estado} onChange={e => setEstado(e.target.value)} style={S.fieldSelect}>
-              <option value="all">Estado: Todos</option>
-              {estados.map(x => <option key={x} value={x}>{x}</option>)}
-            </select>
-
-            <input className="filter-input" type="date" value={desde} onChange={e => setDesde(e.target.value)} style={S.dateInput} />
-            <input className="filter-input" type="date" value={hasta} onChange={e => setHasta(e.target.value)} style={S.dateInput} />
-
-            <button className="btn btn-secondary btn-sm" onClick={limpiar}>Limpiar</button>
-          </div>
-
           <div style={S.pagRow}>
             <span style={S.pill}>{from}-{to} de {total}</span>
             <span style={S.pageInfo}>Filtra, ordena y pagina desde la tabla</span>
@@ -942,13 +910,16 @@ const TareasPage = () => {
 
           <div style={S.erpTools}>
             <div style={S.erpGroup}>
-              <input
-                className="filter-input"
-                value={quickText}
-                onChange={e => setQuickText(e.target.value)}
-                placeholder="Búsqueda global..."
-                style={S.erpSearch}
-              />
+              <div style={S.erpSearchWrap}>
+                <span style={S.erpSearchIcon}>🔍</span>
+                <input
+                  className="filter-input"
+                  value={quickText}
+                  onChange={e => setQuickText(e.target.value)}
+                  placeholder="Búsqueda global..."
+                  style={S.erpSearch}
+                />
+              </div>
               <select className="filter-input" value={quickPreset} onChange={e => setQuickPreset(e.target.value)} style={S.erpSelect}>
                 <option value="all">Vista: Todos</option>
                 <option value="today">Hoy</option>
@@ -1027,9 +998,9 @@ const TareasPage = () => {
             height: compactMode ? 'calc(100vh - 330px)' : 'calc(100vh - 390px)',
             minHeight: 310,
             '--ag-font-size': compactMode ? '10.5px' : '12px',
-            '--ag-header-height': compactMode ? '12px' : '14px',
-            '--ag-row-height': compactMode ? '12px' : '15px',
-            '--ag-list-item-height': '18px',
+            '--ag-header-height': compactMode ? '9px' : '11px',
+            '--ag-row-height': compactMode ? '9px' : '11px',
+            '--ag-list-item-height': '14px',
             '--ag-header-column-resize-handle-height': '60%',
             '--ag-wrapper-border-radius': '0px',
           }}
@@ -1086,7 +1057,9 @@ const TareasPage = () => {
 const S = {
   erpTools: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap', padding: '3px 10px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
   erpGroup: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  erpSearch: { width: 210, height: 24, fontSize: 10 },
+  erpSearchWrap: { position: 'relative', width: 210 },
+  erpSearchIcon: { position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5', pointerEvents: 'none', zIndex: 1 },
+  erpSearch: { width: '100%', height: 24, fontSize: 10, paddingLeft: 30 },
   erpSelect: { minWidth: 150, height: 24, fontSize: 9.5, padding: '0 22px 0 8px' },
   viewInput: { width: 140, height: 24, fontSize: 10 },
   columnPanel: { display: 'flex', gap: 8, flexWrap: 'wrap', padding: '6px 14px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
@@ -1115,7 +1088,7 @@ const S = {
   fieldSelect: { width: 'auto', minWidth: 120, height: 32, fontSize: 12 },
   dateInput: { width: 130, height: 32, fontSize: 12 },
   searchInput: { minWidth: 180, maxWidth: 340, height: 32, fontSize: 12 },
-  pagRow: { display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', padding: '5px 14px 7px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
+  pagRow: { display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', padding: '3px 10px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
   pageInfo: { fontSize: 11, color: 'var(--qf-text-light)', fontWeight: 600 },
   loadMini: { fontSize: 11, color: '#185FA5', fontWeight: 700 },
   th0: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 6.5, padding: '5px 4px' },
