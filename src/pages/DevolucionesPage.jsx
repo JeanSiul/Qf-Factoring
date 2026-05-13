@@ -569,6 +569,7 @@ const DevolucionesPage = () => {
       headerName: 'Acciones',
       field: 'acciones',
       width: 115,
+      headerClass: 'qf-center-header',
       pinned: 'right',
       sortable: false,
       filter: 'agTextColumnFilter',
@@ -736,6 +737,17 @@ const DevolucionesPage = () => {
           display: none !important;
         }
         /* qf-date-filter-clean */
+        .qf-tareas-grid .ag-header-cell[col-id="fecha_operacion"] .ag-input-field-input,
+        .qf-tareas-grid .ag-floating-filter[col-id="fecha_operacion"] .ag-input-field-input {
+          background-image: none !important;
+          padding-left: 4px !important;
+        }
+        .qf-tareas-grid .ag-header-cell[col-id="fecha_operacion"] .ag-icon-search,
+        .qf-tareas-grid .ag-header-cell[col-id="fecha_operacion"] .ag-icon-filter,
+        .qf-tareas-grid .ag-floating-filter[col-id="fecha_operacion"] .ag-icon-search,
+        .qf-tareas-grid .ag-floating-filter[col-id="fecha_operacion"] .ag-icon-filter {
+          display: none !important;
+        }
       `}</style>
       <div style={S.topHeader}><h1 style={S.title}>↩ Devoluciones</h1><p style={S.subtitle}>Gestión de devoluciones bancarias</p></div>
       <div style={S.kpiGrid}>{[{ l: 'Total registros', v: total, c: 'var(--qf-navy)', b: '#2196f3' },{ l: 'Mostradas', v: data.length, c: '#185FA5', b: '#03a9f4' },{ l: 'Total cargado', v: money(metrics.totalCargado), c: '#c62828', b: '#f44336' },{ l: 'Total abonado', v: money(metrics.totalAbonado), c: '#2e7d32', b: '#4caf50' },{ l: 'Comisiones', v: money(metrics.totalComision), c: '#e65100', b: '#ff9800' },{ l: 'Pendientes', v: metrics.pendientes, c: '#5e35b1', b: '#7e57c2' }].map(s => <div key={s.l} style={{ ...S.kpiCard, borderTop: `3px solid ${s.b}` }}><div style={S.kpiLabel}>{s.l}</div><div style={{ ...S.kpiValue, color: s.c }}>{s.v}</div></div>)}</div>
@@ -1018,13 +1030,13 @@ const S = {
   pageMini: { fontSize: 10, fontWeight: 800, color: 'var(--qf-navy)', minWidth: 72, textAlign: 'center' },
   pageNavBtn: { minWidth: 22, height: 22, padding: '0 6px', borderRadius: 999, fontWeight: 900 },
   resetInlineBtn: { minWidth: 54, height: 24, padding: '0 8px', textTransform: 'uppercase', fontSize: 10, fontWeight: 800 },
-  newRecordWrap: { marginLeft: 'auto', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 },
-  floatActionBtn: { height: 21, padding: '0 4px', fontSize: 8, borderRadius: 6, whiteSpace: 'nowrap', minWidth: 70 },
-  exportRow: { display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '3px 10px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
+  newRecordWrap: { marginLeft: 'auto', display: 'flex', justifyContent: 'flex-end', flexShrink: 0, minWidth: 150 },
+  floatActionBtn: { height: 21, padding: '0 4px', fontSize: 8, borderRadius: 6, whiteSpace: 'nowrap', minWidth: 70, display: 'block', margin: '0 auto', textAlign: 'center' },
+  exportTopGroup: { display: 'flex', gap: 6, alignItems: 'center', marginLeft: 8 },
   exportBtn: { height: 24, padding: '0 10px', fontSize: 10, borderRadius: 8, fontWeight: 700 },
 
-  erpTools: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap', padding: '2px 10px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
-  erpGroup: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  erpTools: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'nowrap', padding: '2px 10px', background: '#fff', borderTop: '1px solid var(--qf-border)', width: '100%' },
+  erpGroup: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', minWidth: 0 },
   erpSearchWrap: { position: 'relative', width: 210, flexShrink: 0 },
   erpSearchIcon: { position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5', pointerEvents: 'none', zIndex: 1 },
   erpSearch: { width: '100%', height: 24, fontSize: 10, paddingLeft: 30 },
