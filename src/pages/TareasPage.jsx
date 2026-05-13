@@ -452,7 +452,7 @@ const TareasPage = () => {
     {
       headerName: 'Inicio',
       field: '_inicio_sort',
-      width: 110,
+      width: 150,
       sort: 'desc',
       cellRenderer: p => (
         <div>
@@ -466,7 +466,7 @@ const TareasPage = () => {
     {
       headerName: 'Fin',
       field: '_fin_sort',
-      width: 110,
+      width: 150,
       cellRenderer: p => (
         <div>
           <code style={S.opCode}>{formatDate(p.data?.fecha_fin)}</code>
