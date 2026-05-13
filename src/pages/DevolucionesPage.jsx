@@ -568,16 +568,21 @@ const DevolucionesPage = () => {
     {
       headerName: 'Acciones',
       field: 'acciones',
-      width: 115,
+      width: 190,
       pinned: 'right',
       sortable: false,
       filter: 'agTextColumnFilter',
       suppressMenu: true,
       floatingFilter: true,
       floatingFilterComponent: () => (
-        <button className="btn btn-secondary btn-sm" style={S.floatActionBtn} onClick={() => setCompactMode(v => !v)}>
-          {compactMode ? 'Vista cómoda' : 'Vista compacta'}
-        </button>
+        <div style={S.floatActionGroup}>
+          <button className="btn btn-secondary btn-sm" style={S.floatExportBtn} onClick={exportCsv}>CSV</button>
+          <button className="btn btn-secondary btn-sm" style={S.floatExportBtn} onClick={exportExcel}>Excel</button>
+          <button className="btn btn-secondary btn-sm" style={S.floatExportBtn} onClick={exportPdf}>PDF</button>
+          <button className="btn btn-secondary btn-sm" style={S.floatActionBtn} onClick={() => setCompactMode(v => !v)}>
+            {compactMode ? 'Vista cómoda' : 'Vista compacta'}
+          </button>
+        </div>
       ),
       floatingFilterComponentParams: { suppressFilterButton: true },
       cellRenderer: p => (
@@ -772,9 +777,6 @@ const DevolucionesPage = () => {
             </select>
 
             <button className="btn btn-secondary btn-sm" onClick={limpiarFiltrosTabla}>Limpiar filtros tabla</button>
-            <button className="btn btn-secondary btn-sm" onClick={exportCsv}>CSV</button>
-            <button className="btn btn-secondary btn-sm" onClick={exportExcel}>Excel</button>
-            <button className="btn btn-secondary btn-sm" onClick={exportPdf}>PDF</button>
 
             <select className="filter-input" value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }} style={{ width: 'auto', minWidth: 70, height: 28, fontSize: 11, padding: '0 4px' }}>
               <option value={25}>25 filas</option>
@@ -827,7 +829,7 @@ const DevolucionesPage = () => {
                   </div>
                 </>
               )}
-              <button className="btn btn-secondary btn-sm" onClick={resetGridView} style={S.resetInlineBtn}>Reset</button>
+
 
             </div>
           </div>
@@ -1003,8 +1005,11 @@ const S = {
   topPagination: { display: 'flex', alignItems: 'center', gap: 3, background: '#e8eef5', borderRadius: 999, padding: '2px 5px', border: '1px solid #c9d7e6' },
   pageMini: { fontSize: 10, fontWeight: 800, color: 'var(--qf-navy)', minWidth: 72, textAlign: 'center' },
   pageNavBtn: { minWidth: 22, height: 22, padding: '0 6px', borderRadius: 999, fontWeight: 900 },
-  resetInlineBtn: { marginLeft: 'auto', minWidth: 54, height: 24, padding: '0 8px', textTransform: 'uppercase', fontSize: 10, fontWeight: 800 },
-  floatActionBtn: { width: '100%', height: 22, padding: '0 4px', fontSize: 8.5, borderRadius: 6, whiteSpace: 'nowrap' },
+  resetInlineBtn: { minWidth: 54, height: 24, padding: '0 8px', textTransform: 'uppercase', fontSize: 10, fontWeight: 800 },
+  newRecordWrap: { marginLeft: 'auto', display: 'flex', justifyContent: 'flex-end' },
+  floatActionGroup: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 },
+  floatExportBtn: { height: 21, padding: '0 4px', fontSize: 8, borderRadius: 6, minWidth: 31 },
+  floatActionBtn: { height: 21, padding: '0 4px', fontSize: 8, borderRadius: 6, whiteSpace: 'nowrap', minWidth: 70 },
 
   erpTools: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap', padding: '2px 10px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
   erpGroup: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
