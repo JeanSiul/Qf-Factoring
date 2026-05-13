@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { apiCall, toArray } from '../utils/api'
 import { useToast } from '../hooks/useToast'
 import ToastContainer from '../components/ToastContainer'
@@ -7,8 +7,6 @@ import { AgGridReact } from 'ag-grid-react'
 
 const CLAIM = 'TAREAS'
 const DEBOUNCE_MS = 450
-const STORAGE_KEY = 'qf_tareas_grid_view_v6'
-const SAVED_VIEWS_KEY = 'qf_tareas_saved_views_v6'
 
 const camposBusqueda = [
   { value: 'all', label: 'Todos' },
@@ -93,32 +91,6 @@ const prioridadStyle = value => {
 }
 
 const norm = value => String(value ?? '').toLowerCase().trim()
-
-const safeJsonParse = (value, fallback) => {
-  try {
-    return value ? JSON.parse(value) : fallback
-  } catch {
-    return fallback
-  }
-}
-
-const downloadTextFile = (filename, content, mime = 'text/csv;charset=utf-8;') => {
-  const blob = new Blob([content], { type: mime })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
-}
-
-const csvEscape = value => {
-  const s = String(value ?? '')
-  return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
-}
-
 
 const emptyTask = user => ({
   tipo_tarea: 'Soporte',
@@ -321,14 +293,6 @@ const TareasPage = () => {
   const [sortField, setSortField] = useState('fecha_inicio')
   const [sortDir, setSortDir] = useState('desc')
   const [gridApi, setGridApi] = useState(null)
-  const gridColumnApiRef = useRef(null)
-  const [quickText, setQuickText] = useState('')
-  const [quickPreset, setQuickPreset] = useState('all')
-  const [viewName, setViewName] = useState('')
-  const [savedViews, setSavedViews] = useState(() => safeJsonParse(localStorage.getItem(SAVED_VIEWS_KEY), []))
-  const [showColumnPanel, setShowColumnPanel] = useState(false)
-  const [visibleCols, setVisibleCols] = useState({})
-  const [filteredStats, setFilteredStats] = useState({ rows: 0, minutos: 0, pendientes: 0, completadas: 0, soporte: 0, programacion: 0 })
 
   const cv = permisos?.[CLAIM] || '11111111111'
   const canList = cv[1] !== '0'
@@ -435,39 +399,14 @@ const TareasPage = () => {
     }
   }, [data])
 
-  const quickFilteredData = useMemo(() => {
-    const now = new Date()
-    const todayIso = today()
-    const weekStart = new Date(now)
-    weekStart.setDate(now.getDate() - 6)
-    const weekIso = weekStart.toISOString().slice(0, 10)
-    const monthIso = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
-
-    return data.filter(r => {
-      const fecha = toDateInput(r.fecha_inicio)
-      const estadoNorm = norm(r.estado)
-      const tipoNorm = norm(r.tipo_tarea)
-
-      if (quickPreset === 'today') return fecha === todayIso
-      if (quickPreset === 'week') return fecha >= weekIso && fecha <= todayIso
-      if (quickPreset === 'month') return fecha >= monthIso && fecha <= todayIso
-      if (quickPreset === 'pending') return estadoNorm.includes('pend') || estadoNorm.includes('proceso')
-      if (quickPreset === 'done') return estadoNorm.includes('complet')
-      if (quickPreset === 'support') return tipoNorm.includes('soporte')
-      if (quickPreset === 'programming') return tipoNorm.includes('program')
-      if (quickPreset === 'high') return norm(r.prioridad).includes('alta') || norm(r.prioridad).includes('crítica') || norm(r.prioridad).includes('critica')
-      return true
-    })
-  }, [data, quickPreset])
-
-  const agRows = useMemo(() => quickFilteredData.map(r => ({
+  const agRows = useMemo(() => data.map(r => ({
     ...r,
     _inicio_sort: toDateFilterValue(r.fecha_inicio),
     _fin_sort: toDateFilterValue(r.fecha_fin),
     _inicio_text: `${formatDate(r.fecha_inicio)} ${toTimeInput(r.hora_inicio)}`,
     _fin_text: `${formatDate(r.fecha_fin)} ${toTimeInput(r.hora_fin)}`,
     _duracion: calcMinutes(r),
-  })), [quickFilteredData])
+  })), [data])
 
   const agDefaultColDef = useMemo(() => ({
     sortable: true,
@@ -478,7 +417,7 @@ const TareasPage = () => {
     cellStyle: {
       fontSize: compactMode ? '10.5px' : '12px',
       color: 'var(--qf-navy)',
-      lineHeight: compactMode ? '7px' : '9px',
+      lineHeight: compactMode ? '10px' : '12px',
     },
     headerClass: 'qf-tareas-ag-header',
     floatingFilterComponentParams: { suppressFilterButton: false },
@@ -524,120 +463,11 @@ const TareasPage = () => {
 
   const limpiarFiltrosTabla = () => {
     if (!gridApi) return
-    setQuickText('')
     gridApi.setFilterModel(null)
-    gridApi.setGridOption?.('quickFilterText', '')
     gridApi.applyColumnState({
       defaultState: { sort: null },
       state: [{ colId: '_inicio_sort', sort: 'desc' }],
     })
-    setTimeout(() => refreshFilteredStats(gridApi), 60)
-  }
-
-  const getDisplayedRows = () => {
-    if (!gridApi) return agRows
-    const rows = []
-    gridApi.forEachNodeAfterFilterAndSort(node => {
-      if (node?.data) rows.push(node.data)
-    })
-    return rows
-  }
-
-  const refreshFilteredStats = api => {
-    if (!api) return
-    const rows = []
-    api.forEachNodeAfterFilterAndSort(node => {
-      if (node?.data) rows.push(node.data)
-    })
-
-    setFilteredStats({
-      rows: rows.length,
-      minutos: rows.reduce((s, r) => s + calcMinutes(r), 0),
-      pendientes: rows.filter(r => ['Pendiente', 'En proceso'].includes(r.estado)).length,
-      completadas: rows.filter(r => r.estado === 'Completado').length,
-      soporte: rows.filter(r => r.tipo_tarea === 'Soporte').length,
-      programacion: rows.filter(r => r.tipo_tarea === 'Programación').length,
-    })
-  }
-
-  const saveCurrentView = name => {
-    if (!gridApi || !name.trim()) return
-    const view = {
-      id: Date.now(),
-      name: name.trim(),
-      quickText,
-      quickPreset,
-      pageSize,
-      filterModel: gridApi.getFilterModel(),
-      columnState: gridApi.getColumnState(),
-      createdAt: new Date().toISOString(),
-    }
-    const next = [view, ...savedViews.filter(v => v.name !== view.name)].slice(0, 10)
-    setSavedViews(next)
-    localStorage.setItem(SAVED_VIEWS_KEY, JSON.stringify(next))
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(view))
-    setViewName('')
-    show('Vista guardada')
-  }
-
-  const applyView = view => {
-    if (!gridApi || !view) return
-    setQuickText(view.quickText || '')
-    setQuickPreset(view.quickPreset || 'all')
-    setPageSize(Number(view.pageSize || 50))
-    setTimeout(() => {
-      gridApi.setFilterModel(view.filterModel || null)
-      if (view.columnState?.length) gridApi.applyColumnState({ state: view.columnState, applyOrder: true })
-      gridApi.setGridOption?.('quickFilterText', view.quickText || '')
-      refreshFilteredStats(gridApi)
-    }, 60)
-  }
-
-  const deleteView = id => {
-    const next = savedViews.filter(v => v.id !== id)
-    setSavedViews(next)
-    localStorage.setItem(SAVED_VIEWS_KEY, JSON.stringify(next))
-  }
-
-  const resetGridView = () => {
-    if (!gridApi) return
-    setQuickText('')
-    setQuickPreset('all')
-    setPageSize(50)
-    gridApi.setFilterModel(null)
-    gridApi.resetColumnState()
-    gridApi.setGridOption?.('quickFilterText', '')
-    localStorage.removeItem(STORAGE_KEY)
-    setTimeout(() => refreshFilteredStats(gridApi), 60)
-  }
-
-  const exportCsv = () => {
-    const rows = getDisplayedRows()
-    const headers = ['Inicio', 'Hora inicio', 'Fin', 'Hora fin', 'Tipo', 'Tarea', 'Usuario', 'Duración minutos', 'Duración', 'Estado', 'Prioridad', 'Descripción', 'Observaciones']
-    const body = rows.map(r => [
-      toDateInput(r.fecha_inicio),
-      toTimeInput(r.hora_inicio),
-      toDateInput(r.fecha_fin),
-      toTimeInput(r.hora_fin),
-      r.tipo_tarea,
-      r.titulo,
-      r.usuario_nombre || r.usuario_email || r.usuario_id,
-      calcMinutes(r),
-      minToTime(calcMinutes(r)),
-      r.estado,
-      r.prioridad,
-      r.descripcion,
-      r.observaciones,
-    ].map(csvEscape).join(';'))
-
-    downloadTextFile(`tareas_${today()}.csv`, [headers.join(';'), ...body].join('\n'))
-  }
-
-  const toggleColumn = field => {
-    if (!gridApi) return
-    const current = visibleCols[field] !== false
-    gridApi.setColumnsVisible([field], !current)
-    setVisibleCols(prev => ({ ...prev, [field]: !current }))
   }
 
   const agColumnDefs = useMemo(() => [
@@ -782,17 +612,11 @@ const TareasPage = () => {
         }
         .qf-tareas-grid .ag-header-cell-text {
           color: #fff;
-          font-size: 8.5px;
+          font-size: 9px;
         }
         .qf-tareas-grid .ag-header-cell {
           padding-left: 2px;
           padding-right: 2px;
-          line-height: 1;
-        }
-        .qf-tareas-grid .ag-floating-filter .ag-cell-label-container,
-        .qf-tareas-grid .ag-floating-filter-body {
-          min-height: 11px;
-          line-height: 11px;
         }
         .qf-tareas-grid .ag-icon,
         .qf-tareas-grid .ag-header-icon {
@@ -801,17 +625,16 @@ const TareasPage = () => {
         .qf-tareas-grid .ag-floating-filter {
           background: #f8fafc;
           border-bottom: 1px solid var(--qf-border);
-          min-height: 12px;
+          min-height: 20px;
         }
         .qf-tareas-grid .ag-floating-filter-body {
-          min-height: 11px;
-          line-height: 11px;
+          width: 100%;
         }
         .qf-tareas-grid .ag-floating-filter-input,
         .qf-tareas-grid .ag-input-field-input {
-          min-height: 11px;
-          height: 11px;
-          font-size: 8px;
+          min-height: 18px;
+          height: 18px;
+          font-size: 9px;
           border-radius: 7px;
           border: 1px solid #9fb2c8 !important;
           background: #ffffff !important;
@@ -841,7 +664,7 @@ const TareasPage = () => {
         }
         .qf-tareas-grid .ag-paging-panel {
           min-height: 24px;
-          font-size: 8px;
+          font-size: 9px;
           color: var(--qf-text-light);
           border-top: 1px solid var(--qf-border);
         }
@@ -850,7 +673,6 @@ const TareasPage = () => {
           align-items: center;
           padding-top: 0 !important;
           padding-bottom: 0 !important;
-          line-height: 1 !important;
         }
         .qf-tareas-grid .ag-cell[col-id="_inicio_sort"],
         .qf-tareas-grid .ag-cell[col-id="_fin_sort"] {
@@ -896,6 +718,39 @@ const TareasPage = () => {
               </button>
             )}
           </div>
+
+          <div style={S.filtersRow}>
+            <select className="filter-input" value={campo} onChange={e => setCampo(e.target.value)} style={S.fieldSelect}>
+              {camposBusqueda.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+
+            <div style={{ position: 'relative', flex: 1, maxWidth: 360 }}>
+              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5', pointerEvents: 'none' }}>🔍</span>
+              <input
+                className="filter-input"
+                placeholder={campo === 'all' ? 'Buscar...' : `Buscar por ${camposBusqueda.find(f => f.value === campo)?.label || ''}...`}
+                value={busqueda}
+                onChange={e => setBusqueda(e.target.value)}
+                style={{ ...S.searchInput, paddingLeft: 32, width: '100%' }}
+              />
+            </div>
+
+            <select className="filter-input" value={tipo} onChange={e => setTipo(e.target.value)} style={S.fieldSelect}>
+              <option value="all">Tipo: Todos</option>
+              {tipos.map(x => <option key={x} value={x}>{x}</option>)}
+            </select>
+
+            <select className="filter-input" value={estado} onChange={e => setEstado(e.target.value)} style={S.fieldSelect}>
+              <option value="all">Estado: Todos</option>
+              {estados.map(x => <option key={x} value={x}>{x}</option>)}
+            </select>
+
+            <input className="filter-input" type="date" value={desde} onChange={e => setDesde(e.target.value)} style={S.dateInput} />
+            <input className="filter-input" type="date" value={hasta} onChange={e => setHasta(e.target.value)} style={S.dateInput} />
+
+            <button className="btn btn-secondary btn-sm" onClick={limpiar}>Limpiar</button>
+          </div>
+
           <div style={S.pagRow}>
             <span style={S.pill}>{from}-{to} de {total}</span>
             <span style={S.pageInfo}>Filtra, ordena y pagina desde la tabla</span>
@@ -907,88 +762,6 @@ const TareasPage = () => {
               <option value={200}>200 filas</option>
             </select>
             {loading && <span style={S.loadMini}>...</span>}
-          </div>
-
-          <div style={S.erpTools}>
-            <div style={S.erpGroup}>
-              <div style={S.erpSearchWrap}>
-                <span style={S.erpSearchIcon}>🔍</span>
-                <input
-                  className="filter-input"
-                  value={quickText}
-                  onChange={e => setQuickText(e.target.value)}
-                  placeholder="Búsqueda global..."
-                  style={S.erpSearch}
-                />
-              </div>
-              <select className="filter-input" value={quickPreset} onChange={e => setQuickPreset(e.target.value)} style={S.erpSelect}>
-                <option value="all">Vista: Todos</option>
-                <option value="today">Hoy</option>
-                <option value="week">Últimos 7 días</option>
-                <option value="month">Este mes</option>
-                <option value="pending">Pendientes / En proceso</option>
-                <option value="done">Completadas</option>
-                <option value="support">Soporte</option>
-                <option value="programming">Programación</option>
-                <option value="high">Alta prioridad</option>
-              </select>
-              <button className="btn btn-secondary btn-sm" onClick={exportCsv}>Exportar CSV</button>
-            </div>
-
-            <div style={S.erpGroup}>
-              <button className="btn btn-secondary btn-sm" onClick={() => setShowColumnPanel(v => !v)}>Columnas</button>
-              <input
-                className="filter-input"
-                value={viewName}
-                onChange={e => setViewName(e.target.value)}
-                placeholder="Nombre de vista"
-                style={S.viewInput}
-              />
-              <button className="btn btn-primary btn-sm" onClick={() => saveCurrentView(viewName)}>Guardar vista</button>
-              <button className="btn btn-secondary btn-sm" onClick={resetGridView}>Reset</button>
-            </div>
-          </div>
-
-          {showColumnPanel && (
-            <div style={S.columnPanel}>
-              {[
-                ['_inicio_sort', 'Inicio'],
-                ['_fin_sort', 'Fin'],
-                ['tipo_tarea', 'Tipo'],
-                ['titulo', 'Tarea'],
-                ['usuario_nombre', 'Usuario'],
-                ['_duracion', 'Duración'],
-                ['estado', 'Estado'],
-                ['prioridad', 'Prioridad'],
-                ['acciones', 'Acciones'],
-              ].map(([field, label]) => (
-                <label key={field} style={S.columnCheck}>
-                  <input type="checkbox" checked={visibleCols[field] !== false} onChange={() => toggleColumn(field)} />
-                  {label}
-                </label>
-              ))}
-            </div>
-          )}
-
-          {savedViews.length > 0 && (
-            <div style={S.savedViews}>
-              <span style={S.savedTitle}>Vistas guardadas:</span>
-              {savedViews.map(v => (
-                <span key={v.id} style={S.savedChip}>
-                  <button type="button" onClick={() => applyView(v)} style={S.savedBtn}>{v.name}</button>
-                  <button type="button" onClick={() => deleteView(v.id)} style={S.savedDel}>×</button>
-                </span>
-              ))}
-            </div>
-          )}
-
-          <div style={S.smartTotals}>
-            <span><b>{filteredStats.rows || agRows.length}</b> filtradas</span>
-            <span><b>{minToTime(filteredStats.minutos || agRows.reduce((s, r) => s + calcMinutes(r), 0))}</b> horas</span>
-            <span><b>{filteredStats.pendientes}</b> pendientes</span>
-            <span><b>{filteredStats.completadas}</b> completadas</span>
-            <span><b>{filteredStats.soporte}</b> soporte</span>
-            <span><b>{filteredStats.programacion}</b> programación</span>
           </div>
         </div>
 
@@ -1017,29 +790,9 @@ const TareasPage = () => {
               paginationPageSize={pageSize}
               paginationPageSizeSelector={[25, 50, 100, 200]}
               localeText={agLocaleText}
-              onGridReady={params => {
-                setGridApi(params.api)
-                gridColumnApiRef.current = params.columnApi
-                setVisibleCols(Object.fromEntries(params.api.getColumns().map(c => [c.getColId(), c.isVisible()])))
-                const lastView = safeJsonParse(localStorage.getItem(STORAGE_KEY), null)
-                setTimeout(() => {
-                  if (lastView) {
-                    setQuickText(lastView.quickText || '')
-                    setQuickPreset(lastView.quickPreset || 'all')
-                    setPageSize(Number(lastView.pageSize || 50))
-                    params.api.setFilterModel(lastView.filterModel || null)
-                    if (lastView.columnState?.length) params.api.applyColumnState({ state: lastView.columnState, applyOrder: true })
-                    params.api.setGridOption?.('quickFilterText', lastView.quickText || '')
-                  }
-                  refreshFilteredStats(params.api)
-                }, 80)
-              }}
-              quickFilterText={quickText}
+              onGridReady={params => setGridApi(params.api)}
               animateRows
               suppressCellFocus
-              onFilterChanged={params => refreshFilteredStats(params.api)}
-              onSortChanged={params => refreshFilteredStats(params.api)}
-              onColumnVisible={params => setVisibleCols(Object.fromEntries(params.api.getColumns().map(c => [c.getColId(), c.isVisible()])))}
               overlayNoRowsTemplate="<span style='padding:10px;color:#64748b;font-size:12px;'>No se encontraron tareas con los filtros aplicados</span>"
             />
           )}
@@ -1056,21 +809,6 @@ const TareasPage = () => {
 }
 
 const S = {
-  erpTools: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap', padding: '3px 10px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
-  erpGroup: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  erpSearchWrap: { position: 'relative', width: 210 },
-  erpSearchIcon: { position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#8a9bb5', pointerEvents: 'none', zIndex: 1 },
-  erpSearch: { width: '100%', height: 24, fontSize: 10, paddingLeft: 30 },
-  erpSelect: { minWidth: 150, height: 24, fontSize: 9.5, padding: '0 22px 0 8px' },
-  viewInput: { width: 140, height: 24, fontSize: 10 },
-  columnPanel: { display: 'flex', gap: 8, flexWrap: 'wrap', padding: '6px 14px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
-  columnCheck: { fontSize: 10.5, color: 'var(--qf-navy)', display: 'inline-flex', alignItems: 'center', gap: 4, background: '#fff', border: '1px solid var(--qf-border)', borderRadius: 999, padding: '3px 8px' },
-  savedViews: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '5px 14px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
-  savedTitle: { fontSize: 10, color: 'var(--qf-text-light)', fontWeight: 700 },
-  savedChip: { display: 'inline-flex', alignItems: 'center', border: '1px solid #9fb2c8', borderRadius: 999, overflow: 'hidden', background: '#e8eef5' },
-  savedBtn: { border: 0, background: 'transparent', padding: '3px 7px', cursor: 'pointer', fontSize: 10.5, color: 'var(--qf-navy)', fontWeight: 700 },
-  savedDel: { border: 0, background: '#dbe7f3', padding: '3px 6px', cursor: 'pointer', fontSize: 11, color: '#c62828', fontWeight: 900 },
-  smartTotals: { display: 'flex', gap: 8, flexWrap: 'wrap', padding: '3px 10px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)', color: 'var(--qf-text-light)', fontSize: 10.5 },
   page: { paddingBottom: 12, maxWidth: '100%', overflowX: 'hidden' },
   topHeader: { marginBottom: 6 },
   title: { fontFamily: 'Montserrat', fontSize: 22, fontWeight: 800, color: 'var(--qf-navy)', marginBottom: 2 },
@@ -1089,11 +827,11 @@ const S = {
   fieldSelect: { width: 'auto', minWidth: 120, height: 32, fontSize: 12 },
   dateInput: { width: 130, height: 32, fontSize: 12 },
   searchInput: { minWidth: 180, maxWidth: 340, height: 32, fontSize: 12 },
-  pagRow: { display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', padding: '3px 10px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
+  pagRow: { display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', padding: '5px 14px 7px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
   pageInfo: { fontSize: 11, color: 'var(--qf-text-light)', fontWeight: 600 },
   loadMini: { fontSize: 11, color: '#185FA5', fontWeight: 700 },
-  th0: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 6.5, padding: '5px 4px' },
-  ths: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 6.5, padding: '5px 4px', cursor: 'pointer', userSelect: 'none' },
+  th0: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 7, padding: '5px 4px' },
+  ths: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 7, padding: '5px 4px', cursor: 'pointer', userSelect: 'none' },
   si: { fontSize: 7, opacity: 0.45, marginLeft: 1 },
   td: { padding: '3px 4px', verticalAlign: 'middle', lineHeight: 1.15 },
   opCode: { background: '#e8eef5', padding: '1px 4px', borderRadius: 3, fontSize: 9.5, fontWeight: 800, color: 'var(--qf-navy)' },
