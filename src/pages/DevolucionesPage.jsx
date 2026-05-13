@@ -12,6 +12,14 @@ const SAVED_VIEWS_KEY = 'qf_devoluciones_saved_views_v2'
 const DASHBOARD_KEY = 'qf_devoluciones_dashboard_v2'
 
 
+// ============================================================
+// 01. CONFIGURACIÓN GENERAL Y CONSTANTES
+// ------------------------------------------------------------
+// CLAIM: permiso usado por la pantalla.
+// GRID_VIEW_KEY / SAVED_VIEWS_KEY / DASHBOARD_KEY:
+// claves de localStorage para guardar vistas, columnas,
+// filtros y estado visual del dashboard.
+// ============================================================
 const camposBusqueda = [
   { value: 'all', label: 'Todos' },
   { value: 'numero_operacion', label: 'Nro. Operación' },
@@ -25,6 +33,14 @@ const camposBusqueda = [
   { value: 'banco', label: 'Banco' },
 ]
 
+// ============================================================
+// 02. HELPERS DE FORMATO Y NORMALIZACIÓN
+// ------------------------------------------------------------
+// money: formatea importes PEN/USD.
+// dateKey: convierte fechas a formato YYYY-MM-DD para filtros.
+// formatDate: muestra fechas como DD/MM/YYYY.
+// badgeClass: define estilo visual del estado.
+// ============================================================
 const money = (value, currency = 'PEN') => {
   const cur = String(currency || '').toUpperCase() === 'USD' || String(currency || '').toLowerCase().includes('dol') ? 'USD' : 'PEN'
   return new Intl.NumberFormat('es-PE', { style: 'currency', currency: cur, minimumFractionDigits: 2 }).format(Number(value || 0))
@@ -134,6 +150,12 @@ const printDevPdfReport = (rows, title = 'Reporte de Devoluciones QF') => {
 }
 
 
+// ============================================================
+// 03. MODAL DE DETALLE
+// ------------------------------------------------------------
+// Muestra información completa de una devolución seleccionada.
+// Aquí puedes agregar/quitar campos visibles del detalle.
+// ============================================================
 const ModalDetalle = ({ item, bancos, monedas, onClose }) => (
   <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
     <div className="modal" style={{ maxWidth: 820 }}>
@@ -150,6 +172,12 @@ const ModalDetalle = ({ item, bancos, monedas, onClose }) => (
   </div>
 )
 
+// ============================================================
+// 04. MODAL CREAR / EDITAR DEVOLUCIÓN
+// ------------------------------------------------------------
+// Formulario principal para registrar o actualizar devoluciones.
+// Aquí se configuran inputs, selects, validaciones y payload.
+// ============================================================
 const ModalDevolucion = ({ item, bancos, monedas, onClose, onSave }) => {
   const isEdit = !!item?.id
   const [form, setForm] = useState({ id: item?.id || '', archivo: item?.archivo || '', numero_operacion: item?.numero_operacion || '', numero_operacion_pdf: item?.numero_operacion_pdf || '', fecha_operacion: toDateInput(item?.fecha_operacion) || new Date().toISOString().slice(0, 10), importe_cargado: item?.importe_cargado || '', importe_abonado: item?.importe_abonado || '', comision: item?.comision || 0, cuenta_cargo: item?.cuenta_cargo || '', cuenta_abono: item?.cuenta_abono || '', banco: item?.banco || '', moneda_cargo: item?.moneda_cargo || '', moneda_abono: item?.moneda_abono || '', referencia: item?.referencia || '', estado: item?.estado || 'Pendiente', mensaje: item?.mensaje || '' })
@@ -164,6 +192,20 @@ const ModalDevolucion = ({ item, bancos, monedas, onClose, onSave }) => {
     try { await onSave({ ...form, importe_cargado: Number(form.importe_cargado || 0), importe_abonado: Number(form.importe_abonado || 0), comision: Number(form.comision || 0) }); onClose() }
     catch (e) { setError(e.message || 'No se pudo guardar') } finally { setSaving(false) }
   }
+  // ==========================================================
+  // 06. RENDER PRINCIPAL
+  // ----------------------------------------------------------
+  // Estructura visual de la página:
+  // - estilos CSS internos
+  // - cabecera
+  // - KPIs
+  // - toolbar superior
+  // - paginación superior
+  // - totales dinámicos
+  // - dashboard/panel opcionales
+  // - AG Grid
+  // - modales
+  // ==========================================================
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal" style={{ maxWidth: 920, width: '94vw' }}>
@@ -183,6 +225,12 @@ const ModalDevolucion = ({ item, bancos, monedas, onClose, onSave }) => {
   )
 }
 
+// ============================================================
+// 05. COMPONENTE PRINCIPAL DE LA PÁGINA
+// ------------------------------------------------------------
+// Contiene estados, permisos, carga de datos, filtros,
+// configuración AG Grid, toolbar, KPIs y modales.
+// ============================================================
 const DevolucionesPage = () => {
   const { permisos } = useAuth()
   const [data, setData] = useState([])
@@ -218,6 +266,13 @@ const DevolucionesPage = () => {
 
   useEffect(() => { (async () => { try { const [bR, mR] = await Promise.all([apiCall('/qf/devoluciones/bancos'), apiCall('/qf/devoluciones/monedas')]); setBancos((Array.isArray(bR) ? bR : (bR?.data || [])).filter(x => x && (x.id || x.ID))); setMonedas((Array.isArray(mR) ? mR : (mR?.data || [])).filter(x => x && (x.ID || x.id))) } catch (e) { console.warn(e.message) } })() }, [])
 
+  // ==========================================================
+  // 05.1 CARGA DE DATOS
+  // ----------------------------------------------------------
+  // Lee devoluciones desde n8n/API.
+  // pageSize se fuerza a 5000 para que AG Grid pueda filtrar,
+  // ordenar y paginar del lado cliente.
+  // ==========================================================
   const cargar = async (opts = {}) => {
     setLoading(true)
     try {
@@ -235,6 +290,15 @@ const DevolucionesPage = () => {
   const totalPages = Math.max(1, Math.ceil(total / pageSize)), from = total === 0 ? 0 : ((page - 1) * pageSize) + 1, to = Math.min(page * pageSize, total)
   const metrics = useMemo(() => ({ totalCargado: data.reduce((s, r) => s + Number(r.importe_cargado || 0), 0), totalAbonado: data.reduce((s, r) => s + Number(r.importe_abonado || 0), 0), totalComision: data.reduce((s, r) => s + Number(r.comision || 0), 0), pendientes: data.filter(r => String(r.estado || '').toLowerCase().includes('pendiente')).length }), [data])
 
+  // ==========================================================
+  // 05.2 VISTAS PREDEFINIDAS / FILTROS RÁPIDOS
+  // ----------------------------------------------------------
+  // Controla el desplegable "Vista: Todos", "Hoy",
+  // "Últimos 7 días", "Este mes", etc.
+  // Si deseas agregar una nueva vista rápida, agrega:
+  // 1) <option value="...">Nombre</option>
+  // 2) una condición if (quickPreset === '...')
+  // ==========================================================
   const quickFilteredData = useMemo(() => {
     const now = new Date()
     const todayIso = dateKey(now)
@@ -322,6 +386,14 @@ const DevolucionesPage = () => {
     ariaFilterInput: 'Entrada de filtro',
   }), [])
 
+  // ==========================================================
+  // 05.3 CONFIGURACIÓN GENERAL DE COLUMNAS AG GRID
+  // ----------------------------------------------------------
+  // Aplica a todas las columnas por defecto:
+  // sortable, filter, floatingFilter, resizable, estilos base.
+  // Para alinear TODAS las celdas, se puede tocar cellStyle.
+  // Para alinear solo una columna, usar cellClass en agColumnDefs.
+  // ==========================================================
   const agDefaultColDef = useMemo(() => ({
     sortable: true,
     filter: true,
@@ -372,6 +444,14 @@ const DevolucionesPage = () => {
     setTimeout(() => refreshPaginationInfo(gridApi), 0)
   }
 
+  // ==========================================================
+  // 05.4 ACCIONES DE GRID
+  // ----------------------------------------------------------
+  // limpiarFiltrosTabla: limpia filtros y búsqueda global.
+  // saveCurrentView/applyView/deleteView: vistas guardadas.
+  // resetGridView: vuelve a la vista base de la tabla.
+  // exportCsv/exportExcel/exportPdf: exportaciones.
+  // ==========================================================
   const limpiarFiltrosTabla = () => {
     if (!gridApi) return
     setQuickText('')
@@ -504,7 +584,22 @@ const DevolucionesPage = () => {
     setVisibleCols(prev => ({ ...prev, [field]: !current }))
   }
 
+  // ==========================================================
+  // 05.5 COLUMNAS DEL GRID
+  // ----------------------------------------------------------
+  // AQUÍ se definen cabeceras, campos, anchos, filtros,
+  // alineaciones, columnas ocultas y botones de acciones.
+  //
+  // headerName: texto visible en la cabecera.
+  // field: campo de la data.
+  // width: ancho fijo de columna.
+  // hide: true => oculta por defecto, visible desde Columnas.
+  // headerClass: alinea cabecera. Ej: qf-center-header.
+  // cellClass: alinea celdas. Ej: qf-right-cell.
+  // cellRenderer: render personalizado. Ej: botones o badges.
+  // ==========================================================
   const agColumnDefs = useMemo(() => [
+    // Columna principal: número de operación.
     {
       headerName: 'Nro. Operación',
       field: 'numero_operacion',
@@ -513,7 +608,9 @@ const DevolucionesPage = () => {
       cellRenderer: p => <code style={S.opCode}>{p.value || '-'}</code>,
       filter: 'agTextColumnFilter',
     },
+    // Fecha: ancho 150px y filtro de fecha. CSS elimina la lupa interna.
     { headerName: 'Fecha', field: 'fecha_operacion', width: 150, valueFormatter: p => formatDate(p.value), filter: 'agDateColumnFilter', headerClass: 'qf-center-header' },
+    // Campo opcional oculto por defecto. Activable desde botón Columnas.
     { headerName: 'Nro. Op. PDF', field: 'numero_operacion_pdf', width: 140, filter: 'agTextColumnFilter', hide: true, headerClass: 'qf-center-header' },
     { headerName: 'Creado', field: 'created_at', width: 150, valueFormatter: p => formatDate(p.value), filter: 'agDateColumnFilter', hide: true, headerClass: 'qf-center-header' },
     { headerName: 'Banco', field: 'banco_nombre', width: 150, cellRenderer: p => <span style={S.bankPill}>{p.value || '-'}</span>, filter: 'agTextColumnFilter' },
@@ -565,6 +662,7 @@ const DevolucionesPage = () => {
       cellRenderer: p => <span className={`badge ${badgeClass(p.value)}`} style={{ fontSize: 8 }}>{String(p.value || '-').toUpperCase()}</span>,
       filter: 'agTextColumnFilter',
     },
+    // Acciones: botones Ver/Edit/Del y botón Vista cómoda en filtro flotante.
     {
       headerName: 'Acciones',
       field: 'acciones',
@@ -602,6 +700,17 @@ const DevolucionesPage = () => {
   return (
     <div className="fade-in" style={S.page}>
       <ToastContainer toasts={toasts} />
+      {/* ======================================================
+          06.1 ESTILOS CSS DEL GRID Y FILTROS
+          ------------------------------------------------------
+          Aquí se controlan:
+          - colores de cabecera
+          - alto visual de filtros flotantes
+          - lupita de filtros
+          - alineación de cabeceras
+          - alineación de celdas
+          - eliminación de lupa en filtro Fecha
+          ====================================================== */}
       <style>{`
         .qf-tareas-grid .ag-root-wrapper {
           border: 0;
@@ -754,10 +863,22 @@ const DevolucionesPage = () => {
 
       `}</style>
       <div style={S.topHeader}><h1 style={S.title}>↩ Devoluciones</h1><p style={S.subtitle}>Gestión de devoluciones bancarias</p></div>
+      {/* ======================================================
+          06.2 KPIs SUPERIORES
+          ------------------------------------------------------
+          Tarjetas de resumen: total, mostradas, cargado,
+          abonado, comisiones y pendientes.
+          ====================================================== */}
       <div style={S.kpiGrid}>{[{ l: 'Total registros', v: total, c: 'var(--qf-navy)', b: '#2196f3' },{ l: 'Mostradas', v: data.length, c: '#185FA5', b: '#03a9f4' },{ l: 'Total cargado', v: money(metrics.totalCargado), c: '#c62828', b: '#f44336' },{ l: 'Total abonado', v: money(metrics.totalAbonado), c: '#2e7d32', b: '#4caf50' },{ l: 'Comisiones', v: money(metrics.totalComision), c: '#e65100', b: '#ff9800' },{ l: 'Pendientes', v: metrics.pendientes, c: '#5e35b1', b: '#7e57c2' }].map(s => <div key={s.l} style={{ ...S.kpiCard, borderTop: `3px solid ${s.b}` }}><div style={S.kpiLabel}>{s.l}</div><div style={{ ...S.kpiValue, color: s.c }}>{s.v}</div></div>)}</div>
 
       <div className="page-card" style={S.card}>
         <div style={S.stickyTools}>
+          {/* ==================================================
+              06.3 FILA DE PAGINACIÓN / LIMPIEZA / NUEVO REGISTRO
+              --------------------------------------------------
+              Contiene selector de filas, controles de página,
+              limpiar filtros, reset y Nuevo Registro.
+              ================================================== */}
           <div style={S.pagRow}>
             <select className="filter-input" value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }} style={{ width: 'auto', minWidth: 70, height: 28, fontSize: 11, padding: '0 4px' }}>
               <option value={25}>25 filas</option>
@@ -816,6 +937,12 @@ const DevolucionesPage = () => {
             {loading && <span style={S.loadMini}>...</span>}
           </div>
 
+          {/* ==================================================
+              06.4 TOOLBAR ERP / VISTAS / COLUMNAS
+              --------------------------------------------------
+              Panel, BI, agrupación, columnas, nombre de vista,
+              guardar vista y vistas guardadas.
+              ================================================== */}
           <div style={S.erpTools}>
             <div style={S.erpGroup}>
               <button className="btn btn-secondary btn-sm" onClick={() => setShowSidePanel(v => !v)}>Panel</button>
@@ -882,6 +1009,12 @@ const DevolucionesPage = () => {
             </div>
           )}
 
+          {/* ==================================================
+              06.5 TOTALES DINÁMICOS Y EXPORTACIÓN
+              --------------------------------------------------
+              Muestra totales según filtros activos y botones
+              CSV / Excel / PDF al extremo derecho.
+              ================================================== */}
           <div style={S.smartTotals}>
             <span><b>{liveRows.length}</b> filtradas</span>
             <span><b>{money(liveRows.reduce((s, r) => s + Number(r.importe_cargado || 0), 0))}</b> cargado</span>
@@ -944,11 +1077,21 @@ const DevolucionesPage = () => {
           )}
         </div>
 
+        {/* ====================================================
+            06.6 CONTENEDOR AG GRID
+            ----------------------------------------------------
+            Aquí se define el alto del grid.
+            Para ajustar alto:
+            height: compactMode ? 'calc(100vh - 280px)' : ...
+            Si quieres más filas visibles, baja la resta.
+            Si quieres menos alto, sube la resta.
+            ==================================================== */}
         <div
           className="ag-theme-quartz qf-tareas-grid"
           style={{
             width: '100%',
-            height: compactMode ? 'calc(100vh - 230px)' : 'calc(100vh - 285px)',
+            // Alto del grid: se redujo aprox. 2 filas para que encaje mejor en pantalla.
+            height: compactMode ? 'calc(100vh - 280px)' : 'calc(100vh - 335px)',
             minHeight: 310,
             '--ag-font-size': compactMode ? '10.5px' : '12px',
             '--ag-header-height': compactMode ? '35px' : '35px',
@@ -962,6 +1105,16 @@ const DevolucionesPage = () => {
           {loading && data.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner dark" /></div>
           ) : (
+            {/* ================================================
+                06.7 CONFIGURACIÓN DEL COMPONENTE AG GRID
+                ------------------------------------------------
+                Aquí se conectan:
+                - rowData
+                - columnDefs
+                - paginación
+                - filtros
+                - eventos onGridReady/onFilterChanged/etc.
+                ================================================= */}
             <AgGridReact
               rowData={agRows}
               columnDefs={agColumnDefs}
@@ -1014,6 +1167,13 @@ const DevolucionesPage = () => {
   )
 }
 
+// ============================================================
+// 07. ESTILOS INLINE DE LA PÁGINA
+// ------------------------------------------------------------
+// Aquí se configuran estilos de layout, toolbars, botones,
+// KPIs, paneles, dashboard, exportaciones y modales.
+// Es la sección más rápida para ajustar tamaños/espaciados.
+// ============================================================
 const S = {
   page: { paddingBottom: 12, maxWidth: '100%', overflowX: 'hidden' },
   topHeader: { marginBottom: 6 },
