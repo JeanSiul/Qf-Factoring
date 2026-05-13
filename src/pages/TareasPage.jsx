@@ -827,8 +827,8 @@ const TareasPage = () => {
           margin-left: 3px;
         }
         .qf-tareas-grid .ag-floating-filter-button-button {
-          min-width: 15px;
-          height: 11px;
+          min-width: 18px;
+          height: 18px;
           border-radius: 6px;
           border: 1px solid #9fb2c8;
           background: #e8eef5;
