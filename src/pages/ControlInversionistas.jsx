@@ -1,9 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { apiCall, toArray } from '../utils/api'
+import { AgGridReact } from 'ag-grid-react'
 
 const CLAIM = 'INVCTL'
 const API_BASE = '/qf/inversionistas'
+const GRID_VIEW_KEY = 'qf_inversionistas_grid_view_v1'
+const SAVED_VIEWS_KEY = 'qf_inversionistas_saved_views_v1'
+const DASHBOARD_KEY = 'qf_inversionistas_dashboard_v1'
 
 const EMPTY_FORM = {
   id: null,
@@ -269,6 +273,93 @@ const getNaturalezaLabel = (value) => value === 'PJ' ? 'Persona Jurídica' : 'Pe
 
 const normalize = (v) => String(v ?? '').toLowerCase().trim()
 
+const safeJsonParse = (value, fallback) => {
+  try {
+    return value ? JSON.parse(value) : fallback
+  } catch (_) {
+    return fallback
+  }
+}
+
+const downloadTextFile = (filename, content, mime = 'text/csv;charset=utf-8;') => {
+  const blob = new Blob([content], { type: mime })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+const csvEscape = value => {
+  const s = String(value ?? '')
+  return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+
+const pct = (value, total) => `${Math.round((Number(value || 0) / Math.max(Number(total || 0), 1)) * 100)}%`
+
+const getPersonaTipo = row => {
+  const nat = normalize(row.naturaleza)
+  const tipoDoc = normalize(row.tipo_documento)
+  const tipoRuc = normalize(row.tipo_ruc)
+
+  if (
+    nat === 'pj' ||
+    nat.includes('jur') ||
+    tipoDoc === 'ruc' ||
+    tipoDoc === '2' ||
+    tipoRuc === 'pj' ||
+    tipoRuc.includes('jur')
+  ) return 'Persona Jurídica'
+
+  return 'Persona Natural'
+}
+
+const getNombreCompleto = row => [row.nombre, row.apellido].filter(Boolean).join(' ')
+
+const getEstadoValue = row => row.estado || 'Activo'
+
+const groupInvestorLabel = (row, groupBy, bancos = [], monedas = []) => {
+  if (groupBy === 'estado') return getEstadoValue(row)
+  if (groupBy === 'naturaleza') return getPersonaTipo(row)
+  if (groupBy === 'banco') return row.banco_nombre || getBancoNombre(row.banco, bancos) || 'Sin banco'
+  if (groupBy === 'moneda') return row.moneda_codigo || getMonedaNombre(row.moneda, monedas) || 'Sin moneda'
+  if (groupBy === 'documento') return getTipoDocumentoLabel(row.tipo_documento)
+  return 'General'
+}
+
+const buildInvestorGroupSummary = (rows, groupBy, bancos = [], monedas = []) => {
+  const map = new Map()
+  rows.forEach(row => {
+    const key = groupInvestorLabel(row, groupBy, bancos, monedas)
+    const current = map.get(key) || { name: key, count: 0, activos: 0, inactivos: 0, naturales: 0, juridicos: 0 }
+    current.count += 1
+    if (normalize(getEstadoValue(row)) === 'activo') current.activos += 1
+    else current.inactivos += 1
+    if (getPersonaTipo(row) === 'Persona Jurídica') current.juridicos += 1
+    else current.naturales += 1
+    map.set(key, current)
+  })
+  return [...map.values()].sort((a, b) => b.count - a.count)
+}
+
+const exportInvestorHtmlTable = (filename, rows, bancos, monedas) => {
+  const headers = ['Código', 'Documento', 'Número', 'Tipo Persona', 'Razón Social', 'Nombre', 'Email', 'Banco', 'Moneda', 'Cuenta', 'CCI', 'Estado']
+  const htmlRows = rows.map(r => `<tr><td>${r.codigo || ''}</td><td>${getTipoDocumentoLabel(r.tipo_documento)}</td><td>${r.numero_documento || ''}</td><td>${getPersonaTipo(r)}</td><td>${r.razon_social || ''}</td><td>${getNombreCompleto(r)}</td><td>${r.email || ''}</td><td>${r.banco_nombre || getBancoNombre(r.banco, bancos)}</td><td>${r.moneda_codigo || getMonedaNombre(r.moneda, monedas)}</td><td>${r.cuenta || ''}</td><td>${r.cci || ''}</td><td>${getEstadoValue(r)}</td></tr>`).join('')
+  const content = `<html><head><meta charset="utf-8" /></head><body><table border="1"><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${htmlRows}</tbody></table></body></html>`
+  downloadTextFile(filename, content, 'application/vnd.ms-excel;charset=utf-8;')
+}
+
+const printInvestorPdfReport = (rows, bancos, monedas, title = 'Reporte de Inversionistas QF') => {
+  const byEstado = buildInvestorGroupSummary(rows, 'estado', bancos, monedas)
+  const html = `<html><head><title>${title}</title><style>body{font-family:Arial,sans-serif;color:#0f2742;padding:18px}h1{font-size:18px;margin:0 0 8px}.meta{color:#64748b;font-size:11px;margin-bottom:12px}table{width:100%;border-collapse:collapse;font-size:10px}th{background:#0f2742;color:#fff;text-align:left;padding:5px}td{border:1px solid #d9e2ec;padding:4px}.kpis{display:flex;gap:8px;margin:12px 0}.kpi{border:1px solid #d9e2ec;border-radius:8px;padding:8px;min-width:110px}.kpi b{display:block;font-size:16px;color:#185FA5}</style></head><body><h1>${title}</h1><div class="meta">Generado: ${new Date().toLocaleString('es-PE')} · Registros: ${rows.length}</div><div class="kpis"><div class="kpi"><span>Total</span><b>${rows.length}</b></div><div class="kpi"><span>Activos</span><b>${rows.filter(r => normalize(getEstadoValue(r)) === 'activo').length}</b></div><div class="kpi"><span>PN</span><b>${rows.filter(r => getPersonaTipo(r) === 'Persona Natural').length}</b></div><div class="kpi"><span>PJ</span><b>${rows.filter(r => getPersonaTipo(r) === 'Persona Jurídica').length}</b></div></div><h2 style="font-size:14px">Resumen por estado</h2><table><thead><tr><th>Estado</th><th>Cantidad</th><th>Activos</th><th>Inactivos</th></tr></thead><tbody>${byEstado.map(g => `<tr><td>${g.name}</td><td>${g.count}</td><td>${g.activos}</td><td>${g.inactivos}</td></tr>`).join('')}</tbody></table><h2 style="font-size:14px">Detalle</h2><table><thead><tr><th>Código</th><th>Documento</th><th>Número</th><th>Tipo</th><th>Razón Social</th><th>Nombre</th><th>Banco</th><th>Estado</th></tr></thead><tbody>${rows.map(r => `<tr><td>${r.codigo || ''}</td><td>${getTipoDocumentoLabel(r.tipo_documento)}</td><td>${r.numero_documento || ''}</td><td>${getPersonaTipo(r)}</td><td>${r.razon_social || ''}</td><td>${getNombreCompleto(r)}</td><td>${r.banco_nombre || getBancoNombre(r.banco, bancos)}</td><td>${getEstadoValue(r)}</td></tr>`).join('')}</tbody></table><script>window.onload=()=>window.print()</script></body></html>`
+  const w = window.open('', '_blank')
+  if (w) { w.document.write(html); w.document.close() }
+}
+
+
 const ControlInversionistas = () => {
   const { permisos } = useAuth()
   const claimValue = permisos?.[CLAIM] || '00000000000'
@@ -297,6 +388,18 @@ const ControlInversionistas = () => {
 
   const [sortField, setSortField] = useState('id')
   const [sortDir, setSortDir] = useState('desc')
+  const [gridApi, setGridApi] = useState(null)
+  const gridColumnApiRef = useRef(null)
+  const [quickText, setQuickText] = useState('')
+  const [quickPreset, setQuickPreset] = useState('all')
+  const [viewName, setViewName] = useState('')
+  const [savedViews, setSavedViews] = useState(() => safeJsonParse(localStorage.getItem(SAVED_VIEWS_KEY), []))
+  const [showColumnPanel, setShowColumnPanel] = useState(false)
+  const [visibleCols, setVisibleCols] = useState({})
+  const [displayedRows, setDisplayedRows] = useState([])
+  const [showSidePanel, setShowSidePanel] = useState(false)
+  const [showDashboard, setShowDashboard] = useState(() => safeJsonParse(localStorage.getItem(DASHBOARD_KEY), true))
+  const [groupBy, setGroupBy] = useState('estado')
 
   const [detail, setDetail] = useState(null)
   const [modal, setModal] = useState({ open: false, mode: 'create', form: EMPTY_FORM })
@@ -346,7 +449,7 @@ const ControlInversionistas = () => {
       setError('')
       const params = new URLSearchParams({
         page: String(page),
-        pageSize: String(pageSize),
+        pageSize: String(5000),
         field,
         q: debouncedQ,
       })
@@ -411,72 +514,269 @@ const ControlInversionistas = () => {
     ]
   }, [data, total])
 
-  const sortedData = useMemo(() => {
-    const rows = [...data]
+  const quickFilteredData = useMemo(() => data.filter(row => {
+    const estadoNorm = normalize(getEstadoValue(row))
+    const tipoPersona = getPersonaTipo(row)
+    const bancoNombre = normalize(row.banco_nombre || getBancoNombre(row.banco, bancos))
+    const monedaNombre = normalize(row.moneda_codigo || getMonedaNombre(row.moneda, monedas))
 
-    rows.sort((a, b) => {
-      let av = a?.[sortField]
-      let bv = b?.[sortField]
+    if (quickPreset === 'active') return estadoNorm === 'activo'
+    if (quickPreset === 'inactive') return estadoNorm !== 'activo'
+    if (quickPreset === 'pn') return tipoPersona === 'Persona Natural'
+    if (quickPreset === 'pj') return tipoPersona === 'Persona Jurídica'
+    if (quickPreset === 'withBank') return !!bancoNombre
+    if (quickPreset === 'withoutBank') return !bancoNombre
+    if (quickPreset === 'soles') return monedaNombre.includes('pen') || monedaNombre.includes('sol')
+    if (quickPreset === 'dolares') return monedaNombre.includes('usd') || monedaNombre.includes('dol')
+    if (quickPreset === 'gerencia') return estadoNorm !== 'activo' || !bancoNombre || !row.email
+    if (quickPreset === 'operaciones') return estadoNorm === 'activo' && !!bancoNombre
+    return true
+  }), [data, quickPreset, bancos, monedas])
 
-      if (sortField === 'banco_nombre') {
-        av = a.banco_nombre || getBancoNombre(a.banco, bancos)
-        bv = b.banco_nombre || getBancoNombre(b.banco, bancos)
-      }
+  const agRows = useMemo(() => quickFilteredData.map(row => ({
+    ...row,
+    _documento_label: getTipoDocumentoLabel(row.tipo_documento),
+    _tipo_persona: getPersonaTipo(row),
+    _nombre_completo: getNombreCompleto(row),
+    _banco_nombre: row.banco_nombre || getBancoNombre(row.banco, bancos),
+    _moneda_nombre: row.moneda_codigo || getMonedaNombre(row.moneda, monedas),
+    _estado_value: getEstadoValue(row),
+  })), [quickFilteredData, bancos, monedas])
 
-      if (sortField === 'moneda_nombre') {
-        av = a.moneda_codigo || getMonedaNombre(a.moneda, monedas)
-        bv = b.moneda_codigo || getMonedaNombre(b.moneda, monedas)
-      }
+  useEffect(() => {
+    setDisplayedRows(agRows)
+  }, [agRows])
 
-      if (sortField === 'naturaleza') {
-        const getTipoPersona = (r) => {
-          const nat = normalize(r.naturaleza)
-          const tipoDoc = normalize(r.tipo_documento)
-          const tipoRuc = normalize(r.tipo_ruc)
+  const agLocaleText = useMemo(() => ({
+    contains: 'Contiene',
+    notContains: 'No contiene',
+    equals: 'Igual',
+    notEqual: 'Distinto',
+    startsWith: 'Empieza con',
+    endsWith: 'Termina con',
+    blank: 'Vacío',
+    notBlank: 'No vacío',
+    filterOoo: 'Filtrar...',
+    applyFilter: 'Aplicar',
+    resetFilter: 'Restablecer',
+    clearFilter: 'Limpiar',
+    cancelFilter: 'Cancelar',
+    noRowsToShow: 'No se encontraron inversionistas',
+    loadingOoo: 'Cargando...',
+    selectAll: 'Seleccionar todo',
+    searchOoo: 'Buscar...',
+    blanks: 'Vacíos',
+    page: 'Página',
+    more: 'Más',
+    to: 'a',
+    of: 'de',
+    next: 'Siguiente',
+    last: 'Última',
+    first: 'Primera',
+    previous: 'Anterior',
+    pageSizeSelectorLabel: 'Filas',
+    ariaFilterInput: 'Entrada de filtro',
+  }), [])
 
-          if (
-            nat === 'pj' ||
-            nat.includes('jur') ||
-            tipoDoc === 'ruc' ||
-            tipoDoc === '2' ||
-            tipoRuc === 'pj' ||
-            tipoRuc.includes('jur')
-          ) {
-            return 'persona juridica'
-          }
+  const agDefaultColDef = useMemo(() => ({
+    sortable: true,
+    filter: true,
+    floatingFilter: true,
+    resizable: true,
+    minWidth: 90,
+    cellStyle: {
+      fontSize: comfortable ? '12px' : '10.5px',
+      color: 'var(--qf-navy)',
+      lineHeight: comfortable ? '22px' : '18px',
+    },
+    headerClass: 'qf-tareas-ag-header',
+    floatingFilterComponentParams: { suppressFilterButton: false },
+  }), [comfortable])
 
-          return 'persona natural'
-        }
-
-        av = getTipoPersona(a)
-        bv = getTipoPersona(b)
-      }
-
-      const an = Number(av)
-      const bn = Number(bv)
-      let cmp = 0
-
-      if (!Number.isNaN(an) && !Number.isNaN(bn) && String(av).trim() !== '' && String(bv).trim() !== '') {
-        cmp = an - bn
-      } else {
-        cmp = normalize(av).localeCompare(normalize(bv))
-      }
-
-      return sortDir === 'asc' ? cmp : -cmp
+  const getDisplayedRows = () => {
+    if (!gridApi) return agRows
+    const rows = []
+    gridApi.forEachNodeAfterFilterAndSort(node => {
+      if (node?.data) rows.push(node.data)
     })
-
     return rows
-  }, [data, sortField, sortDir, bancos, monedas])
-
-  const sortBy = (key) => {
-    if (sortField === key) setSortDir(prev => prev === 'asc' ? 'desc' : 'asc')
-    else {
-      setSortField(key)
-      setSortDir('asc')
-    }
   }
 
-  const sortIcon = (key) => sortField === key ? (sortDir === 'asc' ? '▲' : '▼') : '↕'
+  const refreshDisplayedRows = api => {
+    if (!api) return
+    const rows = []
+    api.forEachNodeAfterFilterAndSort(node => {
+      if (node?.data) rows.push(node.data)
+    })
+    setDisplayedRows(rows)
+  }
+
+  const limpiarFiltrosTabla = () => {
+    if (!gridApi) return
+    setQuickText('')
+    gridApi.setFilterModel(null)
+    gridApi.setGridOption?.('quickFilterText', '')
+    gridApi.applyColumnState({
+      defaultState: { sort: null },
+      state: [{ colId: 'id', sort: 'desc' }],
+    })
+    setTimeout(() => refreshDisplayedRows(gridApi), 60)
+  }
+
+  const saveCurrentView = name => {
+    if (!gridApi || !name.trim()) return
+    const view = {
+      id: Date.now(),
+      name: name.trim(),
+      quickText,
+      quickPreset,
+      pageSize,
+      groupBy,
+      showDashboard,
+      filterModel: gridApi.getFilterModel(),
+      columnState: gridApi.getColumnState(),
+      createdAt: new Date().toISOString(),
+    }
+    const next = [view, ...savedViews.filter(v => v.name !== view.name)].slice(0, 10)
+    setSavedViews(next)
+    localStorage.setItem(SAVED_VIEWS_KEY, JSON.stringify(next))
+    localStorage.setItem(GRID_VIEW_KEY, JSON.stringify(view))
+    setViewName('')
+  }
+
+  const applyView = view => {
+    if (!gridApi || !view) return
+    setQuickText(view.quickText || '')
+    setQuickPreset(view.quickPreset || 'all')
+    setGroupBy(view.groupBy || 'estado')
+    setShowDashboard(view.showDashboard ?? true)
+    setPageSize(Number(view.pageSize || 50))
+    setTimeout(() => {
+      gridApi.setFilterModel(view.filterModel || null)
+      if (view.columnState?.length) gridApi.applyColumnState({ state: view.columnState, applyOrder: true })
+      gridApi.setGridOption?.('quickFilterText', view.quickText || '')
+      refreshDisplayedRows(gridApi)
+    }, 60)
+  }
+
+  const deleteView = id => {
+    const next = savedViews.filter(v => v.id !== id)
+    setSavedViews(next)
+    localStorage.setItem(SAVED_VIEWS_KEY, JSON.stringify(next))
+  }
+
+  const resetGridView = () => {
+    if (!gridApi) return
+    setQuickText('')
+    setQuickPreset('all')
+    setGroupBy('estado')
+    setShowDashboard(true)
+    setPageSize(50)
+    gridApi.setFilterModel(null)
+    gridApi.resetColumnState()
+    gridApi.setGridOption?.('quickFilterText', '')
+    localStorage.removeItem(GRID_VIEW_KEY)
+    setTimeout(() => refreshDisplayedRows(gridApi), 60)
+  }
+
+  const exportCsv = () => {
+    const rows = getDisplayedRows()
+    const headers = ['Código', 'Documento', 'Número', 'Tipo Persona', 'Razón Social', 'Nombre', 'Email', 'Banco', 'Moneda', 'Cuenta', 'CCI', 'Estado']
+    const body = rows.map(r => [
+      r.codigo,
+      getTipoDocumentoLabel(r.tipo_documento),
+      r.numero_documento,
+      getPersonaTipo(r),
+      r.razon_social,
+      getNombreCompleto(r),
+      r.email,
+      r.banco_nombre || getBancoNombre(r.banco, bancos),
+      r.moneda_codigo || getMonedaNombre(r.moneda, monedas),
+      r.cuenta,
+      r.cci,
+      getEstadoValue(r),
+    ].map(csvEscape).join(';'))
+    downloadTextFile(`inversionistas_${new Date().toISOString().slice(0, 10)}.csv`, [headers.join(';'), ...body].join('\n'))
+  }
+
+  const exportExcel = () => {
+    exportInvestorHtmlTable(`inversionistas_${new Date().toISOString().slice(0, 10)}.xls`, getDisplayedRows(), bancos, monedas)
+  }
+
+  const exportPdf = () => {
+    printInvestorPdfReport(getDisplayedRows(), bancos, monedas, 'Reporte de Inversionistas QF')
+  }
+
+  const applyColumnPreset = preset => {
+    if (!gridApi) return
+    const allCols = ['codigo', '_documento_label', 'numero_documento', '_tipo_persona', 'razon_social', '_nombre_completo', 'email', '_banco_nombre', '_moneda_nombre', 'cuenta', '_estado_value', 'acciones']
+    const presets = {
+      gerencia: ['codigo', 'numero_documento', '_tipo_persona', 'razon_social', '_nombre_completo', '_banco_nombre', '_moneda_nombre', '_estado_value', 'acciones'],
+      operaciones: ['codigo', '_documento_label', 'numero_documento', 'razon_social', '_nombre_completo', '_banco_nombre', 'cuenta', '_estado_value', 'acciones'],
+      contacto: ['codigo', 'numero_documento', 'razon_social', '_nombre_completo', 'email', '_estado_value', 'acciones'],
+      completo: allCols,
+    }
+    const visible = presets[preset] || allCols
+    gridApi.setColumnsVisible(allCols, false)
+    gridApi.setColumnsVisible(visible, true)
+    setVisibleCols(Object.fromEntries(allCols.map(c => [c, visible.includes(c)])))
+  }
+
+  const toggleDashboard = () => {
+    setShowDashboard(v => {
+      localStorage.setItem(DASHBOARD_KEY, JSON.stringify(!v))
+      return !v
+    })
+  }
+
+  const toggleColumn = field => {
+    if (!gridApi) return
+    const current = visibleCols[field] !== false
+    gridApi.setColumnsVisible([field], !current)
+    setVisibleCols(prev => ({ ...prev, [field]: !current }))
+  }
+
+  const agColumnDefs = useMemo(() => [
+    {
+      headerName: 'Código',
+      field: 'codigo',
+      width: 110,
+      sort: 'desc',
+      cellRenderer: p => <code style={S.code}>{p.value || ''}</code>,
+      filter: 'agTextColumnFilter',
+    },
+    { headerName: 'Doc.', field: '_documento_label', width: 90, filter: 'agTextColumnFilter' },
+    { headerName: 'Número', field: 'numero_documento', width: 120, filter: 'agTextColumnFilter' },
+    { headerName: 'Tipo Persona', field: '_tipo_persona', width: 145, filter: 'agTextColumnFilter' },
+    { headerName: 'Razón Social', field: 'razon_social', flex: 1, minWidth: 190, filter: 'agTextColumnFilter' },
+    { headerName: 'Nombre', field: '_nombre_completo', width: 170, filter: 'agTextColumnFilter' },
+    { headerName: 'Email', field: 'email', width: 180, filter: 'agTextColumnFilter' },
+    { headerName: 'Banco', field: '_banco_nombre', width: 145, cellRenderer: p => <span style={S.pill}>{p.value || ''}</span>, filter: 'agTextColumnFilter' },
+    { headerName: 'M', field: '_moneda_nombre', width: 80, filter: 'agTextColumnFilter' },
+    { headerName: 'Cuenta', field: 'cuenta', width: 145, filter: 'agTextColumnFilter' },
+    { headerName: 'Estado', field: '_estado_value', width: 105, cellRenderer: p => <EstadoBadge value={p.value || 'Activo'} />, filter: 'agTextColumnFilter' },
+    {
+      headerName: 'Acc.',
+      field: 'acciones',
+      width: 115,
+      pinned: 'right',
+      sortable: false,
+      filter: false,
+      cellRenderer: p => (
+        <div style={S.actions}>
+          {canView && <button className="btn btn-secondary btn-sm" style={S.actionBtn} onClick={() => setDetail(p.data)}>Ver</button>}
+          {canEdit && <button className="btn btn-primary btn-sm" style={S.actionBtn} onClick={() => openEdit(p.data)}>Edit</button>}
+          {canDelete && <button className="btn btn-danger btn-sm" style={S.dangerBtn} onClick={() => deleteRow(p.data)}>Del</button>}
+        </div>
+      ),
+    },
+  ], [comfortable, canView, canEdit, canDelete, bancos, monedas])
+
+  const liveRows = displayedRows.length ? displayedRows : agRows
+  const groupSummary = useMemo(() => buildInvestorGroupSummary(liveRows, groupBy, bancos, monedas), [liveRows, groupBy, bancos, monedas])
+  const estadoSummary = useMemo(() => buildInvestorGroupSummary(liveRows, 'estado', bancos, monedas), [liveRows, bancos, monedas])
+  const tipoSummary = useMemo(() => buildInvestorGroupSummary(liveRows, 'naturaleza', bancos, monedas), [liveRows, bancos, monedas])
+  const bancoSummary = useMemo(() => buildInvestorGroupSummary(liveRows, 'banco', bancos, monedas), [liveRows, bancos, monedas])
 
   const openCreate = async () => {
     setError('')
@@ -837,6 +1137,96 @@ const ControlInversionistas = () => {
 
   return (
     <div style={S.page}>
+      <style>{`
+        .qf-tareas-grid .ag-root-wrapper {
+          border: 0;
+          border-top: 1px solid var(--qf-border);
+          font-family: Montserrat, Arial, sans-serif;
+        }
+        .qf-tareas-grid .ag-header {
+          background: var(--qf-navy);
+          color: #fff;
+          border-bottom: 0;
+        }
+        .qf-tareas-grid .ag-header-cell,
+        .qf-tareas-grid .ag-header-group-cell {
+          background: var(--qf-navy);
+          color: #fff;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: .2px;
+          border-right: 0;
+        }
+        .qf-tareas-grid .ag-header-cell-text {
+          color: #fff;
+          font-size: 8.5px;
+        }
+        .qf-tareas-grid .ag-header-cell {
+          padding-left: 2px;
+          padding-right: 2px;
+          line-height: 1;
+        }
+        .qf-tareas-grid .ag-icon,
+        .qf-tareas-grid .ag-header-icon {
+          color: #fff;
+          font-size: 15px;
+        }
+        .qf-tareas-grid .ag-floating-filter {
+          background: #f8fafc;
+          border-bottom: 1px solid var(--qf-border);
+          min-height: 10px;
+        }
+        .qf-tareas-grid .ag-floating-filter-body {
+          width: 100%;
+        }
+        .qf-tareas-grid .ag-floating-filter-input,
+        .qf-tareas-grid .ag-input-field-input {
+          min-height: 2px;
+          height: 6px;
+          padding: 0 2px;
+          font-size: 8px;
+          border-radius: 7px;
+          border: 1px solid #9fb2c8 !important;
+          background: #ffffff !important;
+          color: var(--qf-navy);
+          box-shadow: inset 0 0 0 1px rgba(24,95,165,.08);
+        }
+        .qf-tareas-grid .ag-floating-filter-button {
+          margin-left: 6px;
+        }
+        .qf-tareas-grid .ag-floating-filter-button-button {
+          min-width: 22px;
+          height: 22px;
+          width: 22px;
+          border-radius: 6px;
+          border: 1px solid #9fb2c8;
+          background: #e8eef5;
+        }
+        .qf-tareas-grid .ag-row {
+          border-bottom: 1px solid var(--qf-border);
+        }
+        .qf-tareas-grid .ag-row-hover {
+          background: #f8fafc;
+        }
+        .qf-tareas-grid .ag-paging-panel {
+          min-height: 24px;
+          font-size: 8px;
+          color: var(--qf-text-light);
+          border-top: 1px solid var(--qf-border);
+        }
+        .qf-tareas-grid .ag-cell {
+          display: flex;
+          align-items: center;
+          padding-top: 0 !important;
+          padding-bottom: 0 !important;
+          line-height: 1 !important;
+        }
+        .qf-tareas-grid .ag-icon-filter,
+        .qf-tareas-grid .ag-icon-search,
+        .qf-tareas-grid .ag-icon-calendar {
+          font-size: 14px;
+        }
+      `}</style>
       <PageHeader />
 
       <div style={S.actionBar}>
@@ -865,123 +1255,226 @@ const ControlInversionistas = () => {
             )}
           </div>
 
-          <div style={S.filters}>
-          <select
-            className="filter-input"
-            value={field}
-            onChange={e => {
-              setField(e.target.value)
-              setPage(1)
-            }}
-            style={S.select}
-          >
-            {SEARCH_FIELDS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
-          </select>
-
-          <div style={S.searchWrap}>
-            <span style={S.searchIcon}>🔍</span>
-            <input
+          <div style={S.pagination}>
+            <span style={S.resultPill}>{from}-{to} de {total}</span>
+            <span style={S.pageIndicator}>Filtra, ordena y pagina desde la tabla</span>
+            <button className="btn btn-secondary btn-sm" onClick={limpiarFiltrosTabla}>Limpiar filtros tabla</button>
+            <select
               className="filter-input"
-              value={q}
-              onChange={e => setQ(e.target.value)}
-              placeholder="Buscar inversionista..."
-              style={S.searchInput}
-            />
+              value={pageSize}
+              onChange={e => {
+                setPageSize(Number(e.target.value))
+                setPage(1)
+              }}
+              style={S.pageSize}
+            >
+              {[25, 50, 100, 200].map(n => <option key={n} value={n}>{n} filas</option>)}
+            </select>
           </div>
 
-          <button
-            className="btn btn-secondary btn-sm"
-            style={S.clearBtn}
-            onClick={() => {
-              setField('all')
-              setQ('')
-              setDebouncedQ('')
-              setPage(1)
-            }}
-          >
-            Limpiar
-          </button>
-        </div>
+          <div style={S.erpTools}>
+            <div style={S.erpGroup}>
+              <div style={S.searchWrap}>
+                <span style={S.searchIcon}>🔍</span>
+                <input
+                  className="filter-input"
+                  value={quickText}
+                  onChange={e => setQuickText(e.target.value)}
+                  placeholder="Búsqueda global..."
+                  style={S.searchInput}
+                />
+              </div>
+              <select className="filter-input" value={quickPreset} onChange={e => setQuickPreset(e.target.value)} style={S.erpSelect}>
+                <option value="all">Vista: Todos</option>
+                <option value="active">Activos</option>
+                <option value="inactive">Inactivos</option>
+                <option value="pn">Persona natural</option>
+                <option value="pj">Persona jurídica</option>
+                <option value="withBank">Con banco</option>
+                <option value="withoutBank">Sin banco</option>
+                <option value="soles">Soles</option>
+                <option value="dolares">Dólares</option>
+                <option value="gerencia">Vista Gerencia</option>
+                <option value="operaciones">Vista Operaciones</option>
+              </select>
+              <button className="btn btn-secondary btn-sm" onClick={exportCsv}>CSV</button>
+              <button className="btn btn-secondary btn-sm" onClick={exportExcel}>Excel</button>
+              <button className="btn btn-secondary btn-sm" onClick={exportPdf}>PDF</button>
+            </div>
 
-        <div style={S.pagination}>
-          <span style={S.resultPill}>{from}-{to} de {total}</span>
+            <div style={S.erpGroup}>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowSidePanel(v => !v)}>Panel</button>
+              <button className="btn btn-secondary btn-sm" onClick={toggleDashboard}>{showDashboard ? 'Ocultar BI' : 'Ver BI'}</button>
+              <select className="filter-input" value={groupBy} onChange={e => setGroupBy(e.target.value)} style={S.erpSelectSmall}>
+                <option value="estado">Agrupar: Estado</option>
+                <option value="naturaleza">Agrupar: Tipo Persona</option>
+                <option value="banco">Agrupar: Banco</option>
+                <option value="moneda">Agrupar: Moneda</option>
+                <option value="documento">Agrupar: Documento</option>
+              </select>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowColumnPanel(v => !v)}>Columnas</button>
+              <input
+                className="filter-input"
+                value={viewName}
+                onChange={e => setViewName(e.target.value)}
+                placeholder="Nombre de vista"
+                style={S.viewInput}
+              />
+              <button className="btn btn-primary btn-sm" onClick={() => saveCurrentView(viewName)}>Guardar vista</button>
+              <button className="btn btn-secondary btn-sm" onClick={resetGridView}>Reset</button>
+            </div>
+          </div>
 
-          <select
-            className="filter-input"
-            value={pageSize}
-            onChange={e => {
-              setPageSize(Number(e.target.value))
-              setPage(1)
-            }}
-            style={S.pageSize}
-          >
-            {[25, 50, 100, 200].map(n => <option key={n} value={n}>{n}</option>)}
-          </select>
+          {showColumnPanel && (
+            <div style={S.columnPanel}>
+              {[
+                ['codigo', 'Código'],
+                ['_documento_label', 'Doc.'],
+                ['numero_documento', 'Número'],
+                ['_tipo_persona', 'Tipo Persona'],
+                ['razon_social', 'Razón Social'],
+                ['_nombre_completo', 'Nombre'],
+                ['email', 'Email'],
+                ['_banco_nombre', 'Banco'],
+                ['_moneda_nombre', 'Moneda'],
+                ['cuenta', 'Cuenta'],
+                ['_estado_value', 'Estado'],
+                ['acciones', 'Acciones'],
+              ].map(([col, label]) => (
+                <label key={col} style={S.columnCheck}>
+                  <input type="checkbox" checked={visibleCols[col] !== false} onChange={() => toggleColumn(col)} />
+                  {label}
+                </label>
+              ))}
+            </div>
+          )}
 
-          <button className="btn btn-secondary btn-sm" disabled={page <= 1 || loading} onClick={() => setPage(1)}>«</button>
-          <button className="btn btn-secondary btn-sm" disabled={page <= 1 || loading} onClick={() => setPage(p => Math.max(1, p - 1))}>‹</button>
-          <span style={S.pageIndicator}>{page}/{totalPages}</span>
-          <button className="btn btn-secondary btn-sm" disabled={page >= totalPages || loading} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>›</button>
-          <button className="btn btn-secondary btn-sm" disabled={page >= totalPages || loading} onClick={() => setPage(totalPages)}>»</button>
-        </div>
+          {savedViews.length > 0 && (
+            <div style={S.savedViews}>
+              <span style={S.savedTitle}>Vistas guardadas:</span>
+              {savedViews.map(v => (
+                <span key={v.id} style={S.savedChip}>
+                  <button type="button" onClick={() => applyView(v)} style={S.savedBtn}>{v.name}</button>
+                  <button type="button" onClick={() => deleteView(v.id)} style={S.savedDel}>×</button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div style={S.smartTotals}>
+            <span><b>{liveRows.length}</b> filtrados</span>
+            <span><b>{liveRows.filter(r => normalize(getEstadoValue(r)) === 'activo').length}</b> activos</span>
+            <span><b>{liveRows.filter(r => normalize(getEstadoValue(r)) !== 'activo').length}</b> inactivos</span>
+            <span><b>{liveRows.filter(r => getPersonaTipo(r) === 'Persona Natural').length}</b> PN</span>
+            <span><b>{liveRows.filter(r => getPersonaTipo(r) === 'Persona Jurídica').length}</b> PJ</span>
+          </div>
+
+          {showSidePanel && (
+            <div style={S.sidePanel}>
+              <div style={S.sideSection}>
+                <div style={S.sideTitle}>Vistas rápidas</div>
+                <button className="btn btn-secondary btn-sm" onClick={() => { setQuickPreset('gerencia'); applyColumnPreset('gerencia') }}>Gerencia</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => { setQuickPreset('operaciones'); applyColumnPreset('operaciones') }}>Operaciones</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => { setQuickPreset('all'); applyColumnPreset('contacto') }}>Contacto</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => { setQuickPreset('all'); applyColumnPreset('completo') }}>Completo</button>
+              </div>
+              <div style={S.sideSection}>
+                <div style={S.sideTitle}>Exportación</div>
+                <button className="btn btn-secondary btn-sm" onClick={exportCsv}>CSV filtrado</button>
+                <button className="btn btn-secondary btn-sm" onClick={exportExcel}>Excel filtrado</button>
+                <button className="btn btn-secondary btn-sm" onClick={exportPdf}>PDF / imprimir</button>
+              </div>
+              <div style={S.sideSection}>
+                <div style={S.sideTitle}>Agrupación actual</div>
+                {groupSummary.slice(0, 6).map(g => (
+                  <div key={g.name} style={S.groupMini}><span>{g.name}</span><b>{g.count}</b></div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {showDashboard && (
+            <div style={S.dashboard}>
+              <div style={S.dashPanel}>
+                <div style={S.sideTitle}>Dashboard por estado</div>
+                {estadoSummary.slice(0, 5).map(g => (
+                  <div key={g.name} style={S.barRow}><span style={S.barLabel}>{g.name}</span><div style={S.barTrack}><div style={{ ...S.barFill, width: pct(g.count, liveRows.length) }} /></div><b style={S.barValue}>{g.count}</b></div>
+                ))}
+              </div>
+              <div style={S.dashPanel}>
+                <div style={S.sideTitle}>Tipo persona</div>
+                {tipoSummary.slice(0, 5).map(g => (
+                  <div key={g.name} style={S.barRow}><span style={S.barLabel}>{g.name}</span><div style={S.barTrack}><div style={{ ...S.barFill, width: pct(g.count, liveRows.length) }} /></div><b style={S.barValue}>{g.count}</b></div>
+                ))}
+              </div>
+              <div style={S.dashPanel}>
+                <div style={S.sideTitle}>Bancos</div>
+                {bancoSummary.slice(0, 5).map(g => (
+                  <div key={g.name} style={S.barRow}><span style={S.barLabel}>{g.name}</span><div style={S.barTrack}><div style={{ ...S.barFill, width: pct(g.count, liveRows.length) }} /></div><b style={S.barValue}>{g.count}</b></div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {error && <div style={S.error}>{error}</div>}
 
-        <div style={S.tableWrap}>
-          <table className="qf-table" style={{ ...S.table, fontSize: comfortable ? 12 : 10.5 }}>
-            <thead>
-              <tr>
-                <Th onClick={() => sortBy('codigo')}>Código {sortIcon('codigo')}</Th>
-                <Th onClick={() => sortBy('tipo_documento')}>Doc. {sortIcon('tipo_documento')}</Th>
-                <Th onClick={() => sortBy('numero_documento')}>Número {sortIcon('numero_documento')}</Th>
-                <Th onClick={() => sortBy('naturaleza')}>Tipo Persona {sortIcon('naturaleza')}</Th>
-                <Th onClick={() => sortBy('razon_social')}>Razón Social {sortIcon('razon_social')}</Th>
-                <Th onClick={() => sortBy('nombre')}>Nombre {sortIcon('nombre')}</Th>
-                <Th onClick={() => sortBy('email')}>Email {sortIcon('email')}</Th>
-                <Th onClick={() => sortBy('banco_nombre')}>Banco {sortIcon('banco_nombre')}</Th>
-                <Th onClick={() => sortBy('moneda_nombre')}>M {sortIcon('moneda_nombre')}</Th>
-                <Th onClick={() => sortBy('cuenta')}>Cuenta {sortIcon('cuenta')}</Th>
-                <Th onClick={() => sortBy('estado')}>Estado {sortIcon('estado')}</Th>
-                <th style={S.th}>Acciones</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {loading && (
-                <tr><td colSpan={12} style={S.empty}>Cargando...</td></tr>
-              )}
-
-              {!loading && sortedData.length === 0 && (
-                <tr><td colSpan={12} style={S.empty}>No hay registros para mostrar.</td></tr>
-              )}
-
-              {!loading && sortedData.map(row => (
-                <tr key={row.id || row.codigo} style={S.tr}>
-                  <td style={S.td}><code style={S.code}>{row.codigo}</code></td>
-                  <td style={S.td}>{getTipoDocumentoLabel(row.tipo_documento)}</td>
-                  <td style={S.td}>{row.numero_documento}</td>
-                  <td style={S.td}>{row.naturaleza === 'PN' ? 'Persona Natural' : row.naturaleza === 'PJ' ? 'Persona Jurídica' : (String(row.numero_documento || '').startsWith('20') ? 'Persona Jurídica' : getTipoDocumentoLabel(row.tipo_documento) === 'DNI' || getTipoDocumentoLabel(row.tipo_documento) === 'RUC' ? 'Persona Natural' : row.naturaleza)}</td>
-                  <td style={S.td}>{row.razon_social}</td>
-                  <td style={S.td}>{[row.nombre, row.apellido].filter(Boolean).join(' ')}</td>
-                  <td style={S.td}>{row.email}</td>
-                  <td style={S.td}>
-                    <span style={S.pill}>{row.banco_nombre || getBancoNombre(row.banco, bancos)}</span>
-                  </td>
-                  <td style={S.td}>{row.moneda_codigo || getMonedaNombre(row.moneda, monedas)}</td>
-                  <td style={{ ...S.td, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.cuenta}</td>
-                  <td style={S.td}><EstadoBadge value={row.estado || 'Activo'} /></td>
-                  <td style={S.td}>
-                    <div style={S.actions}>
-                      {canView && <button className="btn btn-secondary btn-sm" style={S.actionBtn} onClick={() => setDetail(row)}>Ver</button>}
-                      {canEdit && <button className="btn btn-primary btn-sm" style={S.actionBtn} onClick={() => openEdit(row)}>Edit</button>}
-                      {canDelete && <button className="btn btn-danger btn-sm" style={S.dangerBtn} onClick={() => deleteRow(row)}>Del</button>}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div
+          className="ag-theme-quartz qf-tareas-grid"
+          style={{
+            width: '100%',
+            height: comfortable ? 'calc(100vh - 390px)' : 'calc(100vh - 330px)',
+            minHeight: 310,
+            '--ag-font-size': comfortable ? '12px' : '10.5px',
+            '--ag-header-height': comfortable ? '35px' : '35px',
+            '--ag-row-height': comfortable ? '32px' : '25px',
+            '--ag-list-item-height': '22px',
+            '--ag-header-column-resize-handle-height': '60%',
+            '--ag-wrapper-border-radius': '0px',
+          }}
+        >
+          {loading && data.length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center' }}>Cargando...</div>
+          ) : (
+            <AgGridReact
+              rowData={agRows}
+              columnDefs={agColumnDefs}
+              headerHeight={35}
+              floatingFiltersHeight={30}
+              rowHeight={comfortable ? 32 : 25}
+              defaultColDef={agDefaultColDef}
+              pagination
+              paginationPageSize={pageSize}
+              paginationPageSizeSelector={[25, 50, 100, 200]}
+              localeText={agLocaleText}
+              onGridReady={params => {
+                setGridApi(params.api)
+                gridColumnApiRef.current = params.columnApi
+                setVisibleCols(Object.fromEntries(params.api.getColumns().map(c => [c.getColId(), c.isVisible()])))
+                const lastView = safeJsonParse(localStorage.getItem(GRID_VIEW_KEY), null)
+                setTimeout(() => {
+                  if (lastView) {
+                    setQuickText(lastView.quickText || '')
+                    setQuickPreset(lastView.quickPreset || 'all')
+                    setGroupBy(lastView.groupBy || 'estado')
+                    setShowDashboard(lastView.showDashboard ?? true)
+                    setPageSize(Number(lastView.pageSize || 50))
+                    params.api.setFilterModel(lastView.filterModel || null)
+                    if (lastView.columnState?.length) params.api.applyColumnState({ state: lastView.columnState, applyOrder: true })
+                    params.api.setGridOption?.('quickFilterText', lastView.quickText || '')
+                  }
+                  refreshDisplayedRows(params.api)
+                }, 80)
+              }}
+              quickFilterText={quickText}
+              animateRows
+              suppressCellFocus
+              onFilterChanged={params => refreshDisplayedRows(params.api)}
+              onSortChanged={params => refreshDisplayedRows(params.api)}
+              onColumnVisible={params => setVisibleCols(Object.fromEntries(params.api.getColumns().map(c => [c.getColId(), c.isVisible()])))}
+              overlayNoRowsTemplate="<span style='padding:10px;color:#64748b;font-size:12px;'>No se encontraron inversionistas</span>"
+            />
+          )}
         </div>
 
         <div style={S.footer}>Registros cargados en página: {data.length}</div>
@@ -1356,6 +1849,31 @@ const S = {
   cardTitle: { margin: 0, fontSize: 16, fontFamily: 'Montserrat', color: 'var(--qf-navy)' },
   cardSub: { display: 'none' },
   newBtn: { display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' },
+
+  erpTools: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap', padding: '3px 10px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
+  erpGroup: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  erpSelect: { minWidth: 150, height: 24, fontSize: 9.5, padding: '0 22px 0 8px' },
+  erpSelectSmall: { minWidth: 130, height: 24, fontSize: 9.5, padding: '0 20px 0 7px' },
+  viewInput: { width: 140, height: 24, fontSize: 10 },
+  columnPanel: { display: 'flex', gap: 8, flexWrap: 'wrap', padding: '6px 14px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
+  columnCheck: { fontSize: 10.5, color: 'var(--qf-navy)', display: 'inline-flex', alignItems: 'center', gap: 4, background: '#fff', border: '1px solid var(--qf-border)', borderRadius: 999, padding: '3px 8px' },
+  savedViews: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '5px 14px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
+  savedTitle: { fontSize: 10, color: 'var(--qf-text-light)', fontWeight: 700 },
+  savedChip: { display: 'inline-flex', alignItems: 'center', border: '1px solid #9fb2c8', borderRadius: 999, overflow: 'hidden', background: '#e8eef5' },
+  savedBtn: { border: 0, background: 'transparent', padding: '3px 7px', cursor: 'pointer', fontSize: 10.5, color: 'var(--qf-navy)', fontWeight: 700 },
+  savedDel: { border: 0, background: '#dbe7f3', padding: '3px 6px', cursor: 'pointer', fontSize: 11, color: '#c62828', fontWeight: 900 },
+  smartTotals: { display: 'flex', gap: 8, flexWrap: 'wrap', padding: '3px 10px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)', color: 'var(--qf-text-light)', fontSize: 10.5 },
+  sidePanel: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 8, padding: '8px 10px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
+  sideSection: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 8 },
+  sideTitle: { width: '100%', fontSize: 9.5, fontWeight: 800, color: 'var(--qf-navy)', textTransform: 'uppercase', letterSpacing: 0.3 },
+  groupMini: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, minWidth: 120, background: '#fff', border: '1px solid var(--qf-border)', borderRadius: 999, padding: '2px 8px', fontSize: 10, color: 'var(--qf-navy)' },
+  dashboard: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8, padding: '8px 10px', background: '#fff', borderTop: '1px solid var(--qf-border)' },
+  dashPanel: { background: '#f8fafc', border: '1px solid var(--qf-border)', borderRadius: 8, padding: 8 },
+  barRow: { display: 'grid', gridTemplateColumns: '80px 1fr 28px', alignItems: 'center', gap: 6, marginTop: 5 },
+  barLabel: { fontSize: 9.5, color: 'var(--qf-text-light)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  barTrack: { height: 6, background: '#e8eef5', borderRadius: 999, overflow: 'hidden' },
+  barFill: { height: '100%', background: '#185FA5', borderRadius: 999 },
+  barValue: { fontSize: 10, color: 'var(--qf-navy)', textAlign: 'right' },
 
   filters: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '0 14px 6px', margin: 0 },
   select: { width: 'auto', minWidth: 170, height: 32, fontSize: 12, padding: '0 28px 0 10px' },
