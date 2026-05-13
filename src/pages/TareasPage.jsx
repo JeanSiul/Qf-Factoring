@@ -1003,6 +1003,7 @@ const TareasPage = () => {
             '--ag-list-item-height': '14px',
             '--ag-header-column-resize-handle-height': '60%',
             '--ag-wrapper-border-radius': '0px',
+            '--ag-grid-size': '3px'
           }}
         >
           {loading && data.length === 0 ? (
