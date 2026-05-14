@@ -81,11 +81,13 @@ const Sidebar = ({ mobileOpen, onClose }) => {
   const navigate = useNavigate()
   const location = useLocation()
   const [expanded, setExpanded] = useState({
-    '🔐': true,
-    '🔔': false,
-    '📦': false,
-    '💼': false,
-    '🏢': false,
+      '🔐': true,
+      '🔔': false,
+      '📦': false,
+      '💼': false,
+      '💰': false,
+      '🏛️': false,
+      '🏢': false,
   })
 
   const handleNav = (path) => {
