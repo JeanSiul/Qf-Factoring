@@ -47,6 +47,12 @@ const menuItems = [
     ]
   },
   {
+  icon: '💰', label: 'Finanzas', path: null,
+  children: [
+      { icon: '📊', label: 'Consulta RO', path: '/finanzas/ro', claim: 'FINRO' },
+    ]
+  },
+  {
     icon: '🏢', label: 'Gerencia', path: null,
     children: [
       { icon: '📊', label: 'Dashboard Ejecutivo', path: '/gerencia/GerenciaBI', claim: 'GERBI' },
