@@ -29,7 +29,9 @@ import RiesgoBI from './pages/gerencia/RiesgoBI'
 import Operaciones3D from './pages/gerencia/Operaciones3D'
 import PowerBIGerencias from './pages/gerencia/PowerBIGerencias'
 import GerenciaPowerBIReplica from './pages/gerencia/GerenciaPowerBIReplica'
+import FinanzasROPage from './pages/finanzas/FinanzasROPage'
 import PowerBIEmbeddedGerencia from './pages/gerencia/PowerBIEmbeddedGerencia'
+
 import TareasPage from './pages/TareasPage'
 
 const PrivateRoute = ({ children }) => {
@@ -78,6 +80,7 @@ const App = () => (
           <Route path="/operaciones/devoluciones" element={<DevolucionesPage />} />
           <Route path="/operaciones/inversionistas" element={<ControlInversionistas />} />
           <Route path="/operaciones/dashboard-bi" element={<DashboardOperacionesBI />} />
+          <Route path="/finanzas/ro" element={<FinanzasROPage />} />
           <Route path="/gerencia/GerenciaBI" element={<GerenciaBI />} />
           <Route path="/gerencia/facturacion" element={<FacturacionBI />} />
           <Route path="/gerencia/cobranza" element={<CobranzaBI />} />
