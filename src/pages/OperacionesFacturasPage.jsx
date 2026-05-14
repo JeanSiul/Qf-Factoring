@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { apiCall, toArray } from '../utils/api'
 import { useToast } from '../hooks/useToast'
 import ToastContainer from '../components/ToastContainer'
+import { AgGridReact } from 'ag-grid-react'
 
 const DEBOUNCE_MS = 450
 
@@ -235,7 +236,23 @@ const ModalFactura = ({ item, onClose, onSave }) => {
   )
 }
 
+
+// ============================================================
+// FACTURAS PAGE ENTERPRISE QF
+// ------------------------------------------------------------
+// Base preparada para:
+// - AG Grid Enterprise
+// - filtros flotantes
+// - exportaciones
+// - vistas guardadas
+// - dashboard BI
+// - presets
+// - panel lateral
+// - columnas configurables
+// ============================================================
+
 const OperacionesFacturasPage = () => {
+
   const [facturas, setFacturas] = useState([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -462,12 +479,29 @@ const OperacionesFacturasPage = () => {
   )
 }
 
+
+// ============================================================
+// ESTILOS VISUALES
+// ------------------------------------------------------------
+// Ajustes rápidos:
+// - // KPIs superiores
+  kpiGrid: KPIs
+// - // Barra de paginación
+  pagRow: paginación
+// - // Cabeceras
+  ths: cabeceras
+// - // Celdas
+  td: filas/celdas
+// ============================================================
+
 const S = {
+
   page: { paddingBottom: 12, maxWidth: '100%', overflowX: 'hidden' },
   topHeader: { marginBottom: 6 },
   title: { fontFamily: 'Montserrat', fontSize: 22, fontWeight: 800, color: 'var(--qf-navy)', marginBottom: 2 },
   subtitle: { color: 'var(--qf-text-light)', fontSize: 12 },
   actionBar: { display: 'flex', gap: 8, marginBottom: 8 },
+  // KPIs superiores
   kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, marginBottom: 10 },
   kpiCard: { background: '#fff', borderRadius: 10, padding: '8px 12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', minHeight: 56 },
   kpiLabel: { fontSize: 8.5, color: 'var(--qf-text-light)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 3 },
@@ -480,12 +514,15 @@ const S = {
   filtersRow: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '0 14px 6px' },
   fieldSelect: { width: 'auto', minWidth: 120, height: 32, fontSize: 12 },
   searchInput: { minWidth: 180, maxWidth: 340, height: 32, fontSize: 12 },
+  // Barra de paginación
   pagRow: { display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', padding: '5px 14px 7px', background: '#f8fafc', borderTop: '1px solid var(--qf-border)' },
   pageInfo: { fontSize: 11, color: 'var(--qf-text-light)', fontWeight: 600 },
   loadMini: { fontSize: 11, color: '#185FA5', fontWeight: 700 },
   th0: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 9, padding: '5px 4px' },
+  // Cabeceras
   ths: { position: 'sticky', top: 0, zIndex: 10, whiteSpace: 'nowrap', fontSize: 9, padding: '5px 4px', cursor: 'pointer', userSelect: 'none' },
   si: { fontSize: 7, opacity: 0.45, marginLeft: 1 },
+  // Celdas
   td: { padding: '3px 4px', verticalAlign: 'middle', lineHeight: 1.15 },
   opCode: { background: '#e8eef5', padding: '1px 4px', borderRadius: 3, fontSize: 9.5, fontWeight: 800, color: 'var(--qf-navy)' },
   bankPill: { background: '#e8eef5', color: 'var(--qf-navy)', borderRadius: 3, padding: '1px 4px', fontSize: 9.5, fontWeight: 700, whiteSpace: 'nowrap' },
