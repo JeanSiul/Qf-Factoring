@@ -35,7 +35,7 @@ const menuItems = [
     ]
   },
   {
-  icon: '🏛️', label: 'Administración', path: null,
+  icon: '🏗️', label: 'Administración', path: null,
     children: [
       { icon: '💳', label: 'Cobranzas - Consulta', path: '/admin/cobranzas/consulta', claim: 'COBABI' },
     ]
@@ -87,7 +87,7 @@ const Sidebar = ({ mobileOpen, onClose }) => {
       '💼': false,
       '💰': false,
       '🏛️': false,
-      '🏢': false,
+      '🏗️': false,
   })
 
   const handleNav = (path) => {
