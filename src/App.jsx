@@ -29,7 +29,7 @@ import RiesgoBI from './pages/gerencia/RiesgoBI'
 import Operaciones3D from './pages/gerencia/Operaciones3D'
 import PowerBIGerencias from './pages/gerencia/PowerBIGerencias'
 import GerenciaPowerBIReplica from './pages/gerencia/GerenciaPowerBIReplica'
-import FinanzasROPage from './pages/finanzas/FinanzasROPage'
+import FinanzasROPage from './pages/Finanzas/FinanzasROPage'
 import PowerBIEmbeddedGerencia from './pages/gerencia/PowerBIEmbeddedGerencia'
 
 import TareasPage from './pages/TareasPage'
