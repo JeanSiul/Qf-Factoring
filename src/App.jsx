@@ -31,6 +31,7 @@ import PowerBIGerencias from './pages/gerencia/PowerBIGerencias'
 import GerenciaPowerBIReplica from './pages/gerencia/GerenciaPowerBIReplica'
 import FinanzasROPage from './pages/Finanzas/FinanzasROPage'
 import PowerBIEmbeddedGerencia from './pages/gerencia/PowerBIEmbeddedGerencia'
+import CobranzasConsultaPage from './pages/Administracion/Cobranzas/CobranzasConsultaPage'
 
 import TareasPage from './pages/TareasPage'
 
@@ -91,6 +92,7 @@ const App = () => (
           <Route path="/gerencia/powerbi-react" element={<GerenciaPowerBIReplica />} />
           <Route path="/gerencia/powerbi-embedded" element={<PowerBIEmbeddedGerencia />} />
           <Route path="/tareas" element={<TareasPage />} />
+          <Route path="/admin/cobranzas/consulta" element={<CobranzasConsultaPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
