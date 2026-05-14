@@ -808,15 +808,6 @@ const OperacionesFacturasPage = () => {
 
             <span style={S.pill}>{from}-{to} de {total}</span>
 
-            <select className="filter-input" value={campo} onChange={e => setCampo(e.target.value)} style={S.erpSelectSmall}>
-              {camposBusqueda.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-
-            <div style={S.erpSearchWrap}>
-              <span style={S.erpSearchIcon}>🔍</span>
-              <input className="filter-input" placeholder={campo === 'all' ? 'Buscar...' : `Buscar por ${camposBusqueda.find(f => f.value === campo)?.label || ''}...`} value={busqueda} onChange={e => setBusqueda(e.target.value)} style={S.erpSearch} />
-            </div>
-
             <div style={S.erpSearchWrap}>
               <span style={S.erpSearchIcon}>🔎</span>
               <input className="filter-input" value={quickText} onChange={e => setQuickText(e.target.value)} placeholder="Búsqueda global..." style={S.erpSearch} />
@@ -838,7 +829,6 @@ const OperacionesFacturasPage = () => {
               <option value="auditoria">Vista Auditoría</option>
             </select>
 
-            <button className="btn btn-secondary btn-sm" onClick={limpiar}>Limpiar</button>
             <button className="btn btn-secondary btn-sm" onClick={limpiarFiltrosTabla}>Limpiar tabla</button>
             <button className="btn btn-secondary btn-sm" onClick={resetGridView} style={S.resetInlineBtn}>Reset</button>
 
