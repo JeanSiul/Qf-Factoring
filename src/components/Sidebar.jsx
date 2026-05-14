@@ -35,6 +35,12 @@ const menuItems = [
     ]
   },
   {
+  icon: '🏛️', label: 'Administración', path: null,
+    children: [
+      { icon: '💳', label: 'Cobranzas - Consulta', path: '/admin/cobranzas/consulta', claim: 'COBABI' },
+    ]
+  },
+  {
     icon: '💼', label: 'Operaciones', path: null,
     children: [
       { icon: '📊', label: 'Dashboard', path: '/operaciones/dashboard', claim: 'OPELIS' },
