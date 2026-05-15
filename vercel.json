@@ -29,6 +29,22 @@
       "destination": "https://lissa-unfloatable-seditiously.ngrok-free.dev/webhook/:path*"
     },
     {
+      "source": "/api/webhook/qf/auth/login",
+      "destination": "https://lissa-unfloatable-seditiously.ngrok-free.dev/webhook/qf/auth/login"
+    },
+    {
+      "source": "/api/webhook/qf/auth/refresh",
+      "destination": "https://lissa-unfloatable-seditiously.ngrok-free.dev/webhook/qf/auth/refresh"
+    },
+    {
+      "source": "/api/webhook/qf/auth/logout",
+      "destination": "https://lissa-unfloatable-seditiously.ngrok-free.dev/webhook/qf/auth/logout"
+    },
+    {
+      "source": "/api/webhook/qf/seguridad/mi-menu",
+      "destination": "https://lissa-unfloatable-seditiously.ngrok-free.dev/webhook/qf/seguridad/mi-menu"
+    }
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
