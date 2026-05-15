@@ -45,6 +45,10 @@
       "destination": "https://lissa-unfloatable-seditiously.ngrok-free.dev/webhook/qf/seguridad/mi-menu"
     }
     {
+      "source": "/api/webhook/qf/v2/:path*",
+      "destination": "https://lissa-unfloatable-seditiously.ngrok-free.dev/webhook/qf/v2/:path*"
+    }
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
